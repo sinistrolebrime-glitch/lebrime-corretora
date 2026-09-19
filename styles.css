@@ -70,8 +70,8 @@ button{font:inherit}
 .hero-card-footer{display:flex;gap:9px;flex-wrap:wrap;margin-top:28px}
 .hero-card-footer span{border:1px solid #45433e;padding:6px 10px;font-size:11px;border-radius:30px;color:#e8dfca}
 .floating-card{position:absolute;background:#fffaf1;border:1px solid #d9c29a;padding:13px 18px;box-shadow:0 14px 36px rgba(30,25,16,.15);z-index:4;font-size:13px;font-weight:700;color:#1a1814;border-radius:3px;white-space:nowrap}
-.floating-one{top:92px;right:2px}
-.floating-two{bottom:92px;left:2px}
+.floating-one{top:110px;left:calc(50% + 150px);right:auto}
+.floating-two{bottom:110px;right:calc(50% + 145px);left:auto}
 .section{padding:105px 0;background:#f4eee4}
 .products{background:#eadfcf}
 #diferenciais{background:#f7f1e7}
