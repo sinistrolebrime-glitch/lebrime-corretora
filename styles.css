@@ -70,8 +70,8 @@ button{font:inherit}
 .hero-card-footer{display:flex;gap:9px;flex-wrap:wrap;margin-top:28px}
 .hero-card-footer span{border:1px solid #45433e;padding:6px 10px;font-size:11px;border-radius:30px;color:#e8dfca}
 .floating-card{position:absolute;background:#fffaf1;border:1px solid #d9c29a;padding:13px 18px;box-shadow:0 14px 36px rgba(30,25,16,.15);z-index:4;font-size:13px;font-weight:700;color:#1a1814;border-radius:3px;white-space:nowrap}
-.floating-one{top:48px;right:-62px}
-.floating-two{bottom:48px;left:-68px}
+.floating-one{top:58px;right:-22px}
+.floating-two{bottom:72px;left:-22px}
 .section{padding:105px 0;background:#f4eee4}
 .products{background:#eadfcf}
 #diferenciais{background:#f7f1e7}
@@ -148,7 +148,7 @@ footer h4{color:#e5d5ad;font-size:13px;text-transform:uppercase;letter-spacing:.
   .nav-links{position:absolute;top:84px;left:0;right:0;background:#fbf9f4;border-bottom:1px solid var(--line);padding:22px;display:none;flex-direction:column;align-items:stretch}
   .nav-links.open{display:flex}.menu-toggle{display:block}
   .hero-grid{grid-template-columns:1fr;min-height:auto}.hero-copy{text-align:center}.hero-copy>p{margin-left:auto;margin-right:auto}.hero-actions,.hero-trust{justify-content:center}.hero-visual{height:480px}
-  .floating-one{right:-48px}.floating-two{left:-54px}
+  .floating-one{right:-16px}.floating-two{left:-16px}
   .product-grid{grid-template-columns:repeat(2,1fr)}
   .feature-grid{grid-template-columns:repeat(2,1fr)}
   .faq-grid,.contact-grid{grid-template-columns:1fr;gap:48px}.faq-intro{position:static}
