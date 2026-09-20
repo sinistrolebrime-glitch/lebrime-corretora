@@ -14,7 +14,7 @@
   --shadow:0 24px 70px rgba(35,27,12,.16);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth}\n#inicio,#seguros,#diferenciais,#duvidas,#contato{scroll-margin-top:120px}
 body{margin:0;font-family:'DM Sans',Arial,sans-serif;color:var(--ink);background:var(--cream);line-height:1.6}
 a{text-decoration:none;color:inherit}
 button{font:inherit}
