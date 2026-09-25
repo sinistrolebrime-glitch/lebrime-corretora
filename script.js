@@ -15,11 +15,41 @@ const products = {
 
 const menuToggle = document.querySelector('.menu-toggle');
 const nav = document.querySelector('.nav-links');
+function closeMenu(){
+  nav?.classList.remove('open');
+  menuToggle?.setAttribute('aria-expanded','false');
+}
 menuToggle?.addEventListener('click',()=>{
+  if(!nav) return;
   const open = nav.classList.toggle('open');
   menuToggle.setAttribute('aria-expanded',String(open));
 });
-nav?.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));
+nav?.querySelectorAll('a').forEach(a=>a.addEventListener('click',closeMenu));
+
+function scrollToSection(target){
+  const header = document.querySelector('.header');
+  const offset = (header?.getBoundingClientRect().height ?? 0) + 12;
+  const top = window.scrollY + target.getBoundingClientRect().top - offset;
+  window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
+}
+document.querySelectorAll('a[href^="#"]').forEach(link=>{
+  link.addEventListener('click',event=>{
+    const hash = link.getAttribute('href');
+    if(!hash || hash.length < 2) return;
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    if(!target) return;
+    event.preventDefault();
+    closeMenu();
+    if(window.location.hash !== hash) history.pushState(null,'',hash);
+    scrollToSection(target);
+  });
+});
+window.addEventListener('popstate',()=>{
+  const id = decodeURIComponent(window.location.hash.slice(1));
+  const target = id ? document.getElementById(id) : null;
+  if(target) scrollToSection(target);
+  else window.scrollTo({top:0,behavior:'smooth'});
+});
 
 const modal = document.getElementById('productModal');
 const title = document.getElementById('modalTitle');
