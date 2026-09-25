@@ -64,10 +64,6 @@ button{font:inherit}
 .glow-two{width:260px;height:260px;background:#f6ead1;left:-80px;bottom:-80px}
 .hero-card{background:linear-gradient(180deg,#171614 0%,#0f0f0e 100%);color:#fff;box-shadow:0 30px 72px rgba(20,17,10,.24)}
 .main-card{position:relative;z-index:2;width:min(400px,88%);padding:42px;border-radius:8px;overflow:visible}
-.floating-card{position:absolute;z-index:4;display:inline-flex;align-items:center;gap:10px;min-height:54px;padding:10px 15px;background:#fffaf2;color:#1c1914;border:1px solid rgba(184,138,47,.48);border-radius:6px;box-shadow:0 14px 32px rgba(0,0,0,.22);font-size:13px;font-weight:700;letter-spacing:.01em;white-space:nowrap;pointer-events:none}
-.floating-card-mark{display:grid;place-items:center;width:30px;height:30px;flex:0 0 auto;background:linear-gradient(135deg,#d6b46b,#b88a2f);color:#161410;border-radius:50%;font-size:14px}
-.floating-auto{top:12px;right:-24px}
-.floating-guarantee{bottom:12px;left:-30px}
 .main-card>span{font-size:12px;letter-spacing:.24em;color:#d4bd87}
 .main-card h3{font-family:'Playfair Display',serif;font-size:34px;line-height:1.12;margin:15px 0 18px}
 .main-card p{color:#c9c6bd;font-size:14px}
@@ -159,8 +155,4 @@ footer h4{color:#e5d5ad;font-size:13px;text-transform:uppercase;letter-spacing:.
   .feature-grid{grid-template-columns:1fr}.faq-intro h2,.contact-section h2{font-size:40px}.contact-card{padding:10px 20px}.contact-card div{flex-direction:column;gap:5px}.contact-card strong{text-align:left}
   .footer-grid{grid-template-columns:1fr}.footer-bottom{flex-direction:column}.whatsapp-float{right:14px;bottom:14px}
   .modal-panel{padding:38px 25px}.modal-panel h2{font-size:35px}
-  .floating-card{min-height:44px;padding:8px 11px;font-size:12px;gap:8px}
-  .floating-card-mark{width:26px;height:26px}
-  .floating-auto{top:-14px;right:-18px}
-  .floating-guarantee{bottom:-18px;left:-18px}
 }
