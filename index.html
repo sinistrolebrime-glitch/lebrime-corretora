@@ -62,15 +62,21 @@
       <section id="importView" class="view hidden">
         <div class="panel">
           <h2>Documentos</h2>
-          <p class="muted">Envie PDF, JPG ou PNG para manter o arquivo vinculado ao cliente. Para esta publicação inicial, a conferência dos dados do documento continua manual.</p>
+          <p class="muted">Anexe o arquivo ao cliente e, quando for documento de seguro, vincule diretamente à proposta ou apólice correspondente. Assim o PDF ficará disponível dentro da ficha do cliente e do contrato.</p>
           <form id="uploadForm" class="form-grid">
             <label>Cliente<select id="uploadClient" required></select></label>
+            <label>Proposta / apólice
+              <select id="uploadInsurance">
+                <option value="">Documento geral do cliente</option>
+              </select>
+            </label>
             <label>Tipo do documento
               <select id="uploadType">
                 <option>Apólice</option><option>Proposta</option><option>Endosso</option><option>Sinistro</option><option>Outros</option>
               </select>
             </label>
-            <label class="span-2">Arquivo<input id="uploadFile" type="file" accept=".pdf,.jpg,.jpeg,.png" required></label>
+            <label>Arquivo<input id="uploadFile" type="file" accept=".pdf,.jpg,.jpeg,.png" required></label>
+            <div id="uploadLinkHint" class="upload-link-hint span-2">Selecione uma proposta ou apólice para deixar o arquivo vinculado diretamente ao seguro.</div>
             <label class="span-2">Observações<textarea id="uploadNotes" rows="3"></textarea></label>
             <div class="span-2"><button class="btn primary" type="submit">Enviar documento</button></div>
           </form>
