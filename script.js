@@ -52,6 +52,14 @@ const primaryInsuranceDocument=insurance=>{
     ||docs[0]
     ||null;
 };
+
+const isInsuranceActive=insurance=>{
+  const status=fold(insurance?.data?.status||'');
+  if(['cancelada','cancelado','recusada','recusado','convertida','convertido','perdida','perdido'].includes(status))return false;
+  return !insurance?.data?.end||insurance.data.end>=today();
+};
+
+const activeInsuranceRows=()=>[...list('proposal'),...list('policy')].filter(isInsuranceActive);
 const insuranceLabel=insurance=>{
   const type=insurance.kind==='policy'?'Apólice':'Proposta';
   return `${type} ${insurance.data.number||'sem número'} · ${insurance.data.insurer||'—'} · ${insurance.data.branch||'—'}`;
@@ -305,11 +313,11 @@ function navigate(view){
 }
 
 function renderDashboard(){
-  const activePolicies=list('policy').filter(r=>r.data.status!=='Cancelada');
+  const activeInsurances=activeInsuranceRows();
   const payments=list('payment');
   const open=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
   const overdue=open.filter(r=>r.data.due&&r.data.due<today());
-  const renew60=activePolicies.filter(r=>{
+  const renew60=activeInsurances.filter(r=>{
     if(!r.data.end)return false;
     const d=(new Date(r.data.end+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000;
     return d>=0&&d<=60;
@@ -321,7 +329,7 @@ function renderDashboard(){
   $('#dashboard').innerHTML=`
     <div class="cards">
       ${metric('Clientes',list('client').length,'Cadastro único por CPF/CNPJ')}
-      ${metric('Apólices ativas',activePolicies.length,'Carteira vigente')}
+      ${metric('Propostas e apólices ativas',activeInsurances.length,'Carteira vigente')}
       ${metric('Parcelas em aberto',open.length,money(open.reduce((s,r)=>s+Number(r.data.amount||0),0)))}
       ${metric('Atrasadas',overdue.length,money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0)))}
       ${metric('Renovam em 60 dias',renew60.length,'Acompanhamento prioritário')}
@@ -331,7 +339,7 @@ function renderDashboard(){
       <div class="panel">
         <div class="panel-head"><h2>Próximas renovações</h2><button class="link-btn" data-go="renewal">Abrir central</button></div>
         ${miniTable(renew60.sort((a,b)=>String(a.data.end).localeCompare(String(b.data.end))).slice(0,8),[
-          ['Cliente',r=>nameById(r.data.clientId)],['Apólice',r=>r.data.number],['Ramo',r=>r.data.branch],['Fim',r=>date(r.data.end)]
+          ['Cliente',r=>nameById(r.data.clientId)],['Contrato',r=>r.data.number],['Ramo',r=>r.data.branch],['Fim',r=>date(r.data.end)]
         ])}
       </div>
       <div class="panel">
@@ -844,8 +852,8 @@ function openClientDetail(clientId){
   const docs=clientRelatedDocuments(clientId);
   const storedDocs=docs.filter(doc=>doc.data.storageKey);
   const pendingDocs=docs.filter(doc=>!doc.data.storageKey);
-  const activePolicies=insurances.filter(r=>r.kind==='policy'&&r.data.status!=='Cancelada'&&(!r.data.end||r.data.end>=today()));
-  const totalPremium=activePolicies.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
+  const activeInsurances=insurances.filter(isInsuranceActive);
+  const totalPremium=activeInsurances.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
 
   const insuranceHtml=insurances.length?insurances.map(r=>{
     const doc=primaryInsuranceDocument(r);
@@ -900,7 +908,7 @@ function openClientDetail(clientId){
   $('#clientDetailTitle').textContent=d.name||'Cliente';
   $('#clientDetailBody').innerHTML=`
     <div class="client-kpis">
-      <div><span>Apólices ativas</span><strong>${activePolicies.length}</strong></div>
+      <div><span>Propostas e apólices ativas</span><strong>${activeInsurances.length}</strong></div>
       <div><span>Propostas e apólices</span><strong>${insurances.length}</strong></div>
       <div><span>Arquivos disponíveis</span><strong>${storedDocs.length}</strong></div>
       <div><span>Arquivos pendentes</span><strong>${pendingDocs.length}</strong></div>
