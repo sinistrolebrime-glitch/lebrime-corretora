@@ -398,7 +398,7 @@ dialog{
 .producer-portfolio-list{display:flex;flex-direction:column;gap:8px}
 .producer-insurance-row{
   display:grid;
-  grid-template-columns:minmax(170px,1.5fr) repeat(7,minmax(100px,1fr));
+  grid-template-columns:minmax(170px,1.5fr) repeat(8,minmax(100px,1fr));
   gap:10px;
   align-items:start;
   padding:13px 14px;
