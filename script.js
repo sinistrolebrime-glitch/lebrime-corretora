@@ -256,7 +256,7 @@ function renderDashboard(){
       ${metric('Parcelas em aberto',open.length,money(open.reduce((s,r)=>s+Number(r.data.amount||0),0)))}
       ${metric('Atrasadas',overdue.length,money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0)))}
       ${metric('Renovam em 60 dias',renew60.length,'Acompanhamento prioritário')}
-      ${metric('Lucro de comissão',money(received-paid),'Recebida − repasse pago')}
+      ${metric('Lucro de comissão',money(received-paid),'Recebida − comissão paga ao produtor')}
     </div>
     <div class="dashboard-grid">
       <div class="panel">
@@ -366,8 +366,6 @@ const config={
     ],
     fields:[
       ['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['producerId','Produtor','ref','producer'],
-      ['netPremium','Prêmio líquido','money'],['commissionPercent','% comissão','number'],['expected','Comissão bruta','money'],
-      ['producerExpected','Comissão prevista do produtor','money'],['lebrimeFee','Taxa Lebrime','money'],
       ['received','Comissão recebida','money'],['due','Vencimento','date'],['receivedDate','Data recebimento','date'],
       ['transferPaid','Comissão paga ao produtor','money'],['transferDate','Data do pagamento ao produtor','date'],['notes','Observações','textarea']
     ]
