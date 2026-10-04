@@ -82,3 +82,41 @@ Quando uma proposta for criada automaticamente a partir dos arquivos de retorno 
 - os metadados de origem da Porto devem ser preservados para auditoria.
 
 Essa regra vale somente para propostas importadas diretamente da Porto sem produtor informado.
+
+
+## Integração Porto — fluxo operacional simplificado
+
+A integração da Porto deve funcionar como fonte automática de dados e auditoria, e não como uma carteira paralela.
+
+### Fluxo principal
+- Os arquivos recebidos da Porto são preservados no storage para auditoria.
+- O processamento tenta identificar cliente e contrato de forma segura.
+- Quando existe vínculo único e confiável, a informação é aplicada diretamente no módulo de negócio correspondente.
+- Quando não existe vínculo seguro, o sistema não cria valores, clientes, parcelas, comissões ou contratos por suposição. Em vez disso, cria uma **Pendência de Integração Porto**.
+
+### Destino por tipo de arquivo
+- **XPP / XPI** → Propostas e Apólices.
+- **APP / API / IRE / SRE** → Propostas e Apólices / emissão.
+- **SAP / CBS** → Central de Parcelas.
+- **COM** → Comissões.
+- **SI2** → Pendências / Sinistros.
+
+### Exceções
+- Arquivos sem vínculo único geram uma pendência operacional clara, com origem, tipo de arquivo e destino esperado.
+- A tela **Integrações** é somente administrativa: status da conexão, sincronização, quantidade de arquivos, exceções e auditoria.
+- Não existe uma tela operacional separada de “Retornos Porto”.
+- Arquivos em exceção devem ser reavaliados nas sincronizações/processamentos seguintes e a pendência deve ser concluída quando o vínculo for resolvido.
+
+### Produtor em propostas Porto
+- Se a Porto não informar o produtor, o sistema mantém o produtor em branco.
+- A proposta recebe o indicador **Produtor pendente**.
+- É criada uma pendência específica para seleção manual do produtor.
+- A comissão não deve ser calculada sem produtor e percentual válidos.
+- Ao definir o produtor manualmente e salvar a proposta, a pendência correspondente é concluída.
+
+### Regras de segurança
+- Nunca inventar produtor.
+- Nunca duplicar cliente ou contrato quando já houver correspondência segura.
+- Nunca aplicar valor financeiro sem vínculo seguro.
+- Endosso não deve virar novo contrato.
+- O arquivo original da Porto deve permanecer preservado para auditoria.
