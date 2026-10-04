@@ -13,14 +13,16 @@ const menu=[
   ['renewal','Renovações'],
   ['task','Pendências'],
   ['document','Documentos'],
-  ['imports','Arquivos']
+  ['imports','Arquivos'],
+  ['integrations','Integrações']
 ];
 
 const NAV_GROUPS=[
   ['Executivo',['overview']],
   ['Carteira',['client','producer','insurance','renewal']],
   ['Financeiro',['payment','commission']],
-  ['Operação',['task','document','imports']]
+  ['Operação',['task','document','imports']],
+  ['Integrações',['integrations']]
 ];
 
 const PAGE_CONTEXT={
@@ -33,7 +35,8 @@ const PAGE_CONTEXT={
   renewal:'Agenda comercial e acompanhamento das próximas renovações.',
   task:'Pendências operacionais e próximos passos da equipe.',
   document:'Biblioteca documental vinculada à carteira.',
-  imports:'Entrada e vinculação de documentos aos contratos.'
+  imports:'Entrada e vinculação de documentos aos contratos.',
+  integrations:'Conectores oficiais com seguradoras e trilha de sincronização.'
 };
 
 const NEW_LABELS={
@@ -370,9 +373,10 @@ function renderNav(){
 function navigate(view){
   current=view;editing=null;renderNav();
   $('#dashboard').classList.toggle('hidden',view!=='overview');
-  $('#listView').classList.toggle('hidden',view==='overview'||view==='imports');
+  $('#listView').classList.toggle('hidden',view==='overview'||view==='imports'||view==='integrations');
   $('#importView').classList.toggle('hidden',view!=='imports');
-  $('#newBtn').classList.toggle('hidden',['overview','imports','commission','renewal'].includes(view));
+  $('#integrationView').classList.toggle('hidden',view!=='integrations');
+  $('#newBtn').classList.toggle('hidden',['overview','imports','integrations','commission','renewal'].includes(view));
   $('#newBtn').textContent=NEW_LABELS[view]||'+ Novo';
   $('#searchInput').value='';
   $('#searchInput').placeholder=SEARCH_LABELS[view]||'Pesquisar...';
@@ -381,7 +385,116 @@ function navigate(view){
   if($('#pageContext'))$('#pageContext').textContent=PAGE_CONTEXT[view]||'';
   if(view==='overview')renderDashboard();
   else if(view==='imports')renderImportClients();
+  else if(view==='integrations')renderIntegrations();
   else renderList();
+}
+
+
+const integrationDateTime=value=>{
+  if(!value)return '—';
+  try{return new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(new Date(value));}
+  catch{return String(value);}
+};
+
+async function renderIntegrations(){
+  const root=$('#integrationView');
+  if(!root)return;
+  root.innerHTML=`
+    <div class="integration-heading">
+      <div>
+        <span class="section-kicker">Conectores oficiais</span>
+        <h2>Integrações com seguradoras</h2>
+        <p>Sincronização rastreável, sem expor credenciais no navegador.</p>
+      </div>
+    </div>
+    <div class="integration-grid">
+      <article class="panel integration-card">
+        <div class="integration-card-head">
+          <div>
+            <span class="integration-provider">PORTO</span>
+            <h3>Arquivo de Retorno</h3>
+            <p>Webservice SOAP 1.1 · propostas, emissões, comissões, cobrança e sinistros.</p>
+          </div>
+          <span class="status-pill corporate-status neutral">Consultando...</span>
+        </div>
+      </article>
+      <article class="panel integration-card">
+        <div class="integration-card-head">
+          <div>
+            <span class="integration-provider">ALLIANZ</span>
+            <h3>DataTransfer</h3>
+            <p>Envios diários configurados por e-mail. O conector será ativado após a chegada dos primeiros arquivos.</p>
+          </div>
+          <span class="status-pill corporate-status warning">Aguardando arquivos</span>
+        </div>
+      </article>
+    </div>`;
+  try{
+    const status=await api('integration-status',{provider:'porto'});
+    const porto=root.querySelector('.integration-card');
+    const ready=Boolean(status.configured);
+    const recent=Array.isArray(status.recentFiles)?status.recentFiles:[];
+    const last=status.lastSync||null;
+    porto.innerHTML=`
+      <div class="integration-card-head">
+        <div>
+          <span class="integration-provider">PORTO</span>
+          <h3>Arquivo de Retorno</h3>
+          <p>Webservice SOAP 1.1 oficial da Porto, executado somente no backend.</p>
+        </div>
+        <span class="status-pill corporate-status ${ready?'success':'warning'}">${ready?'Pronto para sincronizar':'Credenciais pendentes'}</span>
+      </div>
+      <div class="integration-kpis">
+        <div><span>Última sincronização</span><strong>${integrationDateTime(last?.finishedAt||last?.startedAt)}</strong></div>
+        <div><span>Arquivos armazenados</span><strong>${Number(status.totalFiles||0)}</strong></div>
+        <div><span>Últimos 7 dias</span><strong>${Number(status.recentCount||0)}</strong></div>
+        <div><span>Erros no último ciclo</span><strong>${Number(last?.errors||0)}</strong></div>
+      </div>
+      <div class="integration-actions">
+        <button id="portoSyncBtn" class="btn primary" type="button" ${ready?'':'disabled'}>Sincronizar agora</button>
+        <span class="muted">${ready
+          ?'Consulta até 7 dias, baixa somente arquivos novos e mantém histórico.'
+          :'Código implantado. Cadastre PORTO_SUSEP, PORTO_LOGIN e PORTO_PASSWORD nos segredos do Supabase para ativar.'}</span>
+      </div>
+      <div id="portoSyncStatus" class="status"></div>
+      <div class="integration-files">
+        <div class="integration-section-title">
+          <strong>Arquivos recentes</strong>
+          <span class="muted">Originais preservados para auditoria</span>
+        </div>
+        ${recent.length?recent.map(f=>`
+          <div class="integration-file-row">
+            <div><strong>${esc(f.name||'Arquivo Porto')}</strong><span>${esc(f.product||'—')} · ${esc(f.fileType||'—')}</span></div>
+            <div><span>${integrationDateTime(f.generatedAt)}</span><span class="status-pill corporate-status ${f.status==='Erro'?'danger':'info'}">${esc(f.status||'Baixado')}</span></div>
+          </div>`).join(''):'<div class="empty-state compact">Nenhum arquivo sincronizado ainda.</div>'}
+      </div>`;
+    const btn=$('#portoSyncBtn');
+    if(btn)btn.onclick=syncPortoNow;
+  }catch(e){
+    const porto=root.querySelector('.integration-card');
+    if(porto)porto.innerHTML=`
+      <div class="integration-card-head">
+        <div><span class="integration-provider">PORTO</span><h3>Arquivo de Retorno</h3><p>Não foi possível consultar o status do conector.</p></div>
+        <span class="status-pill corporate-status danger">Erro</span>
+      </div>
+      <div class="error-text">${esc(e.message||e)}</div>`;
+  }
+}
+
+async function syncPortoNow(){
+  const btn=$('#portoSyncBtn');
+  const status=$('#portoSyncStatus');
+  if(btn){btn.disabled=true;btn.textContent='Sincronizando...';}
+  if(status)status.textContent='Consultando a Porto e baixando somente arquivos ainda não processados...';
+  try{
+    const result=await api('porto-sync',{days:7});
+    if(status)status.textContent=`Sincronização concluída: ${result.found||0} encontrado(s), ${result.downloaded||0} novo(s), ${result.skipped||0} já existente(s), ${result.errors||0} erro(s).`;
+    await loadRecords();
+    await renderIntegrations();
+  }catch(e){
+    if(status)status.textContent=e.message||String(e);
+    if(btn){btn.disabled=false;btn.textContent='Sincronizar agora';}
+  }
 }
 
 function renderDashboard(){
