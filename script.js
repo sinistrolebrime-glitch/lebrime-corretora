@@ -1,5 +1,6 @@
 const API='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-api';
 const TOKEN_KEY='lebrime_token_v1';
+const THEME_KEY='lebrime_theme_v1';
 const CUTOFF='2026-10';
 
 const menu=[
@@ -66,6 +67,28 @@ let uploadPrefill={clientId:'',insuranceId:''};
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+const currentTheme=()=>document.documentElement.dataset.theme==='dark'?'dark':'light';
+function syncThemeControl(){
+  const btn=$('#themeToggle');
+  const label=$('#themeToggleText');
+  if(!btn||!label)return;
+  const theme=currentTheme();
+  label.textContent=theme==='dark'?'Escuro':'Claro';
+  btn.setAttribute('aria-pressed',theme==='dark'?'true':'false');
+  btn.setAttribute('title',theme==='dark'?'Mudar para modo claro':'Mudar para modo escuro');
+}
+function applyTheme(theme,{persist=true}={}){
+  const next=theme==='dark'?'dark':'light';
+  document.documentElement.dataset.theme=next;
+  document.documentElement.style.colorScheme=next;
+  if(persist)localStorage.setItem(THEME_KEY,next);
+  syncThemeControl();
+}
+function toggleTheme(){
+  applyTheme(currentTheme()==='dark'?'light':'dark');
+}
+
 const token=()=>localStorage.getItem(TOKEN_KEY)||'';
 const uuid=()=>crypto.randomUUID();
 const now=()=>new Date().toISOString();
@@ -1214,6 +1237,7 @@ $('#loginForm').onsubmit=async e=>{
   try{await login($('#loginPassword').value)}catch(err){$('#loginError').textContent=err.message}
 };
 $('#logoutBtn').onclick=logout;
+$('#themeToggle').onclick=toggleTheme;
 $('#newBtn').onclick=()=>openEditor();
 $('#closeClientDetail').onclick=()=>$('#clientDialog').close();
 $('#clientUploadBtn').onclick=openClientUpload;
@@ -1230,4 +1254,9 @@ $('#uploadType').onchange=syncUploadType;
 $('#uploadFile').onchange=syncUploadType;
 $('#uploadForm').onsubmit=uploadDocument;
 
+syncThemeControl();
+if(!localStorage.getItem(THEME_KEY)&&window.matchMedia){
+  const systemTheme=window.matchMedia('(prefers-color-scheme: dark)');
+  systemTheme.addEventListener?.('change',e=>applyTheme(e.matches?'dark':'light',{persist:false}));
+}
 boot();
