@@ -15,7 +15,7 @@ const menu=[
   ['imports','Arquivos']
 ];
 
-const brokerages=['Lebrime','FF Apolinário','Homeni Corretora'];
+const brokerages=['Lebrime','FF Apolinário','Homeni Corretora','Eólica Corretora'];
 const insurers=['Porto','Allianz','Zurich','HDI','Tokio Marine','Yelum','MAPFRE','Bradesco','Suhai','Ezze','Sura','Berkley','Fator','Akad','Aliro','Avla','Potencial','Aruana','Chubb','Junto'];
 const branches=['Automóvel','Frota','Residencial','Empresarial','Multirrisco','Acidentes Pessoais','Vida','Seguro Garantia','Responsabilidade Civil','RC Profissional','RC Obras','RC Empregador','Fiança Locatícia','Transporte','Riscos Nomeados e Operacionais','Riscos de Engenharia','Equipamentos','Condomínio','Cyber','D&O','E&O','Riscos Diversos','Outros'];
 
@@ -62,7 +62,7 @@ const BUSINESS_RULES={
   lebrimePercent:40,
   ffPercent:30,
   fullCommissionProducer:'Leandro',
-  ffBrokerageMatchers:['ff apolinario','homeni'],
+  ffBrokerageMatchers:['ff apolinario','homeni','eolica'],
   migrationCutoff:CUTOFF
 };
 
@@ -213,7 +213,7 @@ function commissionReconcileOps(){
     const imported=Boolean(importedDoc);
 
     const ffRule=ffPercent
-      ?'Corretora FF Apolinário/Homeni: Taxa FF = 30% da comissão bruta e é suportada pela Lebrime.'
+      ?'Corretora FF Apolinário/Homeni/Eólica: Taxa FF = 30% da comissão bruta e é suportada pela Lebrime.'
       :'Corretora Lebrime: sem Taxa FF.';
     const producerRule=isLeandro(producerId)
       ?(ffPercent
@@ -756,8 +756,8 @@ function openProducerDetail(producerId){
   const totalLebrimeNet=insurances.reduce((sum,r)=>sum+lebrimeNetOf(r),0);
   const special=isLeandro(producerId);
   const rule=special
-    ?'LEANDRO: nas operações Lebrime recebe 100% da comissão bruta. Em FF Apolinário/Homeni, recebe 70% e a Taxa FF fica com 30%. Taxa Lebrime = 0%.'
-    :'Produtor recebe 60% da comissão bruta. Taxa Lebrime = 40%. Em FF Apolinário/Homeni, a Taxa FF de 30% é descontada da parte da Lebrime, restando 10% líquido para a Lebrime.';
+    ?'LEANDRO: nas operações Lebrime recebe 100% da comissão bruta. Em FF Apolinário/Homeni/Eólica, recebe 70% e a Taxa FF fica com 30%. Taxa Lebrime = 0%.'
+    :'Produtor recebe 60% da comissão bruta. Taxa Lebrime = 40%. Em FF Apolinário/Homeni/Eólica, a Taxa FF de 30% é descontada da parte da Lebrime, restando 10% líquido para a Lebrime.';
 
   const rows=insurances.length?insurances.map(r=>`
     <div class="producer-insurance-row">
