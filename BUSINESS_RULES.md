@@ -10,6 +10,8 @@
 - Sem anotação confiável, o sistema não deve inventar produtor nem percentual.
 - Toda proposta/apólice deve registrar a operação como `Seguro novo` ou `Renovação` quando essa informação estiver disponível no documento.
 - A operação deve ficar visível na carteira, na ficha do cliente e na ficha do produtor.
+- O padrão de entrada/importação do sistema é proposta.
+- Indicadores de carteira ativa devem considerar propostas e apólices vigentes, excluindo registros cancelados, recusados, convertidos ou perdidos.
 
 ## Comissão
 Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da proposta/apólice**.
