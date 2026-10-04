@@ -777,8 +777,22 @@ const config={
     fields:[['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['insuredItemId','Item segurado','ref','insuredItem'],['name','Cobertura','text'],['limit','Limite','money'],['deductible','Franquia','text'],['status','Status','select',['Ativa','Excluída']],['notes','Observações','textarea']]
   },
   task:{
-    title:'Pendência',columns:[['Título',r=>r.data.title],['Cliente',r=>nameById(r.data.clientId)],['Responsável',r=>r.data.responsible],['Prazo',r=>date(r.data.due)],['Status',r=>r.data.status]],
-    fields:[['title','Título','text'],['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['responsible','Responsável','text'],['due','Prazo','date'],['status','Status','select',['Aberta','Em andamento','Concluída']],['notes','Observações','textarea']]
+    title:'Pendência',
+    columns:[
+      ['Título',r=>r.data.title],
+      ['Cliente',r=>nameById(r.data.clientId)],
+      ['Origem',r=>r.data.source||'Manual'],
+      ['Destino',r=>r.data.destination||'—'],
+      ['Responsável',r=>r.data.responsible],
+      ['Prazo',r=>date(r.data.due)],
+      ['Status',r=>r.data.status]
+    ],
+    fields:[
+      ['title','Título','text'],['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],
+      ['responsible','Responsável','text'],['due','Prazo','date'],
+      ['status','Status','select',['Pendente','Aberta','Em andamento','Concluída']],
+      ['notes','Observações','textarea']
+    ]
   },
   document:{
     title:'Documento',columns:[['Cliente',r=>nameById(r.data.clientId)],['Nome',r=>r.data.name],['Tipo',r=>r.data.documentType],['Data',r=>date(r.data.referenceDate)],['Status',r=>r.data.status],['Arquivo',r=>r.data.storageKey?'Disponível':'—']],
@@ -1049,7 +1063,7 @@ function validateBeforeSave(data){
 async function saveCurrent(e){
   e.preventDefault();
   const entered=formData();
-  const data=current==='insurance'&&editing?{...(editing.data||{}),...entered}:entered;
+  const data=editing?{...(editing.data||{}),...entered}:entered;
   const err=validateBeforeSave(data);if(err){$('#editorError').textContent=err;return;}
   const id=editing?.id||uuid();const stamp=now();
   const recordKind=current==='insurance'?(editing?.kind||data._kind||'proposal'):current;
