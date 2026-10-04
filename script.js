@@ -14,8 +14,7 @@ const menu=[
   ['task','Pendências'],
   ['document','Documentos'],
   ['imports','Arquivos'],
-  ['integrations','Integrações'],
-  ['porto_returns','Retornos Porto']
+  ['integrations','Integrações']
 ];
 
 const NAV_GROUPS=[
@@ -23,7 +22,7 @@ const NAV_GROUPS=[
   ['Carteira',['client','producer','insurance','renewal']],
   ['Financeiro',['payment','commission']],
   ['Operação',['task','document','imports']],
-  ['Integrações',['integrations','porto_returns']]
+  ['Integrações',['integrations']]
 ];
 
 const PAGE_CONTEXT={
@@ -37,8 +36,7 @@ const PAGE_CONTEXT={
   task:'Pendências operacionais e próximos passos da equipe.',
   document:'Biblioteca documental vinculada à carteira.',
   imports:'Entrada e vinculação de documentos aos contratos.',
-  integrations:'Conectores oficiais com seguradoras e trilha de sincronização.',
-  porto_returns:'Fila operacional dos arquivos recebidos automaticamente da Porto.'
+  integrations:'Conectores oficiais com seguradoras e trilha de sincronização.'
 };
 
 const NEW_LABELS={
@@ -58,8 +56,7 @@ const SEARCH_LABELS={
   commission:'Pesquisar comissão, cliente, produtor...',
   renewal:'Pesquisar renovação...',
   task:'Pesquisar pendência...',
-  document:'Pesquisar documento...',
-  porto_returns:'Pesquisar arquivo, tipo, produto ou destino...'
+  document:'Pesquisar documento...'
 };
 
 const brokerages=['Lebrime','FF Apolinário','Homeni Corretora','Eólica Corretora'];
@@ -384,7 +381,7 @@ function navigate(view){
   $('#listView').classList.toggle('hidden',view==='overview'||view==='imports'||view==='integrations');
   $('#importView').classList.toggle('hidden',view!=='imports');
   $('#integrationView').classList.toggle('hidden',view!=='integrations');
-  $('#newBtn').classList.toggle('hidden',['overview','imports','integrations','porto_returns','commission','renewal'].includes(view));
+  $('#newBtn').classList.toggle('hidden',['overview','imports','integrations','commission','renewal'].includes(view));
   $('#newBtn').textContent=NEW_LABELS[view]||'+ Novo';
   $('#searchInput').value='';
   $('#searchInput').placeholder=SEARCH_LABELS[view]||'Pesquisar...';
@@ -397,32 +394,6 @@ function navigate(view){
   else renderList();
 }
 
-
-const portoReturnDestination=r=>{
-  const type=String(r?.data?.fileType||'').toUpperCase();
-  const event=fold(r?.data?.eventType||'');
-  if(['APP','API','IRE','SRE','XPP','XPI','VID','VIP','VDN','PVD','PVG','PVP'].includes(type)||event.includes('emissao')||event.includes('proposta'))return 'Propostas e Apólices';
-  if(['SAP','CBS'].includes(type)||event.includes('cobranca'))return 'Central de parcelas';
-  if(type==='COM'||event.includes('comissao'))return 'Comissões';
-  if(type==='SI2'||event.includes('sinistro'))return 'Pendências / Sinistros';
-  return 'Integrações';
-};
-const portoReturnView=r=>{
-  const d=portoReturnDestination(r);
-  if(d==='Propostas e Apólices')return 'insurance';
-  if(d==='Central de parcelas')return 'payment';
-  if(d==='Comissões')return 'commission';
-  if(d==='Pendências / Sinistros')return 'task';
-  return 'integrations';
-};
-const portoReturnLinkStatus=r=>{
-  const linked=Array.isArray(r?.data?.linkedInsuranceIds)?r.data.linkedInsuranceIds:[];
-  return linked.length?'Vinculado':'Aguardando vínculo';
-};
-const portoReturnOperationalStatus=r=>{
-  if(portoReturnLinkStatus(r)==='Vinculado')return 'Disponível no módulo';
-  return 'Na fila operacional';
-};
 
 const integrationDateTime=value=>{
   if(!value)return '—';
@@ -438,7 +409,7 @@ async function renderIntegrations(){
       <div>
         <span class="section-kicker">Conectores oficiais</span>
         <h2>Integrações com seguradoras</h2>
-        <p>Sincronização rastreável, sem expor credenciais no navegador.</p>
+        <p>Área técnica de conexão e auditoria. A operação entra automaticamente nos módulos da carteira; exceções vão para Pendências.</p>
       </div>
     </div>
     <div class="integration-grid">
@@ -480,17 +451,15 @@ async function renderIntegrations(){
       </div>
       <div class="integration-kpis">
         <div><span>Última sincronização</span><strong>${integrationDateTime(last?.finishedAt||last?.startedAt)}</strong></div>
-        <div><span>Arquivos armazenados</span><strong>${Number(status.totalFiles||0)}</strong></div>
-        <div><span>Arquivos processados</span><strong>${Number(status.processedCount||0)}</strong></div>
-        <div><span>Pendentes de processamento</span><strong>${Number(status.pendingCount||0)}</strong></div>
+        <div><span>Arquivos recebidos</span><strong>${Number(status.totalFiles||0)}</strong></div>
+        <div><span>Exceções para tratar</span><strong>${Number(status.exceptionCount||0)}</strong></div>
         <div><span>Últimos 7 dias</span><strong>${Number(status.recentCount||0)}</strong></div>
         <div><span>Erros no último ciclo</span><strong>${Number(last?.errors||0)}</strong></div>
       </div>
       <div class="integration-actions">
         <button id="portoSyncBtn" class="btn primary" type="button" ${ready?'':'disabled'}>Sincronizar agora</button>
-        <button id="portoProcessBtn" class="btn ghost" type="button">Processar arquivos</button>
         <span class="muted">${ready
-          ?'Baixa arquivos novos e processa automaticamente vínculos seguros com a carteira.'
+          ?'A sincronização aplica automaticamente os retornos com vínculo seguro. O que não puder ser identificado vai para Pendências.'
           :'Código implantado. Cadastre PORTO_SUSEP, PORTO_LOGIN e PORTO_PASSWORD nos segredos do Supabase para ativar.'}</span>
       </div>
       <div id="portoSyncStatus" class="status"></div>
@@ -501,14 +470,12 @@ async function renderIntegrations(){
         </div>
         ${recent.length?recent.map(f=>`
           <div class="integration-file-row">
-            <div><strong>${esc(f.name||'Arquivo Porto')}</strong><span>${esc(f.product||'—')} · ${esc(f.fileType||'—')}</span><span>${esc(f.parserStatus||'Aguardando processamento')}</span></div>
-            <div><span>${integrationDateTime(f.generatedAt)}</span><span class="status-pill corporate-status ${f.status==='Erro'?'danger':(f.status==='Processado'?'success':'info')}">${esc(f.status||'Baixado')}</span></div>
+            <div><strong>${esc(f.name||'Arquivo Porto')}</strong><span>${esc(f.product||'—')} · ${esc(f.fileType||'—')}</span></div>
+            <div><span>${integrationDateTime(f.generatedAt)}</span><span class="status-pill corporate-status ${f.status==='Erro'?'danger':'success'}">${f.status==='Erro'?'Erro':'Recebido'}</span></div>
           </div>`).join(''):'<div class="empty-state compact">Nenhum arquivo sincronizado ainda.</div>'}
       </div>`;
     const btn=$('#portoSyncBtn');
     if(btn)btn.onclick=syncPortoNow;
-    const processBtn=$('#portoProcessBtn');
-    if(processBtn)processBtn.onclick=processPortoNow;
   }catch(e){
     const porto=root.querySelector('.integration-card');
     if(porto)porto.innerHTML=`
@@ -528,7 +495,7 @@ async function syncPortoNow(){
   try{
     const result=await api('porto-sync',{days:7});
     const p=result.processor||{};
-    if(status)status.textContent=`Sincronização concluída: ${result.found||0} encontrado(s), ${result.downloaded||0} novo(s), ${result.skipped||0} já existente(s), ${result.errors||0} erro(s). Processamento: ${p.processed||0} arquivo(s), ${p.linked||0} vinculado(s), ${p.staged||0} em staging.`;
+    if(status)status.textContent=`Sincronização concluída: ${result.downloaded||0} novo(s), ${p.linked||0} aplicado(s) automaticamente e ${p.staged||0} exceção(ões) encaminhada(s) para Pendências.`;
     await loadRecords();
     await renderIntegrations();
   }catch(e){
@@ -537,22 +504,6 @@ async function syncPortoNow(){
   }
 }
 
-
-async function processPortoNow(){
-  const btn=$('#portoProcessBtn');
-  const status=$('#portoSyncStatus');
-  if(btn){btn.disabled=true;btn.textContent='Processando...';}
-  if(status)status.textContent='Lendo os arquivos da Porto e vinculando somente dados com correspondência segura...';
-  try{
-    const result=await api('porto-process',{});
-    if(status)status.textContent=`Processamento concluído: ${result.processed||0} arquivo(s), ${result.linked||0} vinculado(s), ${result.staged||0} em staging, ${result.createdClients||0} cliente(s), ${result.createdProposals||0} proposta(s) e ${result.createdPolicies||0} apólice(s) criados.`;
-    await loadRecords();
-    await renderIntegrations();
-  }catch(e){
-    if(status)status.textContent=e.message||String(e);
-    if(btn){btn.disabled=false;btn.textContent='Processar arquivos';}
-  }
-}
 
 function renderDashboard(){
   const activeInsurances=activeInsuranceRows();
@@ -790,19 +741,6 @@ const config={
       ['transferPaid','Comissão paga ao produtor','money'],['transferDate','Data do pagamento ao produtor','date'],['notes','Observações','textarea']
     ]
   },
-  porto_returns:{
-    title:'Retorno Porto',
-    columns:[
-      ['Arquivo',r=>r.data.fileName||'—'],
-      ['Tipo',r=>r.data.fileType||'—'],
-      ['Produto',r=>String(r.data.product||'—').replace(/_/g,' ')],
-      ['Destino',r=>portoReturnDestination(r)],
-      ['Gerado em',r=>integrationDateTime(r.data.generatedAt)],
-      ['Vínculo',r=>portoReturnLinkStatus(r)],
-      ['Situação',r=>portoReturnOperationalStatus(r)]
-    ],
-    fields:[]
-  },
   renewal:{
     title:'Renovação',
     columns:[
@@ -936,14 +874,12 @@ function renderList(){
 
   if(current==='insurance')rows=[...list('proposal'),...list('policy')];
   else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
-  else if(current==='porto_returns')rows=[...list('integration_event')].filter(r=>fold(r.data.provider||'')==='porto');
   else rows=[...list(current)];
 
   const q=norm($('#searchInput').value);
   if(q)rows=rows.filter(r=>norm(JSON.stringify(r.data)+' '+nameById(r.data.clientId)+' '+nameById(r.data.producerId)).includes(q));
 
   if(current==='payment')rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
-  if(current==='porto_returns')rows.sort((a,b)=>String(b.data.generatedAt||'').localeCompare(String(a.data.generatedAt||'')));
   if(current==='insurance')rows.sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
   if(current==='commission')rows.sort((a,b)=>String(nameById(a.data.producerId)).localeCompare(String(nameById(b.data.producerId)),'pt-BR'));
   if(current==='renewal')rows.sort((a,b)=>{
@@ -953,16 +889,6 @@ function renderList(){
 
   $('#listMeta').textContent=`${rows.length} registro(s)`;
   if(current==='payment')$('#filters').innerHTML=paymentSummary(rows);
-  else if(current==='porto_returns'){
-    const total=rows.length;
-    const waiting=rows.filter(r=>portoReturnLinkStatus(r)!=='Vinculado').length;
-    const app=rows.filter(r=>String(r.data.fileType||'').toUpperCase()==='APP').length;
-    const sap=rows.filter(r=>String(r.data.fileType||'').toUpperCase()==='SAP').length;
-    const si2=rows.filter(r=>String(r.data.fileType||'').toUpperCase()==='SI2').length;
-    const ire=rows.filter(r=>String(r.data.fileType||'').toUpperCase()==='IRE').length;
-    const com=rows.filter(r=>String(r.data.fileType||'').toUpperCase()==='COM').length;
-    $('#filters').innerHTML=`<span class="chip">Total: ${total}</span><span class="chip danger">Aguardando vínculo: ${waiting}</span><span class="chip">APP: ${app}</span><span class="chip">SAP: ${sap}</span><span class="chip">SI2: ${si2}</span><span class="chip">IRE: ${ire}</span><span class="chip">COM: ${com}</span>`;
-  }
   else if(current==='commission')$('#filters').innerHTML=commissionSummary(rows);
   else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
   else if(current==='insurance'){
@@ -982,10 +908,6 @@ function renderList(){
       if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
         return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
       }
-      if(current==='porto_returns'&&['Vínculo','Situação'].includes(label)){
-        const tone=value==='Vinculado'||value==='Disponível no módulo'?'success':'warning';
-        return `<td><span class="status-pill corporate-status ${tone}">${esc(value)}</span></td>`;
-      }
       if(['Status','Cobrança','Operação','Origem'].includes(label)){
         const tone=statusTone(value);
         return `<td><span class="status-pill corporate-status ${tone}">${esc(value)}</span></td>`;
@@ -1003,9 +925,7 @@ function renderList(){
 
     const editAction=current==='renewal'
       ?`<button data-renewal-track="${r.id}" class="link-btn">${renewalTrackerFor(r)?'Atualizar acompanhamento':'Acompanhar'}</button><button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
-      :current==='porto_returns'
-        ?`<button data-porto-destination="${r.id}" class="link-btn">Abrir destino</button><button data-porto-integration="${r.id}" class="link-btn">Ver integração</button>`
-        :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
+      :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
 
     return '<tr>'+cells+`<td class="actions">${editAction}${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
@@ -1017,11 +937,6 @@ function renderList(){
   document.querySelectorAll('[data-producer-detail]').forEach(b=>b.onclick=()=>openProducerDetail(b.dataset.producerDetail));
   document.querySelectorAll('[data-renewal-track]').forEach(b=>b.onclick=()=>openRenewalTracker(b.dataset.renewalTrack));
   document.querySelectorAll('[data-renewal-edit]').forEach(b=>b.onclick=()=>editInsuranceFromRenewal(b.dataset.renewalEdit));
-  document.querySelectorAll('[data-porto-destination]').forEach(b=>b.onclick=()=>{
-    const row=rowById(b.dataset.portoDestination);
-    if(row)navigate(portoReturnView(row));
-  });
-  document.querySelectorAll('[data-porto-integration]').forEach(b=>b.onclick=()=>navigate('integrations'));
   document.querySelectorAll('[data-renew-filter]').forEach(sel=>sel.onchange=()=>{
     renewalFilters[sel.dataset.renewFilter]=sel.value;
     renderList();
