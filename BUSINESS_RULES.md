@@ -8,6 +8,8 @@
 - Taxa FF só existe quando a proposta/apólice estiver efetivamente vinculada a FF Apolinário ou Homeni. Um seguro marcado apenas como Lebrime nunca recebe Taxa FF.
 - Anotação manual no documento como `LEANDRO 19%` ou `LEANDRO - 15%` é definitiva para produtor e percentual de comissão.
 - Sem anotação confiável, o sistema não deve inventar produtor nem percentual.
+- Toda proposta/apólice deve registrar a operação como `Seguro novo` ou `Renovação` quando essa informação estiver disponível no documento.
+- A operação deve ficar visível na carteira, na ficha do cliente e na ficha do produtor.
 
 ## Comissão
 Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da proposta/apólice**.
@@ -23,11 +25,12 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 - Demais produtores: produtor 60%; Taxa Lebrime 40%; Taxa FF 30%; líquido efetivo Lebrime 10%.
 - Leandro: recebe 70% da comissão bruta; Taxa FF 30%; Taxa Lebrime 0%.
 
-## Proposta importada
-- Uma proposta com PDF importado e vinculado é considerada comissão recebida.
+## Proposta ou apólice importada
+- Uma proposta ou apólice com PDF importado e vinculado é considerada comissão recebida.
 - Valor recebido pela Lebrime = comissão bruta menos Taxa FF, quando houver.
 - Status da comissão = `Recebida`.
 - Data de recebimento = data da importação do documento.
+- Origem do recebimento = `Importação da proposta` ou `Importação da apólice`.
 - A importação não marca automaticamente a comissão como paga ao produtor.
 
 ## Lucro realizado
