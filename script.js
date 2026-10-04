@@ -69,12 +69,6 @@ const BUSINESS_RULES={
 const isLeandro=producerId=>
   fold(nameById(producerId))===fold(BUSINESS_RULES.fullCommissionProducer);
 
-const producerSharePercent=producerId=>
-  isLeandro(producerId)?100:BUSINESS_RULES.producerPercent;
-
-const lebrimeSharePercent=producerId=>
-  isLeandro(producerId)?0:BUSINESS_RULES.lebrimePercent;
-
 const brokerageNamesOf=insurance=>
   String(insurance?.data?.brokerages||insurance?.data?.brokerage||'')
     .split('|').map(v=>fold(v)).filter(Boolean);
