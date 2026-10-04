@@ -80,6 +80,23 @@
     </main>
   </div>
 
+  <dialog id="clientDialog">
+    <div class="detail-shell">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">CLIENTE</p>
+          <h2 id="clientDetailTitle">Detalhes do cliente</h2>
+        </div>
+        <button type="button" id="closeClientDetail" class="icon-btn">×</button>
+      </div>
+      <div id="clientDetailBody"></div>
+      <div class="dialog-actions">
+        <button type="button" id="clientUploadBtn" class="btn ghost">Anexar arquivo</button>
+        <button type="button" id="clientEditBtn" class="btn primary">Editar cliente</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="editorDialog">
     <form id="editorForm" method="dialog">
       <div class="dialog-head">
