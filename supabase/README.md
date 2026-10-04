@@ -22,3 +22,24 @@ Os arquivos devem ser enviados para `lebrime-docs` e o registro `document` deve 
 - nome original, MIME type e tamanho.
 
 A interface atual reaproveita registros de documentos pendentes quando um arquivo antigo é reanexado, evitando duplicação.
+
+
+## Integração Porto — Arquivo de Retorno
+
+A interface v19.2 possui uma área **Integrações > Porto** e a Edge Function `lebrime-api` possui as ações autenticadas:
+
+- `integration-status`: mostra se o conector está configurado, última sincronização e arquivos recentes;
+- `porto-sync`: consulta até 7 dias no Webservice oficial, baixa apenas arquivos novos e preserva o original no bucket privado.
+
+Credenciais devem existir apenas como segredos do ambiente Supabase:
+
+- `PORTO_SUSEP`;
+- `PORTO_LOGIN`;
+- `PORTO_PASSWORD`;
+- `PORTO_ENDPOINT` é opcional; sem ele é usado o endpoint de produção documentado pela Porto.
+
+**Nunca** salvar Token/Senha da Porto em `script.js`, HTML, banco em texto aberto ou GitHub.
+
+Os arquivos originais são armazenados em `lebrime-docs/integrations/porto/<ano>/<mês>/...` e registrados como `integration_file`. Cada execução cria um `integration_sync` para auditoria.
+
+A primeira etapa do conector faz aquisição segura e idempotente dos arquivos. A interpretação de APP/API/XPP/XPI/COM/SAP/CBS/SI2 deve respeitar o layout específico de cada arquivo; não inventar campos quando o layout ou uma amostra real ainda não estiver disponível.
