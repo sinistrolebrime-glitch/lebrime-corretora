@@ -561,8 +561,10 @@ async function uploadDocument(e){
   const documentType=$('#uploadType').value;
   const key=`clients/${clientId}/${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth()+1).padStart(2,'0')}/${uuid()}-${f.name.replace(/[^a-zA-Z0-9._-]+/g,'-')}`;
   $('#uploadStatus').textContent='Enviando e vinculando arquivo...';
+  let uploaded=false;
   try{
     await api('storage-put',f,{raw:true,key,headers:{'content-type':f.type||'application/octet-stream'}});
+    uploaded=true;
     const stamp=now();
     const placeholder=insurance?list('document').find(doc=>{
       const sameClient=String(doc.data.clientId||'')===String(clientId);
@@ -583,6 +585,7 @@ async function uploadDocument(e){
       ?{type:'update',id:placeholder.id,kind:'document',data,version:placeholder.version,updated_at:stamp,strict:true}
       :{type:'insert',id:uuid(),kind:'document',data,version:1,created_at:stamp,updated_at:stamp};
     await api('write',{ops:[op]});
+    uploaded=false;
     $('#uploadForm').reset();
     $('#uploadStatus').textContent=placeholder
       ?'Arquivo recuperado e vinculado ao seguro com sucesso.'
@@ -592,7 +595,10 @@ async function uploadDocument(e){
     await loadRecords();
     uploadPrefill={clientId:'',insuranceId:''};
     await renderImportClients();
-  }catch(err){$('#uploadStatus').textContent=err.message}
+  }catch(err){
+    if(uploaded)try{await api('storage-delete',{}, {key})}catch{}
+    $('#uploadStatus').textContent=err.message
+  }
 }
 
 async function openDocument(entry){
