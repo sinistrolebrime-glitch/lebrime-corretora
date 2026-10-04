@@ -398,7 +398,7 @@ dialog{
 .producer-portfolio-list{display:flex;flex-direction:column;gap:8px}
 .producer-insurance-row{
   display:grid;
-  grid-template-columns:minmax(170px,1.5fr) repeat(6,minmax(100px,1fr));
+  grid-template-columns:minmax(170px,1.5fr) repeat(7,minmax(100px,1fr));
   gap:10px;
   align-items:start;
   padding:13px 14px;
@@ -429,4 +429,19 @@ dialog{
   .renewal-filters{display:grid;grid-template-columns:1fr 1fr;width:100%}
   .renewal-filters label,.renewal-filters select{min-width:0;width:100%}
   .producer-insurance-row{grid-template-columns:1fr}
+}
+
+.commission-rule-note{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin:0 0 12px;
+  padding:10px 12px;
+  border:1px solid #e2d4bc;
+  border-radius:9px;
+  background:#faf7f1;
+  color:#5f4a29;
+  font-size:11px;
+  font-weight:700;
 }
