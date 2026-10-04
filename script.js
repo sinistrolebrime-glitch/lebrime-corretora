@@ -32,6 +32,7 @@ const now=()=>new Date().toISOString();
 const today=()=>new Date().toISOString().slice(0,10);
 const digits=v=>String(v||'').replace(/\D/g,'');
 const norm=v=>String(v||'').trim().toLocaleLowerCase('pt-BR');
+const fold=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(v)||0)/100);
 const parseMoney=v=>Math.max(0,Math.round(Number(String(v||'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))*100)||0);
 const date=v=>v?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(new Date(v+'T12:00:00Z')):'—';
@@ -59,25 +60,49 @@ const insuranceLabel=insurance=>{
 const BUSINESS_RULES={
   producerPercent:60,
   lebrimePercent:40,
+  ffPercent:30,
   fullCommissionProducer:'Leandro',
+  ffBrokerageMatchers:['ff apolinario','homeni'],
   migrationCutoff:CUTOFF
 };
 
+const isLeandro=producerId=>
+  fold(nameById(producerId))===fold(BUSINESS_RULES.fullCommissionProducer);
+
 const producerSharePercent=producerId=>
-  norm(nameById(producerId))===norm(BUSINESS_RULES.fullCommissionProducer)
-    ?100
-    :BUSINESS_RULES.producerPercent;
+  isLeandro(producerId)?100:BUSINESS_RULES.producerPercent;
 
 const lebrimeSharePercent=producerId=>
-  norm(nameById(producerId))===norm(BUSINESS_RULES.fullCommissionProducer)
-    ?0
-    :BUSINESS_RULES.lebrimePercent;
+  isLeandro(producerId)?0:BUSINESS_RULES.lebrimePercent;
+
+const brokerageNamesOf=insurance=>
+  String(insurance?.data?.brokerages||insurance?.data?.brokerage||'')
+    .split('|').map(v=>fold(v)).filter(Boolean);
+
+const usesFfRule=insurance=>{
+  const names=brokerageNamesOf(insurance);
+  return names.some(name=>BUSINESS_RULES.ffBrokerageMatchers.some(match=>name.includes(match)));
+};
 
 const netPremiumOf=insurance=>Number(insurance?.data?.netPremium||0);
 const commissionPercentOf=insurance=>Number(insurance?.data?.commissionPercent||0);
 const commissionValueOf=insurance=>Math.round(netPremiumOf(insurance)*commissionPercentOf(insurance)/100);
-const producerCommissionOf=insurance=>Math.round(commissionValueOf(insurance)*producerSharePercent(insurance?.data?.producerId)/100);
-const lebrimeFeeOf=insurance=>Math.round(commissionValueOf(insurance)*lebrimeSharePercent(insurance?.data?.producerId)/100);
+
+const commissionBreakdown=insurance=>{
+  const gross=commissionValueOf(insurance);
+  const ffPercent=usesFfRule(insurance)?BUSINESS_RULES.ffPercent:0;
+  const ffFee=Math.round(gross*ffPercent/100);
+  const afterFf=Math.max(0,gross-ffFee);
+  const producerPercent=producerSharePercent(insurance?.data?.producerId);
+  const producerExpected=Math.round(afterFf*producerPercent/100);
+  const lebrimePercent=lebrimeSharePercent(insurance?.data?.producerId);
+  const lebrimeFee=Math.max(0,afterFf-producerExpected);
+  return {gross,ffPercent,ffFee,afterFf,producerPercent,producerExpected,lebrimePercent,lebrimeFee};
+};
+
+const producerCommissionOf=insurance=>commissionBreakdown(insurance).producerExpected;
+const ffFeeOf=insurance=>commissionBreakdown(insurance).ffFee;
+const lebrimeFeeOf=insurance=>commissionBreakdown(insurance).lebrimeFee;
 
 const producerInsurances=producerId=>[...list('proposal'),...list('policy')]
   .filter(r=>String(r.data.producerId||'')===String(producerId||''));
@@ -165,16 +190,18 @@ function commissionReconcileOps(){
     // Never invent producer, percentage or commission.
     if(!netPremium||!commissionPercent||!producerId)continue;
 
-    const expected=commissionValueOf(insurance);
-    const producerPercent=producerSharePercent(producerId);
-    const producerExpected=Math.round(expected*producerPercent/100);
-    const lebrimePercent=lebrimeSharePercent(producerId);
-    const lebrimeFee=Math.round(expected*lebrimePercent/100);
+    const calc=commissionBreakdown(insurance);
+    const expected=calc.gross;
+    const {ffPercent,ffFee,afterFf,producerPercent,producerExpected,lebrimePercent,lebrimeFee}=calc;
     const existing=commissionForInsurance(insurance);
 
-    const businessRule=producerPercent===100
-      ?'LEANDRO: produtor recebe 100% da comissão bruta; Taxa Lebrime = 0%.'
-      :'Produtor recebe 60% da comissão bruta; Taxa Lebrime = 40%.';
+    const ffRule=ffPercent
+      ?'Corretora FF Apolinário/Homeni: Taxa FF = 30% da comissão bruta.'
+      :'Sem Taxa FF para esta corretora.';
+    const producerRule=producerPercent===100
+      ?'LEANDRO: recebe 100% do valor restante após a Taxa FF; Taxa Lebrime = 0%.'
+      :'Demais produtores: recebem 60% do valor restante após a Taxa FF; Taxa Lebrime = 40% do restante.';
+    const businessRule=ffRule+' '+producerRule;
 
     const data={
       ...(existing?.data||{}),
@@ -185,6 +212,9 @@ function commissionReconcileOps(){
       netPremium,
       commissionPercent,
       expected,
+      ffPercent,
+      ffFee,
+      afterFf,
       producerPercent,
       producerExpected,
       lebrimePercent,
@@ -197,7 +227,7 @@ function commissionReconcileOps(){
     };
 
     if(existing){
-      const keys=['clientId','policyId','proposalId','producerId','netPremium','commissionPercent','expected','producerPercent','producerExpected','lebrimePercent','lebrimeFee'];
+      const keys=['clientId','policyId','proposalId','producerId','netPremium','commissionPercent','expected','ffPercent','ffFee','afterFf','producerPercent','producerExpected','lebrimePercent','lebrimeFee'];
       const changed=keys.some(k=>String(existing.data[k]??'')!==String(data[k]??''));
       if(changed)ops.push({type:'update',id:existing.id,kind:'commission',data,version:existing.version,updated_at:stamp,strict:true});
     }else{
@@ -313,6 +343,8 @@ const config={
       ['Clientes',r=>producerClients(r.id).length],
       ['Seguros',r=>producerInsurances(r.id).length],
       ['Comissão bruta',r=>money(producerInsurances(r.id).reduce((sum,i)=>sum+commissionValueOf(i),0))],
+      ['Taxa FF',r=>money(producerInsurances(r.id).reduce((sum,i)=>sum+ffFeeOf(i),0))],
+      ['Taxa Lebrime',r=>money(producerInsurances(r.id).reduce((sum,i)=>sum+lebrimeFeeOf(i),0))],
       ['Comissão do produtor',r=>money(producerInsurances(r.id).reduce((sum,i)=>sum+producerCommissionOf(i),0))]
     ],
     fields:[['name','Nome','text'],['document','CPF/CNPJ','text'],['email','E-mail','email'],['phone','Telefone','text'],['notes','Observações','textarea']]
@@ -374,6 +406,8 @@ const config={
       ['Prêmio líquido',r=>money(r.data.netPremium)],
       ['%',r=>String(r.data.commissionPercent||0)+'%'],
       ['Comissão bruta',r=>money(r.data.expected)],
+      ['Taxa FF',r=>money(r.data.ffFee)],
+      ['Após Taxa FF',r=>money(r.data.afterFf)],
       ['Produtor %',r=>String(r.data.producerPercent||0)+'%'],
       ['Comissão produtor',r=>money(r.data.producerExpected)],
       ['Taxa Lebrime',r=>money(r.data.lebrimeFee)],
@@ -497,12 +531,14 @@ function applyRenewalFilters(rows){
 
 function commissionSummary(rows){
   const gross=rows.reduce((sum,r)=>sum+Number(r.data.expected||0),0);
+  const ff=rows.reduce((sum,r)=>sum+Number(r.data.ffFee||0),0);
   const producer=rows.reduce((sum,r)=>sum+Number(r.data.producerExpected||0),0);
   const lebrime=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeFee||0),0);
   const received=rows.reduce((sum,r)=>sum+Number(r.data.received||0),0);
   const paid=rows.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
   return `
     <span class="chip">Comissão bruta: ${money(gross)}</span>
+    <span class="chip">Taxa FF: ${money(ff)}</span>
     <span class="chip">Produtores: ${money(producer)}</span>
     <span class="chip">Taxa Lebrime: ${money(lebrime)}</span>
     <span class="chip">Lucro realizado: ${money(received-paid)}</span>`;
@@ -685,12 +721,13 @@ function openProducerDetail(producerId){
   const insurances=producerInsurances(producerId).sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
   const clients=producerClients(producerId);
   const totalGross=insurances.reduce((sum,r)=>sum+commissionValueOf(r),0);
+  const totalFf=insurances.reduce((sum,r)=>sum+ffFeeOf(r),0);
   const totalProducer=insurances.reduce((sum,r)=>sum+producerCommissionOf(r),0);
   const totalLebrime=insurances.reduce((sum,r)=>sum+lebrimeFeeOf(r),0);
   const special=producerSharePercent(producerId)===100;
   const rule=special
-    ?'LEANDRO: 100% da comissão para o produtor e Taxa Lebrime de 0%.'
-    :'Regra padrão: 60% da comissão para o produtor e Taxa Lebrime de 40%.';
+    ?'LEANDRO: quando houver FF Apolinário/Homeni, desconta 30% de Taxa FF e ele recebe 100% dos 70% restantes. Taxa Lebrime = 0%.'
+    :'Demais produtores: quando houver FF Apolinário/Homeni, desconta 30% de Taxa FF; dos 70% restantes, o produtor recebe 60% e a Taxa Lebrime fica com 40%.';
 
   const rows=insurances.length?insurances.map(r=>`
     <div class="producer-insurance-row">
@@ -699,6 +736,7 @@ function openProducerDetail(producerId){
       <div><span>Tipo</span><strong>${r.kind==='policy'?'Apólice':'Proposta'}</strong></div>
       <div><span>Prêmio líquido</span><strong>${money(netPremiumOf(r))}</strong></div>
       <div><span>Comissão bruta</span><strong>${money(commissionValueOf(r))}</strong></div>
+      <div><span>Taxa FF</span><strong>${money(ffFeeOf(r))}</strong></div>
       <div><span>Produtor</span><strong>${money(producerCommissionOf(r))}</strong></div>
       <div><span>Taxa Lebrime</span><strong>${money(lebrimeFeeOf(r))}</strong></div>
     </div>`).join(''):'<div class="empty compact">Nenhum cliente ou seguro vinculado a este produtor.</div>';
@@ -709,9 +747,10 @@ function openProducerDetail(producerId){
       <div><span>Clientes</span><strong>${clients.length}</strong></div>
       <div><span>Seguros</span><strong>${insurances.length}</strong></div>
       <div><span>Comissão bruta</span><strong>${money(totalGross)}</strong></div>
+      <div><span>Taxa FF</span><strong>${money(totalFf)}</strong></div>
       <div><span>Comissão do produtor</span><strong>${money(totalProducer)}</strong></div>
     </div>
-    <div class="rule-callout"><strong>Regra do produtor</strong><span>${esc(rule)}</span><small>Taxa Lebrime prevista: ${money(totalLebrime)}</small></div>
+    <div class="rule-callout"><strong>Regra do produtor</strong><span>${esc(rule)}</span><small>Taxa FF prevista: ${money(totalFf)} · Taxa Lebrime prevista: ${money(totalLebrime)}</small></div>
     <section class="detail-section">
       <div class="section-title-row"><div><h3>Clientes e seguros do produtor</h3><p>Clique no cliente para abrir a ficha completa.</p></div></div>
       <div class="producer-portfolio-list">${rows}</div>
