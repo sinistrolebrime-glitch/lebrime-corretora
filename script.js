@@ -56,6 +56,58 @@ const insuranceLabel=insurance=>{
   return `${type} ${insurance.data.number||'sem número'} · ${insurance.data.insurer||'—'} · ${insurance.data.branch||'—'}`;
 };
 
+const BUSINESS_RULES={
+  producerPercent:60,
+  lebrimePercent:40,
+  fullCommissionProducer:'Leandro',
+  migrationCutoff:CUTOFF
+};
+
+const producerSharePercent=producerId=>
+  norm(nameById(producerId))===norm(BUSINESS_RULES.fullCommissionProducer)
+    ?100
+    :BUSINESS_RULES.producerPercent;
+
+const lebrimeSharePercent=producerId=>
+  norm(nameById(producerId))===norm(BUSINESS_RULES.fullCommissionProducer)
+    ?0
+    :BUSINESS_RULES.lebrimePercent;
+
+const netPremiumOf=insurance=>Number(insurance?.data?.netPremium||0);
+const commissionPercentOf=insurance=>Number(insurance?.data?.commissionPercent||0);
+const commissionValueOf=insurance=>Math.round(netPremiumOf(insurance)*commissionPercentOf(insurance)/100);
+const producerCommissionOf=insurance=>Math.round(commissionValueOf(insurance)*producerSharePercent(insurance?.data?.producerId)/100);
+const lebrimeFeeOf=insurance=>Math.round(commissionValueOf(insurance)*lebrimeSharePercent(insurance?.data?.producerId)/100);
+
+const producerInsurances=producerId=>[...list('proposal'),...list('policy')]
+  .filter(r=>String(r.data.producerId||'')===String(producerId||''));
+
+const producerClients=producerId=>{
+  const ids=[...new Set(producerInsurances(producerId).map(r=>String(r.data.clientId||'')).filter(Boolean))];
+  return ids.map(rowById).filter(Boolean);
+};
+
+const commissionForInsurance=insurance=>list('commission').find(c=>
+  (insurance?.kind==='policy'&&String(c.data.policyId||'')===String(insurance.id))||
+  (insurance?.kind==='proposal'&&String(c.data.proposalId||'')===String(insurance.id))
+)||null;
+
+const daysUntil=v=>v?Math.ceil((new Date(v+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000):null;
+
+const renewalStatus=r=>{
+  if(r.kind==='proposal')return `Em renovação · ${r.data.status||'Em andamento'}`;
+  const d=daysUntil(r.data.end);
+  if(d===null)return 'Sem vigência';
+  if(d<0)return 'Vencida';
+  if(d<=30)return 'Até 30 dias';
+  if(d<=60)return '31–60 dias';
+  if(d<=90)return '61–90 dias';
+  if(d<=120)return '91–120 dias';
+  return 'Futura';
+};
+
+let renewalFilters={window:'all',producer:'all',insurer:'all',brokerage:'all',status:'all'};
+
 async function api(action,body={},opts={}){
   const headers={...(opts.headers||{})};
   if(token())headers.authorization='Bearer '+token();
@@ -85,9 +137,70 @@ function logout(){
   $('#loginView').classList.remove('hidden');
 }
 
+function commissionReconcileOps(){
+  const stamp=now();
+  const ops=[];
+  for(const insurance of [...list('proposal'),...list('policy')]){
+    const netPremium=netPremiumOf(insurance);
+    const commissionPercent=commissionPercentOf(insurance);
+    const producerId=insurance.data.producerId||'';
+
+    // Never invent producer, percentage or commission.
+    if(!netPremium||!commissionPercent||!producerId)continue;
+
+    const expected=commissionValueOf(insurance);
+    const producerPercent=producerSharePercent(producerId);
+    const producerExpected=Math.round(expected*producerPercent/100);
+    const lebrimePercent=lebrimeSharePercent(producerId);
+    const lebrimeFee=Math.round(expected*lebrimePercent/100);
+    const existing=commissionForInsurance(insurance);
+
+    const businessRule=producerPercent===100
+      ?'LEANDRO: produtor recebe 100% da comissão bruta; Taxa Lebrime = 0%.'
+      :'Produtor recebe 60% da comissão bruta; Taxa Lebrime = 40%.';
+
+    const data={
+      ...(existing?.data||{}),
+      clientId:insurance.data.clientId||'',
+      policyId:insurance.kind==='policy'?insurance.id:'',
+      proposalId:insurance.kind==='proposal'?insurance.id:'',
+      producerId,
+      netPremium,
+      commissionPercent,
+      expected,
+      producerPercent,
+      producerExpected,
+      lebrimePercent,
+      lebrimeFee,
+      received:Number(existing?.data?.received||0),
+      transferPaid:Number(existing?.data?.transferPaid||0),
+      status:existing?.data?.status||'Prevista',
+      calculationRule:'Comissão bruta = prêmio líquido × percentual da proposta/apólice.',
+      businessRule
+    };
+
+    if(existing){
+      const keys=['clientId','policyId','proposalId','producerId','netPremium','commissionPercent','expected','producerPercent','producerExpected','lebrimePercent','lebrimeFee'];
+      const changed=keys.some(k=>String(existing.data[k]??'')!==String(data[k]??''));
+      if(changed)ops.push({type:'update',id:existing.id,kind:'commission',data,version:existing.version,updated_at:stamp,strict:true});
+    }else{
+      ops.push({type:'insert',id:uuid(),kind:'commission',data,version:1,created_at:stamp,updated_at:stamp});
+    }
+  }
+  return ops;
+}
+
 async function loadRecords(){
-  const j=await api('select',{orderUpdatedDesc:true});
-  records=(j.rows||[]).map(r=>({...r,data:r.data||{},version:Number(r.version||1),createdAt:r.created_at,updatedAt:r.updated_at}));
+  const read=async()=>{
+    const j=await api('select',{orderUpdatedDesc:true});
+    records=(j.rows||[]).map(r=>({...r,data:r.data||{},version:Number(r.version||1),createdAt:r.created_at,updatedAt:r.updated_at}));
+  };
+  await read();
+  const ops=commissionReconcileOps();
+  if(ops.length){
+    await api('write',{ops});
+    await read();
+  }
 }
 
 async function boot(){
@@ -113,7 +226,7 @@ function navigate(view){
   $('#dashboard').classList.toggle('hidden',view!=='overview');
   $('#listView').classList.toggle('hidden',view==='overview'||view==='imports');
   $('#importView').classList.toggle('hidden',view!=='imports');
-  $('#newBtn').classList.toggle('hidden',view==='overview'||view==='imports');
+  $('#newBtn').classList.toggle('hidden',['overview','imports','commission','renewal'].includes(view));
   $('#searchInput').value='';
   const label=menu.find(x=>x[0]===view)?.[1]||'Lebrime';
   $('#pageTitle').textContent=label;
@@ -177,7 +290,14 @@ const config={
     ]
   },
   producer:{
-    title:'Produtor',columns:[['Nome',r=>r.data.name],['Telefone',r=>r.data.phone],['E-mail',r=>r.data.email]],
+    title:'Produtor',
+    columns:[
+      ['Nome',r=>r.data.name],
+      ['Clientes',r=>producerClients(r.id).length],
+      ['Seguros',r=>producerInsurances(r.id).length],
+      ['Comissão bruta',r=>money(producerInsurances(r.id).reduce((sum,i)=>sum+commissionValueOf(i),0))],
+      ['Comissão do produtor',r=>money(producerInsurances(r.id).reduce((sum,i)=>sum+producerCommissionOf(i),0))]
+    ],
     fields:[['name','Nome','text'],['document','CPF/CNPJ','text'],['email','E-mail','email'],['phone','Telefone','text'],['notes','Observações','textarea']]
   },
   proposal:{
@@ -210,6 +330,7 @@ const config={
       ['subBranches','Ramos / seções internas','textarea'],
       ['number','Nº proposta / apólice','text'],
       ['policyType','Operação','select',['Seguro novo','Renovação']],
+      ['netPremium','Prêmio líquido','money'],
       ['premium','Prêmio total','money'],
       ['start','Início vigência','date'],
       ['end','Fim vigência','date'],
@@ -228,12 +349,42 @@ const config={
     ]
   },
   commission:{
-    title:'Comissão',columns:[['Apólice',r=>nameById(r.data.policyId)],['Produtor',r=>nameById(r.data.producerId)],['Prevista',r=>money(r.data.expected)],['Recebida',r=>money(r.data.received)],['Repasse pago',r=>money(r.data.transferPaid)],['Lucro',r=>money(Number(r.data.received||0)-Number(r.data.transferPaid||0))]],
-    fields:[['policyId','Apólice','ref','policy'],['producerId','Produtor','ref','producer'],['expected','Comissão prevista','money'],['received','Comissão recebida','money'],['due','Vencimento','date'],['receivedDate','Data recebimento','date'],['transferExpected','Repasse previsto','money'],['transferPaid','Repasse pago','money'],['transferDate','Data repasse','date'],['notes','Observações','textarea']]
+    title:'Comissão',
+    columns:[
+      ['Cliente',r=>nameById(r.data.clientId||dataById(r.data.policyId||r.data.proposalId).clientId)],
+      ['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],
+      ['Produtor',r=>nameById(r.data.producerId)],
+      ['Prêmio líquido',r=>money(r.data.netPremium)],
+      ['%',r=>String(r.data.commissionPercent||0)+'%'],
+      ['Comissão bruta',r=>money(r.data.expected)],
+      ['Produtor %',r=>String(r.data.producerPercent||0)+'%'],
+      ['Comissão produtor',r=>money(r.data.producerExpected)],
+      ['Taxa Lebrime',r=>money(r.data.lebrimeFee)],
+      ['Recebida',r=>money(r.data.received)],
+      ['Paga ao produtor',r=>money(r.data.transferPaid)],
+      ['Lucro realizado',r=>money(Number(r.data.received||0)-Number(r.data.transferPaid||0))]
+    ],
+    fields:[
+      ['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['producerId','Produtor','ref','producer'],
+      ['netPremium','Prêmio líquido','money'],['commissionPercent','% comissão','number'],['expected','Comissão bruta','money'],
+      ['producerExpected','Comissão prevista do produtor','money'],['lebrimeFee','Taxa Lebrime','money'],
+      ['received','Comissão recebida','money'],['due','Vencimento','date'],['receivedDate','Data recebimento','date'],
+      ['transferPaid','Comissão paga ao produtor','money'],['transferDate','Data do pagamento ao produtor','date'],['notes','Observações','textarea']
+    ]
   },
   renewal:{
-    title:'Renovação',columns:[['Cliente',r=>nameById(r.data.clientId)],['Apólice',r=>nameById(r.data.policyId)],['Produtor',r=>nameById(r.data.producerId)],['Status',r=>r.data.status],['Prioridade',r=>r.data.priority],['Próxima ação',r=>r.data.nextAction],['Data',r=>date(r.data.nextActionDate)]],
-    fields:[['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['producerId','Produtor','ref','producer'],['status','Status','select',['A iniciar','Em cotação','Propostas recebidas','Enviado ao cliente','Em negociação','Renovado','Perdido','Não renovar']],['priority','Prioridade','select',['Automática','Crítica','Alta','Média','Baixa']],['nextAction','Próxima ação','text'],['nextActionDate','Data próxima ação','date'],['lastContactDate','Último contato','date'],['lastContactChannel','Canal','select',['','Ligação','WhatsApp','E-mail','Reunião','Outro']],['notes','Observações','textarea']]
+    title:'Renovação',
+    columns:[
+      ['Origem',r=>r.kind==='proposal'?'Proposta de renovação':'Apólice'],
+      ['Cliente',r=>nameById(r.data.clientId)],
+      ['Número',r=>r.data.number],
+      ['Seguradora',r=>r.data.insurer],
+      ['Produtor',r=>nameById(r.data.producerId)],
+      ['Corretora',r=>String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ')],
+      ['Situação',r=>renewalStatus(r)],
+      ['Fim da vigência',r=>r.kind==='policy'?date(r.data.end):'Em andamento']
+    ],
+    fields:[]
   },
   claim:{
     title:'Sinistro',columns:[['Cliente',r=>nameById(r.data.clientId)],['Apólice',r=>nameById(r.data.policyId)],['Número',r=>r.data.number],['Ocorrência',r=>date(r.data.incidentDate)],['Tipo',r=>r.data.claimType],['Status',r=>r.data.status]],
@@ -261,32 +412,113 @@ function businessFields(kind){
   return [
     ['clientId','Cliente','ref','client'],['producerId','Produtor','ref','producer'],['brokerages','Corretoras','brokerages'],['insurer','Seguradora','select',insurers],
     ['branch','Ramo','select',branches],['subBranches','Ramos / seções internas','textarea'],['number',kind==='policy'?'Nº apólice':'Nº proposta','text'],
-    ['policyType','Tipo','select',['Seguro novo','Renovação']],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
+    ['policyType','Tipo','select',['Seguro novo','Renovação']],['netPremium','Prêmio líquido','money'],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
     ['status','Status','select',kind==='policy'?['Ativa','Cancelada','Renovada']:['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida']],
     ['commissionPercent','% comissão','number'],['notes','Observações','textarea']
   ];
 }
 
+function renewalSourceRows(){
+  return [
+    ...list('proposal').filter(r=>norm(r.data.policyType)==='renovação'&&!['recusada','convertida'].includes(norm(r.data.status))),
+    ...list('policy').filter(r=>!['cancelada','renovada'].includes(norm(r.data.status)))
+  ];
+}
+
+function renewalFilterHtml(rows){
+  const producerIds=[...new Set(rows.map(r=>r.data.producerId).filter(Boolean))];
+  const insurerValues=[...new Set(rows.map(r=>r.data.insurer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const brokerageValues=[...new Set(rows.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const statusValues=[...new Set(rows.map(r=>r.data.status).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  return `
+    <div class="renewal-filters">
+      <label>Janela
+        <select data-renew-filter="window">
+          <option value="all" ${renewalFilters.window==='all'?'selected':''}>Todas</option>
+          <option value="30" ${renewalFilters.window==='30'?'selected':''}>Até 30 dias</option>
+          <option value="60" ${renewalFilters.window==='60'?'selected':''}>Até 60 dias</option>
+          <option value="90" ${renewalFilters.window==='90'?'selected':''}>Até 90 dias</option>
+          <option value="120" ${renewalFilters.window==='120'?'selected':''}>Até 120 dias</option>
+        </select>
+      </label>
+      <label>Produtor
+        <select data-renew-filter="producer"><option value="all">Todos</option>${producerIds.map(id=>`<option value="${id}" ${renewalFilters.producer===id?'selected':''}>${esc(nameById(id))}</option>`).join('')}</select>
+      </label>
+      <label>Seguradora
+        <select data-renew-filter="insurer"><option value="all">Todas</option>${insurerValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.insurer===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+      </label>
+      <label>Corretora
+        <select data-renew-filter="brokerage"><option value="all">Todas</option>${brokerageValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.brokerage===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+      </label>
+      <label>Status
+        <select data-renew-filter="status"><option value="all">Todos</option>${statusValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.status===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+      </label>
+    </div>`;
+}
+
+function applyRenewalFilters(rows){
+  return rows.filter(r=>{
+    if(renewalFilters.producer!=='all'&&String(r.data.producerId||'')!==renewalFilters.producer)return false;
+    if(renewalFilters.insurer!=='all'&&String(r.data.insurer||'')!==renewalFilters.insurer)return false;
+    if(renewalFilters.brokerage!=='all'&&!String(r.data.brokerages||r.data.brokerage||'').split('|').includes(renewalFilters.brokerage))return false;
+    if(renewalFilters.status!=='all'&&String(r.data.status||'')!==renewalFilters.status)return false;
+    if(renewalFilters.window!=='all'&&r.kind==='policy'){
+      const d=daysUntil(r.data.end);
+      const max=Number(renewalFilters.window);
+      if(d===null||d<0||d>max)return false;
+    }
+    return true;
+  });
+}
+
+function commissionSummary(rows){
+  const gross=rows.reduce((sum,r)=>sum+Number(r.data.expected||0),0);
+  const producer=rows.reduce((sum,r)=>sum+Number(r.data.producerExpected||0),0);
+  const lebrime=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeFee||0),0);
+  const received=rows.reduce((sum,r)=>sum+Number(r.data.received||0),0);
+  const paid=rows.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
+  return `
+    <span class="chip">Comissão bruta: ${money(gross)}</span>
+    <span class="chip">Produtores: ${money(producer)}</span>
+    <span class="chip">Taxa Lebrime: ${money(lebrime)}</span>
+    <span class="chip">Lucro realizado: ${money(received-paid)}</span>`;
+}
+
 function renderList(){
   const c=config[current];if(!c)return;
-  let rows=current==='insurance'?[...list('proposal'),...list('policy')]:[...list(current)];
+  let rows;
+  const allRenewals=current==='renewal'?renewalSourceRows():[];
+
+  if(current==='insurance')rows=[...list('proposal'),...list('policy')];
+  else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
+  else rows=[...list(current)];
+
   const q=norm($('#searchInput').value);
-  if(q)rows=rows.filter(r=>norm(JSON.stringify(r.data)+' '+nameById(r.data.clientId)).includes(q));
-  if(current==='payment'){
-    rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
-  }
-  if(current==='insurance'){
-    rows.sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
-  }
+  if(q)rows=rows.filter(r=>norm(JSON.stringify(r.data)+' '+nameById(r.data.clientId)+' '+nameById(r.data.producerId)).includes(q));
+
+  if(current==='payment')rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
+  if(current==='insurance')rows.sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
+  if(current==='commission')rows.sort((a,b)=>String(nameById(a.data.producerId)).localeCompare(String(nameById(b.data.producerId)),'pt-BR'));
+  if(current==='renewal')rows.sort((a,b)=>{
+    if(a.kind!==b.kind)return a.kind==='proposal'?-1:1;
+    return String(a.data.end||a.data.start||'').localeCompare(String(b.data.end||b.data.start||''));
+  });
+
   $('#listMeta').textContent=`${rows.length} registro(s)`;
-  $('#filters').innerHTML=current==='payment'?paymentSummary(rows):'';
+  if(current==='payment')$('#filters').innerHTML=paymentSummary(rows);
+  else if(current==='commission')$('#filters').innerHTML=commissionSummary(rows);
+  else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
+  else $('#filters').innerHTML='';
+
   $('#tableHead').innerHTML='<tr>'+c.columns.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'<th></th></tr>';
   $('#tableBody').innerHTML=rows.length?rows.map(r=>{
     const cells=c.columns.map((x,i)=>{
       const value=x[1](r)??'—';
       if(current==='client'&&i===0)return `<td><button class="name-link" data-client-detail="${r.id}">${esc(value)}</button></td>`;
+      if(current==='producer'&&i===0)return `<td><button class="name-link" data-producer-detail="${r.id}">${esc(value)}</button></td>`;
       return '<td>'+esc(value)+'</td>';
     }).join('');
+
     const openFile=current==='document'&&r.data.storageKey?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:'';
     const insuranceDoc=current==='insurance'?primaryInsuranceDocument(r):null;
     const insuranceFile=current==='insurance'
@@ -294,12 +526,24 @@ function renderList(){
         ?`<button data-open="${insuranceDoc.id}" class="link-btn file-action">Abrir PDF</button>`
         :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Regularizar PDF':'Anexar PDF'}</button>`)
       :'';
-    return '<tr>'+cells+`<td class="actions"><button data-edit="${r.id}" class="link-btn">Editar</button>${openFile}${insuranceFile}</td></tr>`;
+
+    const editAction=current==='renewal'
+      ?`<button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
+      :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
+
+    return '<tr>'+cells+`<td class="actions">${editAction}${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
+
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.edit)));
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.open)));
   document.querySelectorAll('[data-insurance-upload]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.insuranceUpload));
   document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
+  document.querySelectorAll('[data-producer-detail]').forEach(b=>b.onclick=()=>openProducerDetail(b.dataset.producerDetail));
+  document.querySelectorAll('[data-renewal-edit]').forEach(b=>b.onclick=()=>editInsuranceFromRenewal(b.dataset.renewalEdit));
+  document.querySelectorAll('[data-renew-filter]').forEach(sel=>sel.onchange=()=>{
+    renewalFilters[sel.dataset.renewFilter]=sel.value;
+    renderList();
+  });
 }
 function paymentSummary(rows){
   const relevant=rows.filter(r=>r.data.financialTracking!=='Previsão da proposta');
@@ -369,6 +613,8 @@ function validateBeforeSave(data){
   if(current==='insurance'){
     const recordKind=editing?.kind||data._kind||'proposal';
     if(!data.clientId||!data.insurer||!data.branch||!data.number)return 'Preencha cliente, seguradora, ramo e número.';
+    if(!String(data.brokerages||'').trim())return 'Selecione a corretora responsável por esta proposta/apólice.';
+    if(Number(data.commissionPercent||0)>0&&!Number(data.netPremium||0))return 'Informe o prêmio líquido para calcular a comissão.';
     const dup=list(recordKind).find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
     if(dup)return 'Já existe um registro com este cliente, seguradora, ramo, número e vigência.';
   }
@@ -405,10 +651,63 @@ async function saveCurrent(e){
   }catch(e){$('#editorError').textContent=e.message}
 }
 
-function clientRelatedDocuments(clientId){
-  const insurances=[...list('proposal'),...list('policy')].filter(r=>r.data.clientId===clientId);
-  const insuranceIds=new Set(insurances.map(r=>r.id));
-  return list('document').filter(r=>r.data.clientId===clientId||insuranceIds.has(r.data.policyId)||insuranceIds.has(r.data.proposalId));
+function openProducerDetail(producerId){
+  const producer=rowById(producerId);if(!producer)return;
+  const insurances=producerInsurances(producerId).sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
+  const clients=producerClients(producerId);
+  const totalGross=insurances.reduce((sum,r)=>sum+commissionValueOf(r),0);
+  const totalProducer=insurances.reduce((sum,r)=>sum+producerCommissionOf(r),0);
+  const totalLebrime=insurances.reduce((sum,r)=>sum+lebrimeFeeOf(r),0);
+  const special=producerSharePercent(producerId)===100;
+  const rule=special
+    ?'LEANDRO: 100% da comissão para o produtor e Taxa Lebrime de 0%.'
+    :'Regra padrão: 60% da comissão para o produtor e Taxa Lebrime de 40%.';
+
+  const rows=insurances.length?insurances.map(r=>`
+    <div class="producer-insurance-row">
+      <div><span>Cliente</span><button class="name-link" data-producer-client="${r.data.clientId}">${esc(nameById(r.data.clientId))}</button></div>
+      <div><span>Contrato</span><strong>${esc(r.data.number||'—')}</strong></div>
+      <div><span>Tipo</span><strong>${r.kind==='policy'?'Apólice':'Proposta'}</strong></div>
+      <div><span>Prêmio líquido</span><strong>${money(netPremiumOf(r))}</strong></div>
+      <div><span>Comissão bruta</span><strong>${money(commissionValueOf(r))}</strong></div>
+      <div><span>Produtor</span><strong>${money(producerCommissionOf(r))}</strong></div>
+      <div><span>Taxa Lebrime</span><strong>${money(lebrimeFeeOf(r))}</strong></div>
+    </div>`).join(''):'<div class="empty compact">Nenhum cliente ou seguro vinculado a este produtor.</div>';
+
+  $('#producerDetailTitle').textContent=producer.data.name||'Produtor';
+  $('#producerDetailBody').innerHTML=`
+    <div class="client-kpis">
+      <div><span>Clientes</span><strong>${clients.length}</strong></div>
+      <div><span>Seguros</span><strong>${insurances.length}</strong></div>
+      <div><span>Comissão bruta</span><strong>${money(totalGross)}</strong></div>
+      <div><span>Comissão do produtor</span><strong>${money(totalProducer)}</strong></div>
+    </div>
+    <div class="rule-callout"><strong>Regra do produtor</strong><span>${esc(rule)}</span><small>Taxa Lebrime prevista: ${money(totalLebrime)}</small></div>
+    <section class="detail-section">
+      <div class="section-title-row"><div><h3>Clientes e seguros do produtor</h3><p>Clique no cliente para abrir a ficha completa.</p></div></div>
+      <div class="producer-portfolio-list">${rows}</div>
+    </section>`;
+  $('#producerDialog').dataset.producerId=producerId;
+  $('#producerDialog').showModal();
+  document.querySelectorAll('[data-producer-client]').forEach(b=>b.onclick=()=>{
+    $('#producerDialog').close();
+    openClientDetail(b.dataset.producerClient);
+  });
+}
+
+function editProducerFromDetail(){
+  const id=$('#producerDialog').dataset.producerId;
+  const producer=rowById(id);
+  $('#producerDialog').close();
+  current='producer';renderNav();
+  openEditor(producer);
+}
+
+function editInsuranceFromRenewal(id){
+  const insurance=rowById(id);if(!insurance)return;
+  current='insurance';renderNav();
+  $('#pageTitle').textContent='Propostas e Apólices';
+  openEditor(insurance);
 }
 
 function clientRelatedDocuments(clientId){
@@ -619,6 +918,8 @@ $('#newBtn').onclick=()=>openEditor();
 $('#closeClientDetail').onclick=()=>$('#clientDialog').close();
 $('#clientUploadBtn').onclick=openClientUpload;
 $('#clientEditBtn').onclick=editClientFromDetail;
+$('#closeProducerDetail').onclick=()=>$('#producerDialog').close();
+$('#producerEditBtn').onclick=editProducerFromDetail;
 $('#closeEditor').onclick=()=>$('#editorDialog').close();
 $('#cancelEditor').onclick=()=>$('#editorDialog').close();
 $('#editorForm').onsubmit=saveCurrent;
