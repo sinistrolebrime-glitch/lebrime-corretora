@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <title>Lebrime | Gestão de Carteira</title>
+  <script>
+    (() => {
+      const saved=localStorage.getItem('lebrime_theme_v1');
+      const preferred=window.matchMedia?.('(prefers-color-scheme: dark)').matches?'dark':'light';
+      document.documentElement.dataset.theme=saved||preferred;
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -25,7 +32,7 @@
       <div class="brand">
         <strong>LEBRIME</strong>
         <span>Gestão de Carteira</span>
-        <small class="version-badge">v19.0</small>
+        <small class="version-badge">v19.1</small>
       </div>
       <nav id="nav"></nav>
       <div class="sidebar-foot">
@@ -50,6 +57,10 @@
           <p id="pageContext" class="page-context">Visão executiva da operação, carteira e financeiro.</p>
         </div>
         <div class="top-actions">
+          <button id="themeToggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+            <span class="theme-toggle-icon" aria-hidden="true"></span>
+            <span id="themeToggleText">Tema</span>
+          </button>
           <input id="searchInput" class="search" placeholder="Pesquisar...">
           <button id="newBtn" class="btn primary">+ Novo</button>
         </div>
