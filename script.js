@@ -402,6 +402,7 @@ const config={
     columns:[
       ['Cliente',r=>nameById(r.data.clientId||dataById(r.data.policyId||r.data.proposalId).clientId)],
       ['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],
+      ['Corretora',r=>String(dataById(r.data.policyId||r.data.proposalId).brokerages||dataById(r.data.policyId||r.data.proposalId).brokerage||'—').replace(/\|/g,' · ')],
       ['Produtor',r=>nameById(r.data.producerId)],
       ['Prêmio líquido',r=>money(r.data.netPremium)],
       ['%',r=>String(r.data.commissionPercent||0)+'%'],
