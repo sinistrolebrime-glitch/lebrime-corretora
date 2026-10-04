@@ -1,4 +1,4 @@
-const API='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-core';
+const API='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-api';
 const TOKEN_KEY='lebrime_token_v1';
 const CUTOFF='2026-10';
 
