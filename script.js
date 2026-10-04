@@ -126,6 +126,11 @@ const isInsuranceActive=insurance=>{
 };
 
 const activeInsuranceRows=()=>[...list('proposal'),...list('policy')].filter(isInsuranceActive);
+const producerLabelOf=insurance=>{
+  if(insurance?.data?.producerId)return nameById(insurance.data.producerId);
+  if(insurance?.kind==='proposal'&&insurance?.data?.producerPending)return 'Pendente — preencher';
+  return '—';
+};
 const insuranceLabel=insurance=>{
   const type=insurance.kind==='policy'?'Apólice':'Proposta';
   return `${type} ${insurance.data.number||'sem número'} · ${insurance.data.insurer||'—'} · ${insurance.data.branch||'—'}`;
@@ -690,6 +695,7 @@ const config={
       ['Número',r=>r.data.number],
       ['Seguradora',r=>r.data.insurer],
       ['Ramo',r=>r.data.branch],
+      ['Produtor',r=>producerLabelOf(r)],
       ['Vigência',r=>date(r.data.end)],
       ['Prêmio',r=>money(r.data.premium)],
       ['Status',r=>r.data.status]
@@ -905,7 +911,12 @@ function renderList(){
   if(current==='payment')$('#filters').innerHTML=paymentSummary(rows);
   else if(current==='commission')$('#filters').innerHTML=commissionSummary(rows);
   else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
-  else $('#filters').innerHTML='';
+  else if(current==='insurance'){
+    const pendingProducer=rows.filter(r=>r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId).length;
+    $('#filters').innerHTML=pendingProducer
+      ?`<span class="chip danger">Produtor pendente: ${pendingProducer}</span><span class="chip">Propostas Porto importadas exigem definição manual do produtor</span>`
+      :'';
+  }else $('#filters').innerHTML='';
 
   $('#tableHead').innerHTML='<tr>'+c.columns.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'<th></th></tr>';
   $('#tableBody').innerHTML=rows.length?rows.map(r=>{
@@ -914,6 +925,9 @@ function renderList(){
       if(current==='client'&&i===0)return `<td><button class="name-link" data-client-detail="${r.id}">${esc(value)}</button></td>`;
       if(current==='producer'&&i===0)return `<td><button class="name-link" data-producer-detail="${r.id}">${esc(value)}</button></td>`;
       const label=x[0];
+      if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
+        return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
+      }
       if(['Status','Cobrança','Operação','Origem'].includes(label)){
         const tone=statusTone(value);
         return `<td><span class="status-pill corporate-status ${tone}">${esc(value)}</span></td>`;
@@ -967,6 +981,13 @@ function openEditor(entry=null){
   if(current==='insurance'){
     const kindSelect=document.querySelector('[name="_kind"]');
     if(kindSelect&&entry)kindSelect.disabled=true;
+    if(entry?.kind==='proposal'&&entry?.data?.producerPending&&!entry?.data?.producerId){
+      $('#editorFields').insertAdjacentHTML('afterbegin',`
+        <div class="rule-callout span-2 producer-pending-callout">
+          <strong>Produtor pendente</strong>
+          <span>Esta proposta foi importada diretamente da Porto e o arquivo não informa o produtor. Selecione o produtor manualmente abaixo e salve.</span>
+        </div>`);
+    }
   }
   $('#editorError').textContent='';
   $('#editorDialog').showModal();
@@ -1047,14 +1068,43 @@ function validateBeforeSave(data){
 
 async function saveCurrent(e){
   e.preventDefault();
-  const data=formData();
+  const entered=formData();
+  const data=current==='insurance'&&editing?{...(editing.data||{}),...entered}:entered;
   const err=validateBeforeSave(data);if(err){$('#editorError').textContent=err;return;}
   const id=editing?.id||uuid();const stamp=now();
   const recordKind=current==='insurance'?(editing?.kind||data._kind||'proposal'):current;
   delete data._kind;
+
+  const ops=[];
+  if(current==='insurance'&&recordKind==='proposal'&&data.producerPending){
+    if(data.producerId){
+      data.producerPending=false;
+      data.producerAssignmentStatus='Definido manualmente';
+      data.producerAssignmentSource='Manual';
+      data.producerAssignedAt=stamp;
+      data.producerPendingReason='';
+      const task=list('task').find(t=>
+        String(t.data.proposalId||'')===String(id)&&
+        String(t.data.taskType||'')==='producer_assignment'&&
+        !['Concluído','Concluida','Concluída','Regularizado'].includes(String(t.data.status||''))
+      );
+      if(task){
+        ops.push({
+          type:'update',id:task.id,kind:'task',
+          data:{...task.data,status:'Concluído',resolvedAt:stamp,resolution:'Produtor definido manualmente na proposta.'},
+          version:task.version,updated_at:stamp,strict:true
+        });
+      }
+    }else{
+      data.producerPending=true;
+      data.producerAssignmentStatus='Pendente — preencher manualmente';
+    }
+  }
+
   const op=editing?{type:'update',id,kind:recordKind,data,version:editing.version,updated_at:stamp,strict:true}:{type:'insert',id,kind:recordKind,data,version:1,created_at:stamp,updated_at:stamp};
+  ops.unshift(op);
   try{
-    await api('write',{ops:[op]});
+    await api('write',{ops});
     $('#editorDialog').close();
     await loadRecords();renderList();if(current==='overview')renderDashboard();
   }catch(e){$('#editorError').textContent=e.message}
