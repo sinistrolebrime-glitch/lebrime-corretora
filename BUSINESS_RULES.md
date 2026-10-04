@@ -50,3 +50,21 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 ## Renovações
 - Não criar automaticamente uma nova proposta apenas porque uma apólice está próxima do vencimento.
 - A central de renovações deriva a carteira vigente e permite acompanhamento por prazo, produtor, seguradora, corretora, status, prioridade e próxima ação.
+
+
+## Motor da proposta
+- A proposta é o ponto de entrada padrão da operação.
+- Ao cadastrar/importar uma proposta, os dados estruturados devem alimentar automaticamente as demais engrenagens do sistema.
+- Comissão: calculada automaticamente pelas regras da corretora/produtor.
+- Parcelas: o plano de pagamento da proposta gera automaticamente registros na Central de Parcelas.
+- Parcelas de proposta são classificadas como `Previsão da proposta` e não devem entrar como cobrança efetiva enquanto não houver apólice/controle financeiro definitivo.
+- Se quantidade/valores do plano forem alterados, as parcelas automáticas são atualizadas; parcelas excedentes automáticas não pagas são canceladas.
+- O total das parcelas geradas deve fechar com o prêmio total da proposta.
+- Quando o documento informar apenas referência de vencimento, como `Fatura do cartão`, o sistema deve preservar essa referência sem inventar uma data de vencimento.
+- Ao importar proposta ou apólice, comissão recebida, documentos, carteira ativa e demais vínculos devem refletir o registro sem depender de abrir manualmente cada aba.
+
+## Endossos
+- Endosso nunca cria uma nova proposta ou apólice.
+- Todo endosso deve ser vinculado ao cliente e à proposta/apólice/contrato existente.
+- Quando o nome do arquivo indicar `Endosso`, o sistema deve classificá-lo como Endosso e exigir a seleção do contrato correspondente.
+- O endosso fica no histórico documental do contrato e na ficha consolidada do cliente.
