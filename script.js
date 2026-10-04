@@ -625,7 +625,7 @@ function statusTone(value){
   const v=fold(value);
   if(['recebida','pago','regularizado','ativa','aprovada','seguro novo'].some(x=>v.includes(x)))return 'success';
   if(['atrasad','cancel','recus','perdid'].some(x=>v.includes(x)))return 'danger';
-  if(['em aberto','em analise','acompanhar','previsao','renovacao'].some(x=>v.includes(x)))return 'warning';
+  if(['em aberto','em analise','acompanhar','previsao','renovacao','pendente'].some(x=>v.includes(x)))return 'warning';
   if(['proposta','apolice','importacao'].some(x=>v.includes(x)))return 'info';
   return 'neutral';
 }
