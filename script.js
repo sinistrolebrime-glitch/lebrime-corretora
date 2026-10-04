@@ -103,17 +103,21 @@ const ffFeeOf=insurance=>commissionBreakdown(insurance).ffFee;
 const lebrimeFeeOf=insurance=>commissionBreakdown(insurance).lebrimeFee;
 const lebrimeNetOf=insurance=>commissionBreakdown(insurance).lebrimeNet;
 
-const importedProposalDocument=insurance=>{
-  if(insurance?.kind!=='proposal')return null;
+const importedInsuranceDocument=insurance=>{
+  if(!insurance||!['proposal','policy'].includes(insurance.kind))return null;
+  const expected=insurance.kind==='policy'?'apólice':'proposta';
   return insuranceDocuments(insurance).find(d=>
-    d.data.storageKey&&fold(d.data.documentType||'').includes('proposta')
+    d.data.storageKey&&fold(d.data.documentType||'').includes(fold(expected))
   )||null;
 };
 
-const importedProposalDate=insurance=>{
-  const doc=importedProposalDocument(insurance);
+const importedInsuranceDate=insurance=>{
+  const doc=importedInsuranceDocument(insurance);
   return doc?.createdAt?.slice(0,10)||doc?.data?.migratedAt?.slice(0,10)||today();
 };
+
+const importedInsuranceSource=insurance=>
+  insurance?.kind==='policy'?'Importação da apólice':'Importação da proposta';
 
 const producerInsurances=producerId=>[...list('proposal'),...list('policy')]
   .filter(r=>String(r.data.producerId||'')===String(producerId||''));
@@ -205,7 +209,7 @@ function commissionReconcileOps(){
     const expected=calc.gross;
     const {ffPercent,ffFee,afterFf,producerPercent,producerExpected,lebrimePercent,lebrimeFee,lebrimeNet}=calc;
     const existing=commissionForInsurance(insurance);
-    const importedDoc=importedProposalDocument(insurance);
+    const importedDoc=importedInsuranceDocument(insurance);
     const imported=Boolean(importedDoc);
 
     const ffRule=ffPercent
@@ -236,8 +240,8 @@ function commissionReconcileOps(){
       lebrimeFee,
       lebrimeNet,
       received:imported?afterFf:Number(existing?.data?.received||0),
-      receivedDate:imported?importedProposalDate(insurance):(existing?.data?.receivedDate||''),
-      receivedSource:imported?'Importação da proposta':(existing?.data?.receivedSource||''),
+      receivedDate:imported?importedInsuranceDate(insurance):(existing?.data?.receivedDate||''),
+      receivedSource:imported?importedInsuranceSource(insurance):(existing?.data?.receivedSource||''),
       transferPaid:Number(existing?.data?.transferPaid||0),
       status:imported?'Recebida':(existing?.data?.status||'Prevista'),
       calculationRule:'Comissão bruta = prêmio líquido × percentual da proposta/apólice.',
