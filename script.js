@@ -292,7 +292,7 @@ function renderList(){
     const insuranceFile=current==='insurance'
       ?(insuranceDoc?.data.storageKey
         ?`<button data-open="${insuranceDoc.id}" class="link-btn file-action">Abrir PDF</button>`
-        :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Anexar PDF pendente':'Anexar PDF'}</button>`)
+        :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Regularizar PDF':'Anexar PDF'}</button>`)
       :'';
     return '<tr>'+cells+`<td class="actions"><button data-edit="${r.id}" class="link-btn">Editar</button>${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
@@ -433,11 +433,11 @@ function openClientDetail(clientId){
     const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
     const fileAction=doc?.data.storageKey
       ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir PDF</button>`
-      :`<button class="btn primary small" data-client-upload-doc="${r.id}" data-client-id="${clientId}">${doc?'Anexar PDF pendente':'Anexar PDF'}</button>`;
+      :`<button class="btn primary small" data-client-upload-doc="${r.id}" data-client-id="${clientId}">${doc?'Regularizar PDF':'Anexar PDF'}</button>`;
     const fileState=doc?.data.storageKey
       ?'<span class="contract-file-state ready">Arquivo disponível</span>'
       :doc
-        ?'<span class="contract-file-state pending">Arquivo pendente</span>'
+        ?'<span class="contract-file-state pending">Registro localizado — PDF ainda não migrado</span>'
         :'<span class="contract-file-state neutral">Sem arquivo</span>';
     return `
       <article class="insurance-card">
@@ -465,8 +465,8 @@ function openClientDetail(clientId){
     const action=doc.data.storageKey
       ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir arquivo</button>`
       :linked
-        ?`<button class="btn primary small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Anexar arquivo</button>`
-        :'<span class="file-missing">Arquivo pendente</span>';
+        ?`<button class="btn primary small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Regularizar arquivo</button>`
+        :'<span class="file-missing">Registro localizado — PDF ainda não migrado</span>';
     return `
       <div class="document-row">
         <div>
@@ -602,7 +602,7 @@ async function uploadDocument(e){
 }
 
 async function openDocument(entry){
-  if(!entry?.data?.storageKey){alert('Este registro ainda não possui arquivo armazenado. Use “Anexar arquivo” para regularizar o documento.');return;}
+  if(!entry?.data?.storageKey){alert('O registro deste documento foi localizado, mas o arquivo físico ainda não está no Supabase Storage. Use “Regularizar arquivo” para anexar o PDF sem criar duplicidade.');return;}
   try{
     const blob=await api('storage-get',null,{blob:true,key:entry.data.storageKey});
     const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');
