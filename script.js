@@ -384,6 +384,7 @@ const config={
     title:'Seguro',
     columns:[
       ['Tipo',r=>r.kind==='policy'?'Apólice':'Proposta'],
+      ['Operação',r=>r.data.policyType||'—'],
       ['Cliente',r=>nameById(r.data.clientId)],
       ['Número',r=>r.data.number],
       ['Seguradora',r=>r.data.insurer],
@@ -763,6 +764,7 @@ function openProducerDetail(producerId){
       <div><span>Cliente</span><button class="name-link" data-producer-client="${r.data.clientId}">${esc(nameById(r.data.clientId))}</button></div>
       <div><span>Contrato</span><strong>${esc(r.data.number||'—')}</strong></div>
       <div><span>Tipo</span><strong>${r.kind==='policy'?'Apólice':'Proposta'}</strong></div>
+      <div><span>Operação</span><strong>${esc(r.data.policyType||'—')}</strong></div>
       <div><span>Prêmio líquido</span><strong>${money(netPremiumOf(r))}</strong></div>
       <div><span>Comissão bruta</span><strong>${money(commissionValueOf(r))}</strong></div>
       <div><span>Taxa FF</span><strong>${money(ffFeeOf(r))}</strong></div>
@@ -869,6 +871,7 @@ function openClientDetail(clientId){
           <div><span>Seguradora</span><strong>${esc(r.data.insurer||'—')}</strong></div>
           <div><span>Ramo</span><strong>${esc(r.data.branch||'—')}</strong></div>
           <div><span>Corretora</span><strong>${esc(broker)}</strong></div>
+          <div><span>Operação</span><strong>${esc(r.data.policyType||'—')}</strong></div>
           <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
           <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
         </div>
