@@ -445,3 +445,396 @@ dialog{
   font-size:11px;
   font-weight:700;
 }
+
+
+/* v19 executive corporate system */
+:root{
+  --navy-950:#091722;
+  --navy-900:#0d2131;
+  --navy-800:#17364f;
+  --navy-700:#244b69;
+  --slate-25:#fafbfc;
+  --slate-50:#f7f8fa;
+  --slate-100:#eef1f4;
+  --slate-200:#dfe4ea;
+  --slate-500:#687586;
+  --gold-500:#b18a4a;
+  --gold-600:#92703b;
+}
+
+.sidebar{
+  box-shadow:8px 0 30px rgba(9,23,34,.06);
+}
+.brand strong{
+  font-size:24px;
+  letter-spacing:.14em;
+}
+.brand span{
+  margin-top:7px;
+  font-size:10px;
+  letter-spacing:.11em;
+}
+#nav{
+  gap:14px;
+  padding-top:2px;
+}
+.nav-group{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.nav-group-title{
+  padding:0 12px 5px;
+  color:#708797;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+#nav button{
+  position:relative;
+  padding:10px 12px 10px 14px;
+}
+#nav button.active:after{
+  content:"";
+  position:absolute;
+  right:11px;
+  top:50%;
+  width:5px;
+  height:5px;
+  margin-top:-2.5px;
+  border-radius:50%;
+  background:var(--gold-500);
+}
+.sidebar-system-note{
+  display:grid;
+  gap:3px;
+  margin-bottom:12px;
+  padding:11px 12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:9px;
+  background:rgba(255,255,255,.035);
+}
+.sidebar-system-note strong{
+  color:#dfe7ed;
+  font-size:10px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.sidebar-system-note span{
+  color:#8296a4;
+  font-size:10px;
+}
+.sidebar-foot .btn.ghost{
+  color:#dce5ec;
+  background:rgba(255,255,255,.035);
+  border-color:rgba(255,255,255,.1);
+}
+.sidebar-foot .btn.ghost:hover{
+  background:rgba(255,255,255,.07);
+}
+
+.top{
+  min-height:94px;
+}
+.top-title-block{
+  min-width:0;
+}
+.top-title-line{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+}
+.environment-badge{
+  display:inline-flex;
+  align-items:center;
+  height:24px;
+  margin-top:2px;
+  padding:0 8px;
+  border:1px solid #dfd2bd;
+  border-radius:999px;
+  background:#f7f1e8;
+  color:#7b5d2d;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.page-context{
+  margin:6px 0 0;
+  color:#74808e;
+  font-size:12px;
+}
+.top-actions{
+  padding-top:4px;
+}
+
+.executive-heading{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:14px;
+}
+.executive-heading h2{
+  margin:3px 0 3px;
+  font-size:20px;
+  letter-spacing:-.015em;
+  color:#172b3a;
+}
+.executive-heading p{
+  margin:0;
+  color:#71808e;
+  font-size:12px;
+}
+.section-kicker{
+  display:block;
+  color:#94723d;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.as-of{
+  color:#778391;
+  font-size:11px;
+  font-weight:650;
+  white-space:nowrap;
+}
+
+.executive-cards{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.executive-cards .metric{
+  min-height:124px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.executive-cards .metric:before{
+  width:2px;
+  opacity:.55;
+}
+.executive-cards .metric span{
+  color:#657384;
+  font-size:10px;
+  letter-spacing:.07em;
+}
+.executive-cards .metric strong{
+  margin:9px 0 5px;
+  color:#142d40;
+  font-size:26px;
+  font-weight:760;
+}
+.executive-cards .metric small{
+  color:#82909d;
+  font-size:11px;
+}
+
+.operational-strip{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:1px;
+  margin:2px 0 18px;
+  overflow:hidden;
+  border:1px solid #dde3e9;
+  border-radius:11px;
+  background:#dde3e9;
+}
+.operational-item{
+  min-width:0;
+  padding:14px 16px;
+  background:#fff;
+}
+.operational-item span{
+  display:block;
+  color:#75818e;
+  font-size:9.5px;
+  font-weight:800;
+  letter-spacing:.065em;
+  text-transform:uppercase;
+}
+.operational-item strong{
+  display:inline-block;
+  margin:5px 9px 0 0;
+  color:#17364f;
+  font-size:20px;
+}
+.operational-item small{
+  color:#73808c;
+  font-size:11px;
+}
+.operational-item.attention{
+  background:#fffafa;
+}
+.operational-item.attention strong{
+  color:#9d2e2e;
+}
+
+.corporate-grid{
+  align-items:start;
+}
+.corporate-panel-head{
+  align-items:flex-start;
+  padding-bottom:11px;
+  border-bottom:1px solid #edf0f3;
+}
+.corporate-panel-head h2{
+  margin-top:3px;
+  color:#213545;
+}
+
+.brokerage-summary{
+  display:flex;
+  flex-direction:column;
+}
+.brokerage-summary-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  padding:13px 2px;
+  border-bottom:1px solid #edf0f3;
+}
+.brokerage-summary-row:last-child{
+  border-bottom:0;
+}
+.brokerage-summary-row>div{
+  min-width:0;
+}
+.brokerage-summary-row>div strong{
+  display:block;
+  color:#253849;
+  font-size:12.5px;
+}
+.brokerage-summary-row span{
+  display:block;
+  margin-top:3px;
+  color:#85909b;
+  font-size:10.5px;
+}
+.brokerage-summary-row>strong{
+  color:#17364f;
+  font-size:13px;
+  white-space:nowrap;
+}
+
+.finance-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+.finance-summary-grid>div{
+  min-width:0;
+  padding:12px 13px;
+  border:1px solid #e5e9ed;
+  border-radius:9px;
+  background:#fafbfc;
+}
+.finance-summary-grid span{
+  display:block;
+  color:#7a8692;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.055em;
+  text-transform:uppercase;
+}
+.finance-summary-grid strong{
+  display:block;
+  margin-top:5px;
+  color:#203749;
+  font-size:14px;
+}
+
+.toolbar{
+  margin-bottom:14px;
+  padding:10px 12px;
+  border:1px solid #e2e6eb;
+  border-radius:10px;
+  background:rgba(255,255,255,.72);
+}
+#listMeta{
+  font-weight:700;
+  color:#6f7c89;
+}
+.table-wrap{
+  border-radius:10px;
+}
+th{
+  background:#f6f7f9;
+  border-bottom-color:#dce2e8;
+}
+tbody tr:last-child td{
+  border-bottom:0;
+}
+.actions{
+  text-align:right;
+}
+
+.status-pill.corporate-status{
+  min-height:24px;
+  padding:0 8px;
+  border:1px solid #dce3e9;
+  background:#f5f7f9;
+  color:#536270;
+}
+.status-pill.corporate-status.success{
+  border-color:#cfe2da;
+  background:#edf7f3;
+  color:#23634f;
+}
+.status-pill.corporate-status.warning{
+  border-color:#eadfc9;
+  background:#faf6ee;
+  color:#7d622e;
+}
+.status-pill.corporate-status.danger{
+  border-color:#efd3d3;
+  background:#fff2f2;
+  color:#9f2e2e;
+}
+.status-pill.corporate-status.info{
+  border-color:#d5e1e9;
+  background:#eff5f8;
+  color:#315873;
+}
+.status-pill.corporate-status.neutral{
+  border-color:#dde3e8;
+  background:#f5f7f9;
+  color:#606e7b;
+}
+
+.auth-card:before{
+  content:"LEBRIME CORRETORA DE SEGUROS";
+  display:block;
+  margin-bottom:18px;
+  color:#96723c;
+  font-size:9px;
+  font-weight:850;
+  letter-spacing:.15em;
+}
+.auth-card h1{
+  color:#162c3d;
+  letter-spacing:-.02em;
+}
+.auth-card .btn.primary{
+  width:100%;
+}
+
+@media(max-width:1200px){
+  .executive-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .operational-strip{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  .top-title-line{display:block}
+  .environment-badge{margin-top:8px}
+  .executive-heading{align-items:flex-start;flex-direction:column}
+  .executive-cards{grid-template-columns:1fr}
+  .operational-strip{grid-template-columns:1fr}
+  .finance-summary-grid{grid-template-columns:1fr}
+  #nav{display:block}
+  .nav-group{margin-bottom:12px}
+}
