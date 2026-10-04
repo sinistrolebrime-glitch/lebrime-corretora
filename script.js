@@ -15,6 +15,46 @@ const menu=[
   ['imports','Arquivos']
 ];
 
+const NAV_GROUPS=[
+  ['Executivo',['overview']],
+  ['Carteira',['client','producer','insurance','renewal']],
+  ['Financeiro',['payment','commission']],
+  ['Operação',['task','document','imports']]
+];
+
+const PAGE_CONTEXT={
+  overview:'Visão executiva da operação, carteira e financeiro.',
+  client:'Cadastro mestre e visão 360º dos segurados.',
+  producer:'Produção, carteira e resultado por produtor.',
+  insurance:'Gestão unificada de propostas e apólices.',
+  payment:'Previsões, parcelas efetivas e acompanhamento financeiro.',
+  commission:'Comissões recebidas, repasses e resultado da Lebrime.',
+  renewal:'Agenda comercial e acompanhamento das próximas renovações.',
+  task:'Pendências operacionais e próximos passos da equipe.',
+  document:'Biblioteca documental vinculada à carteira.',
+  imports:'Entrada e vinculação de documentos aos contratos.'
+};
+
+const NEW_LABELS={
+  client:'+ Novo cliente',
+  producer:'+ Novo produtor',
+  insurance:'+ Nova proposta/apólice',
+  payment:'+ Nova parcela',
+  task:'+ Nova pendência',
+  document:'+ Novo documento'
+};
+
+const SEARCH_LABELS={
+  client:'Pesquisar cliente, CPF/CNPJ...',
+  producer:'Pesquisar produtor...',
+  insurance:'Pesquisar cliente, proposta, apólice...',
+  payment:'Pesquisar parcela ou cliente...',
+  commission:'Pesquisar comissão, cliente, produtor...',
+  renewal:'Pesquisar renovação...',
+  task:'Pesquisar pendência...',
+  document:'Pesquisar documento...'
+};
+
 const brokerages=['Lebrime','FF Apolinário','Homeni Corretora','Eólica Corretora'];
 const insurers=['Porto','Allianz','Zurich','HDI','Tokio Marine','Yelum','MAPFRE','Bradesco','Suhai','Ezze','Sura','Berkley','Fator','Akad','Aliro','Avla','Potencial','Aruana','Chubb','Junto'];
 const branches=['Automóvel','Frota','Residencial','Empresarial','Multirrisco','Acidentes Pessoais','Vida','Seguro Garantia','Responsabilidade Civil','RC Profissional','RC Obras','RC Empregador','Fiança Locatícia','Transporte','Riscos Nomeados e Operacionais','Riscos de Engenharia','Equipamentos','Condomínio','Cyber','D&O','E&O','Riscos Diversos','Outros'];
@@ -294,7 +334,13 @@ async function boot(){
 }
 
 function renderNav(){
-  $('#nav').innerHTML=menu.map(([key,label])=>`<button data-view="${key}" class="${current===key?'active':''}">${label}</button>`).join('');
+  const labelOf=key=>menu.find(x=>x[0]===key)?.[1]||key;
+  $('#nav').innerHTML=NAV_GROUPS.map(([group,items])=>`
+    <div class="nav-group">
+      <div class="nav-group-title">${group}</div>
+      ${items.map(key=>`<button data-view="${key}" class="${current===key?'active':''}">${labelOf(key)}</button>`).join('')}
+    </div>`
+  ).join('');
   $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>navigate(b.dataset.view));
 }
 
@@ -304,9 +350,12 @@ function navigate(view){
   $('#listView').classList.toggle('hidden',view==='overview'||view==='imports');
   $('#importView').classList.toggle('hidden',view!=='imports');
   $('#newBtn').classList.toggle('hidden',['overview','imports','commission','renewal'].includes(view));
+  $('#newBtn').textContent=NEW_LABELS[view]||'+ Novo';
   $('#searchInput').value='';
+  $('#searchInput').placeholder=SEARCH_LABELS[view]||'Pesquisar...';
   const label=menu.find(x=>x[0]===view)?.[1]||'Lebrime';
   $('#pageTitle').textContent=label;
+  if($('#pageContext'))$('#pageContext').textContent=PAGE_CONTEXT[view]||'';
   if(view==='overview')renderDashboard();
   else if(view==='imports')renderImportClients();
   else renderList();
@@ -315,6 +364,7 @@ function navigate(view){
 function renderDashboard(){
   const activeInsurances=activeInsuranceRows();
   const payments=list('payment');
+  const forecasts=payments.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
   const open=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
   const overdue=open.filter(r=>r.data.due&&r.data.due<today());
   const renew60=activeInsurances.filter(r=>{
@@ -325,31 +375,115 @@ function renderDashboard(){
   const comm=list('commission');
   const received=comm.reduce((s,r)=>s+Number(r.data.received||0),0);
   const paid=comm.reduce((s,r)=>s+Number(r.data.transferPaid||0),0);
+  const gross=comm.reduce((s,r)=>s+Number(r.data.expected||0),0);
+  const ff=comm.reduce((s,r)=>s+Number(r.data.ffFee||0),0);
+  const producerExpected=comm.reduce((s,r)=>s+Number(r.data.producerExpected||0),0);
+  const lebrimeNet=comm.reduce((s,r)=>s+Number(r.data.lebrimeNet||0),0);
+  const activePremium=activeInsurances.reduce((s,r)=>s+Number(r.data.premium||0),0);
+  const forecastTotal=forecasts.reduce((s,r)=>s+Number(r.data.amount||0),0);
+  const activeProposals=activeInsurances.filter(r=>r.kind==='proposal').length;
+  const activePolicies=activeInsurances.filter(r=>r.kind==='policy').length;
+  const brokerRows=brokerages.map(name=>{
+    const items=activeInsurances.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(name));
+    return {name,count:items.length,premium:items.reduce((sum,r)=>sum+Number(r.data.premium||0),0)};
+  }).filter(r=>r.count>0);
 
   $('#dashboard').innerHTML=`
-    <div class="cards">
-      ${metric('Clientes',list('client').length,'Cadastro único por CPF/CNPJ')}
-      ${metric('Propostas e apólices ativas',activeInsurances.length,'Carteira vigente')}
-      ${metric('Parcelas em aberto',open.length,money(open.reduce((s,r)=>s+Number(r.data.amount||0),0)))}
-      ${metric('Atrasadas',overdue.length,money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0)))}
-      ${metric('Renovam em 60 dias',renew60.length,'Acompanhamento prioritário')}
-      ${metric('Lucro de comissão',money(received-paid),'Recebida − comissão paga ao produtor')}
+    <div class="executive-heading">
+      <div>
+        <span class="section-kicker">Resumo executivo</span>
+        <h2>Carteira em números</h2>
+        <p>Consolidado operacional e financeiro da Lebrime.</p>
+      </div>
+      <div class="as-of">Posição em ${date(today())}</div>
     </div>
-    <div class="dashboard-grid">
+
+    <div class="cards executive-cards">
+      ${metric('Clientes',list('client').length,'Cadastro mestre')}
+      ${metric('Carteira ativa',activeInsurances.length,`${activeProposals} propostas · ${activePolicies} apólices`)}
+      ${metric('Prêmio em carteira',money(activePremium),'Total vigente')}
+      ${metric('Previsão de parcelas',money(forecastTotal),`${forecasts.length} parcelas de propostas`)}
+      ${metric('Comissões recebidas',money(received),'Reconhecidas no sistema')}
+      ${metric('Resultado realizado',money(received-paid),'Recebida − paga ao produtor')}
+    </div>
+
+    <div class="operational-strip">
+      <div class="operational-item">
+        <span>Parcelas efetivas em aberto</span>
+        <strong>${open.length}</strong>
+        <small>${money(open.reduce((s,r)=>s+Number(r.data.amount||0),0))}</small>
+      </div>
+      <div class="operational-item ${overdue.length?'attention':''}">
+        <span>Parcelas atrasadas</span>
+        <strong>${overdue.length}</strong>
+        <small>${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</small>
+      </div>
+      <div class="operational-item">
+        <span>Renovações em 60 dias</span>
+        <strong>${renew60.length}</strong>
+        <small>Acompanhamento prioritário</small>
+      </div>
+    </div>
+
+    <div class="dashboard-grid corporate-grid">
       <div class="panel">
-        <div class="panel-head"><h2>Próximas renovações</h2><button class="link-btn" data-go="renewal">Abrir central</button></div>
+        <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">Carteira</span><h2>Distribuição por corretora</h2></div>
+          <button class="link-btn" data-go="insurance">Abrir carteira</button>
+        </div>
+        <div class="brokerage-summary">
+          ${brokerRows.length?brokerRows.map(r=>`
+            <div class="brokerage-summary-row">
+              <div><strong>${esc(r.name)}</strong><span>${r.count} contrato(s) ativo(s)</span></div>
+              <strong>${money(r.premium)}</strong>
+            </div>`).join(''):'<div class="empty compact">Nenhuma carteira ativa.</div>'}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">Financeiro</span><h2>Comissões e repasses</h2></div>
+          <button class="link-btn" data-go="commission">Abrir comissões</button>
+        </div>
+        <div class="finance-summary-grid">
+          <div><span>Comissão bruta</span><strong>${money(gross)}</strong></div>
+          <div><span>Recebida</span><strong>${money(received)}</strong></div>
+          <div><span>Taxa FF</span><strong>${money(ff)}</strong></div>
+          <div><span>Produtores</span><strong>${money(producerExpected)}</strong></div>
+          <div><span>Líquido Lebrime</span><strong>${money(lebrimeNet)}</strong></div>
+          <div><span>Pago a produtores</span><strong>${money(paid)}</strong></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">Comercial</span><h2>Próximas renovações</h2></div>
+          <button class="link-btn" data-go="renewal">Abrir central</button>
+        </div>
         ${miniTable(renew60.sort((a,b)=>String(a.data.end).localeCompare(String(b.data.end))).slice(0,8),[
           ['Cliente',r=>nameById(r.data.clientId)],['Contrato',r=>r.data.number],['Ramo',r=>r.data.branch],['Fim',r=>date(r.data.end)]
         ])}
       </div>
+
       <div class="panel">
-        <div class="panel-head"><h2>Parcelas atrasadas</h2><button class="link-btn" data-go="payment">Abrir parcelas</button></div>
+        <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">Financeiro</span><h2>Parcelas atrasadas</h2></div>
+          <button class="link-btn" data-go="payment">Abrir parcelas</button>
+        </div>
         ${miniTable(overdue.sort((a,b)=>String(a.data.due).localeCompare(String(b.data.due))).slice(0,8),[
           ['Cliente',r=>nameById(dataById(r.data.policyId||r.data.proposalId).clientId)],['Vencimento',r=>date(r.data.due)],['Valor',r=>money(r.data.amount)]
         ])}
       </div>
     </div>`;
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navigate(b.dataset.go));
+}
+function statusTone(value){
+  const v=fold(value);
+  if(['recebida','pago','regularizado','ativa','aprovada','seguro novo'].some(x=>v.includes(x)))return 'success';
+  if(['atrasad','cancel','recus','perdid'].some(x=>v.includes(x)))return 'danger';
+  if(['em aberto','em analise','acompanhar','previsao','renovacao'].some(x=>v.includes(x)))return 'warning';
+  if(['proposta','apolice','importacao'].some(x=>v.includes(x)))return 'info';
+  return 'neutral';
 }
 
 function metric(title,value,sub){return `<div class="metric"><span>${title}</span><strong>${value}</strong><small>${sub}</small></div>`}
@@ -620,6 +754,11 @@ function renderList(){
       const value=x[1](r)??'—';
       if(current==='client'&&i===0)return `<td><button class="name-link" data-client-detail="${r.id}">${esc(value)}</button></td>`;
       if(current==='producer'&&i===0)return `<td><button class="name-link" data-producer-detail="${r.id}">${esc(value)}</button></td>`;
+      const label=x[0];
+      if(['Status','Cobrança','Operação','Origem'].includes(label)){
+        const tone=statusTone(value);
+        return `<td><span class="status-pill corporate-status ${tone}">${esc(value)}</span></td>`;
+      }
       return '<td>'+esc(value)+'</td>';
     }).join('');
 
