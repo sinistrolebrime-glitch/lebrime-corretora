@@ -68,3 +68,17 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 - Todo endosso deve ser vinculado ao cliente e à proposta/apólice/contrato existente.
 - Quando o nome do arquivo indicar `Endosso`, o sistema deve classificá-lo como Endosso e exigir a seleção do contrato correspondente.
 - O endosso fica no histórico documental do contrato e na ficha consolidada do cliente.
+
+
+## Importação direta Porto — produtor manual
+
+Quando uma proposta for criada automaticamente a partir dos arquivos de retorno da Porto e o arquivo não trouxer identificação confiável do produtor:
+
+- o sistema **não deve inventar produtor**;
+- a proposta deve ser marcada com **Produtor pendente — preencher manualmente**;
+- deve ser criada uma pendência operacional para definição do produtor;
+- a comissão não deve ser calculada enquanto não houver produtor e percentual válidos;
+- ao selecionar o produtor manualmente na proposta e salvar, a pendência de produtor deve ser concluída automaticamente;
+- os metadados de origem da Porto devem ser preservados para auditoria.
+
+Essa regra vale somente para propostas importadas diretamente da Porto sem produtor informado.
