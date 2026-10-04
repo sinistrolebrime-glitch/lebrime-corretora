@@ -6,14 +6,10 @@ const menu=[
   ['overview','Visão geral'],
   ['client','Clientes'],
   ['producer','Produtores'],
-  ['proposal','Propostas'],
-  ['policy','Apólices'],
+  ['insurance','Propostas e Apólices'],
   ['payment','Central de parcelas'],
   ['commission','Comissões'],
   ['renewal','Renovações'],
-  ['claim','Sinistros'],
-  ['insuredItem','Itens / riscos'],
-  ['coverage','Coberturas'],
   ['task','Pendências'],
   ['document','Documentos'],
   ['imports','Arquivos']
@@ -175,6 +171,36 @@ const config={
     title:'Apólice',columns:[['Cliente',r=>nameById(r.data.clientId)],['Número',r=>r.data.number],['Seguradora',r=>r.data.insurer],['Ramo',r=>r.data.branch],['Vigência',r=>date(r.data.end)],['Prêmio',r=>money(r.data.premium)],['Status',r=>r.data.status]],
     fields:businessFields('policy')
   },
+  insurance:{
+    title:'Seguro',
+    columns:[
+      ['Tipo',r=>r.kind==='policy'?'Apólice':'Proposta'],
+      ['Cliente',r=>nameById(r.data.clientId)],
+      ['Número',r=>r.data.number],
+      ['Seguradora',r=>r.data.insurer],
+      ['Ramo',r=>r.data.branch],
+      ['Vigência',r=>date(r.data.end)],
+      ['Prêmio',r=>money(r.data.premium)],
+      ['Status',r=>r.data.status]
+    ],
+    fields:[
+      ['_kind','Tipo de registro','select',['proposal','policy']],
+      ['clientId','Cliente','ref','client'],
+      ['producerId','Produtor','ref','producer'],
+      ['brokerages','Corretoras','brokerages'],
+      ['insurer','Seguradora','select',insurers],
+      ['branch','Ramo','select',branches],
+      ['subBranches','Ramos / seções internas','textarea'],
+      ['number','Nº proposta / apólice','text'],
+      ['policyType','Operação','select',['Seguro novo','Renovação']],
+      ['premium','Prêmio total','money'],
+      ['start','Início vigência','date'],
+      ['end','Fim vigência','date'],
+      ['status','Status','select',['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida','Ativa','Cancelada','Renovada']],
+      ['commissionPercent','% comissão','number'],
+      ['notes','Observações','textarea']
+    ]
+  },
   payment:{
     title:'Parcela',columns:[['Cliente',r=>nameById(dataById(r.data.policyId||r.data.proposalId).clientId)],['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Parcela',r=>r.data.installment],['Vencimento',r=>date(r.data.due)],['Valor',r=>money(r.data.amount)],['Status',r=>r.data.status],['Cobrança',r=>r.data.collectionStatus]],
     fields:[
@@ -226,18 +252,30 @@ function businessFields(kind){
 
 function renderList(){
   const c=config[current];if(!c)return;
-  let rows=[...list(current)];
+  let rows=current==='insurance'?[...list('proposal'),...list('policy')]:[...list(current)];
   const q=norm($('#searchInput').value);
-  if(q)rows=rows.filter(r=>norm(JSON.stringify(r.data)).includes(q));
+  if(q)rows=rows.filter(r=>norm(JSON.stringify(r.data)+' '+nameById(r.data.clientId)).includes(q));
   if(current==='payment'){
     rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
+  }
+  if(current==='insurance'){
+    rows.sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
   }
   $('#listMeta').textContent=`${rows.length} registro(s)`;
   $('#filters').innerHTML=current==='payment'?paymentSummary(rows):'';
   $('#tableHead').innerHTML='<tr>'+c.columns.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'<th></th></tr>';
-  $('#tableBody').innerHTML=rows.length?rows.map(r=>'<tr>'+c.columns.map(x=>'<td>'+esc(x[1](r)??'—')+'</td>').join('')+`<td class="actions"><button data-edit="${r.id}" class="link-btn">Editar</button>${current==='document'&&r.data.storageKey?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:''}</td></tr>`).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
+  $('#tableBody').innerHTML=rows.length?rows.map(r=>{
+    const cells=c.columns.map((x,i)=>{
+      const value=x[1](r)??'—';
+      if(current==='client'&&i===0)return `<td><button class="name-link" data-client-detail="${r.id}">${esc(value)}</button></td>`;
+      return '<td>'+esc(value)+'</td>';
+    }).join('');
+    const openFile=current==='document'&&r.data.storageKey?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:'';
+    return '<tr>'+cells+`<td class="actions"><button data-edit="${r.id}" class="link-btn">Editar</button>${openFile}</td></tr>`;
+  }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.edit)));
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.open)));
+  document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
 }
 function paymentSummary(rows){
   const relevant=rows.filter(r=>r.data.financialTracking!=='Previsão da proposta');
@@ -246,12 +284,18 @@ function paymentSummary(rows){
   return `<span class="chip">Em aberto: ${open.length} · ${money(open.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip danger">Atrasadas: ${overdue.length} · ${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip">Corte da implantação: ${CUTOFF}</span>`;
 }
 
+function editorConfig(){return config[current]}
 function openEditor(entry=null){
-  const c=config[current];if(!c)return;
+  const c=editorConfig();if(!c)return;
   editing=entry;
   $('#editorTitle').textContent=(entry?'Editar ':'Novo ')+c.title;
-  const values=entry?.data||{};
+  const values={...(entry?.data||{})};
+  if(current==='insurance')values._kind=entry?.kind||'proposal';
   $('#editorFields').innerHTML=c.fields.map(f=>fieldHtml(f,values[f[0]])).join('');
+  if(current==='insurance'){
+    const kindSelect=document.querySelector('[name="_kind"]');
+    if(kindSelect&&entry)kindSelect.disabled=true;
+  }
   $('#editorError').textContent='';
   $('#editorDialog').showModal();
 }
@@ -277,7 +321,7 @@ function fieldHtml(f,value){
 function formData(){
   const fd=new FormData($('#editorForm'));const out={};
   for(const [k,v] of fd.entries())if(k!=='brokerages_multi')out[k]=String(v).trim();
-  const c=config[current];
+  const c=editorConfig();
   for(const f of c.fields){
     const [key,,type]=f;
     if(type==='money')out[key]=parseMoney(out[key]);
@@ -298,9 +342,10 @@ function validateBeforeSave(data){
     const dup=list('client').find(r=>r.id!==editing?.id&&digits(r.data.document)===d);
     if(dup)return 'Já existe um cliente cadastrado com este CPF/CNPJ.';
   }
-  if(current==='policy'||current==='proposal'){
-    if(!data.clientId||!data.producerId||!data.insurer||!data.branch||!data.number)return 'Preencha cliente, produtor, seguradora, ramo e número.';
-    const dup=list(current).find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
+  if(current==='insurance'){
+    const recordKind=editing?.kind||data._kind||'proposal';
+    if(!data.clientId||!data.insurer||!data.branch||!data.number)return 'Preencha cliente, seguradora, ramo e número.';
+    const dup=list(recordKind).find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
     if(dup)return 'Já existe um registro com este cliente, seguradora, ramo, número e vigência.';
   }
   if(current==='payment'){
@@ -326,12 +371,75 @@ async function saveCurrent(e){
   const data=formData();
   const err=validateBeforeSave(data);if(err){$('#editorError').textContent=err;return;}
   const id=editing?.id||uuid();const stamp=now();
-  const op=editing?{type:'update',id,kind:current,data,version:editing.version,updated_at:stamp,strict:true}:{type:'insert',id,kind:current,data,version:1,created_at:stamp,updated_at:stamp};
+  const recordKind=current==='insurance'?(editing?.kind||data._kind||'proposal'):current;
+  delete data._kind;
+  const op=editing?{type:'update',id,kind:recordKind,data,version:editing.version,updated_at:stamp,strict:true}:{type:'insert',id,kind:recordKind,data,version:1,created_at:stamp,updated_at:stamp};
   try{
     await api('write',{ops:[op]});
     $('#editorDialog').close();
     await loadRecords();renderList();if(current==='overview')renderDashboard();
   }catch(e){$('#editorError').textContent=e.message}
+}
+
+function clientRelatedDocuments(clientId){
+  const insurances=[...list('proposal'),...list('policy')].filter(r=>r.data.clientId===clientId);
+  const insuranceIds=new Set(insurances.map(r=>r.id));
+  return list('document').filter(r=>r.data.clientId===clientId||insuranceIds.has(r.data.policyId)||insuranceIds.has(r.data.proposalId));
+}
+
+function openClientDetail(clientId){
+  const client=rowById(clientId);if(!client)return;
+  const d=client.data;
+  const insurances=[...list('proposal'),...list('policy')].filter(r=>r.data.clientId===clientId)
+    .sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
+  const docs=clientRelatedDocuments(clientId);
+  const insuranceHtml=insurances.length?insurances.map(r=>`
+    <div class="detail-row">
+      <div><span>Tipo</span><strong>${r.kind==='policy'?'Apólice':'Proposta'}</strong></div>
+      <div><span>Número</span><strong>${esc(r.data.number||'—')}</strong></div>
+      <div><span>Seguradora</span><strong>${esc(r.data.insurer||'—')}</strong></div>
+      <div><span>Ramo</span><strong>${esc(r.data.branch||'—')}</strong></div>
+      <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
+      <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
+    </div>`).join(''):'<div class="empty compact">Nenhuma proposta ou apólice cadastrada.</div>';
+  const docsHtml=docs.length?docs.map(doc=>`
+    <div class="document-row">
+      <div>
+        <strong>${esc(doc.data.name||doc.data.documentType||'Documento')}</strong>
+        <span>${esc(doc.data.documentType||'Documento')} · ${date(doc.data.referenceDate)}</span>
+      </div>
+      ${doc.data.storageKey?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir arquivo</button>`:`<span class="file-missing">Arquivo ainda não anexado</span>`}
+    </div>`).join(''):'<div class="empty compact">Nenhum arquivo anexado a este cliente.</div>';
+  $('#clientDetailTitle').textContent=d.name||'Cliente';
+  $('#clientDetailBody').innerHTML=`
+    <div class="detail-grid">
+      <div><span>CPF/CNPJ</span><strong>${esc(d.document||'—')}</strong></div>
+      <div><span>Telefone</span><strong>${esc(d.phone||'—')}</strong></div>
+      <div><span>E-mail</span><strong>${esc(d.email||'—')}</strong></div>
+      <div><span>Cidade/UF</span><strong>${esc([d.city,d.state].filter(Boolean).join('/')||'—')}</strong></div>
+      <div class="wide"><span>Endereço</span><strong>${esc(d.address||'—')}</strong></div>
+    </div>
+    <section class="detail-section"><h3>Propostas e apólices</h3>${insuranceHtml}</section>
+    <section class="detail-section"><h3>Arquivos</h3>${docsHtml}</section>`;
+  $('#clientDialog').dataset.clientId=clientId;
+  $('#clientDialog').showModal();
+  document.querySelectorAll('[data-client-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.clientOpenDoc)));
+}
+
+function openClientUpload(){
+  const clientId=$('#clientDialog').dataset.clientId;
+  $('#clientDialog').close();
+  navigate('imports');
+  renderImportClients();
+  setTimeout(()=>{if($('#uploadClient'))$('#uploadClient').value=clientId},0);
+}
+
+function editClientFromDetail(){
+  const clientId=$('#clientDialog').dataset.clientId;
+  const client=rowById(clientId);
+  $('#clientDialog').close();
+  current='client';renderNav();
+  openEditor(client);
 }
 
 async function renderImportClients(){
@@ -368,6 +476,9 @@ $('#loginForm').onsubmit=async e=>{
 };
 $('#logoutBtn').onclick=logout;
 $('#newBtn').onclick=()=>openEditor();
+$('#closeClientDetail').onclick=()=>$('#clientDialog').close();
+$('#clientUploadBtn').onclick=openClientUpload;
+$('#clientEditBtn').onclick=editClientFromDetail;
 $('#closeEditor').onclick=()=>$('#editorDialog').close();
 $('#cancelEditor').onclick=()=>$('#editorDialog').close();
 $('#editorForm').onsubmit=saveCurrent;
