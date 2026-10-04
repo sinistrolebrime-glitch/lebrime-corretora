@@ -22,6 +22,7 @@ const branches=['Automóvel','Frota','Residencial','Empresarial','Multirrisco','
 let records=[];
 let current='overview';
 let editing=null;
+let uploadPrefill={clientId:'',insuranceId:''};
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -38,6 +39,22 @@ const rowById=id=>records.find(r=>r.id===id);
 const dataById=id=>rowById(id)?.data||{};
 const nameById=id=>dataById(id).name||dataById(id).number||'—';
 const list=kind=>records.filter(r=>r.kind===kind);
+const insuranceDocuments=insurance=>list('document').filter(d=>
+  String(d.data.policyId||'')===insurance.id||String(d.data.proposalId||'')===insurance.id
+);
+const primaryInsuranceDocument=insurance=>{
+  const docs=insuranceDocuments(insurance);
+  const expected=insurance.kind==='policy'?'Apólice':'Proposta';
+  return docs.find(d=>d.data.storageKey&&String(d.data.documentType||'')===expected)
+    ||docs.find(d=>d.data.storageKey)
+    ||docs.find(d=>String(d.data.documentType||'')===expected)
+    ||docs[0]
+    ||null;
+};
+const insuranceLabel=insurance=>{
+  const type=insurance.kind==='policy'?'Apólice':'Proposta';
+  return `${type} ${insurance.data.number||'sem número'} · ${insurance.data.insurer||'—'} · ${insurance.data.branch||'—'}`;
+};
 
 async function api(action,body={},opts={}){
   const headers={...(opts.headers||{})};
@@ -271,10 +288,17 @@ function renderList(){
       return '<td>'+esc(value)+'</td>';
     }).join('');
     const openFile=current==='document'&&r.data.storageKey?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:'';
-    return '<tr>'+cells+`<td class="actions"><button data-edit="${r.id}" class="link-btn">Editar</button>${openFile}</td></tr>`;
+    const insuranceDoc=current==='insurance'?primaryInsuranceDocument(r):null;
+    const insuranceFile=current==='insurance'
+      ?(insuranceDoc?.data.storageKey
+        ?`<button data-open="${insuranceDoc.id}" class="link-btn file-action">Abrir PDF</button>`
+        :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Anexar PDF pendente':'Anexar PDF'}</button>`)
+      :'';
+    return '<tr>'+cells+`<td class="actions"><button data-edit="${r.id}" class="link-btn">Editar</button>${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.edit)));
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.open)));
+  document.querySelectorAll('[data-insurance-upload]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.insuranceUpload));
   document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
 }
 function paymentSummary(rows){
@@ -387,51 +411,101 @@ function clientRelatedDocuments(clientId){
   return list('document').filter(r=>r.data.clientId===clientId||insuranceIds.has(r.data.policyId)||insuranceIds.has(r.data.proposalId));
 }
 
+function clientRelatedDocuments(clientId){
+  const insurances=[...list('proposal'),...list('policy')].filter(r=>String(r.data.clientId||'')===String(clientId));
+  const insuranceIds=new Set(insurances.map(r=>r.id));
+  return list('document').filter(r=>String(r.data.clientId||'')===String(clientId)||insuranceIds.has(String(r.data.policyId||''))||insuranceIds.has(String(r.data.proposalId||'')));
+}
+
 function openClientDetail(clientId){
   const client=rowById(clientId);if(!client)return;
   const d=client.data;
-  const insurances=[...list('proposal'),...list('policy')].filter(r=>r.data.clientId===clientId)
+  const insurances=[...list('proposal'),...list('policy')].filter(r=>String(r.data.clientId||'')===String(clientId))
     .sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
   const docs=clientRelatedDocuments(clientId);
-  const insuranceHtml=insurances.length?insurances.map(r=>`
-    <div class="detail-row">
-      <div><span>Tipo</span><strong>${r.kind==='policy'?'Apólice':'Proposta'}</strong></div>
-      <div><span>Número</span><strong>${esc(r.data.number||'—')}</strong></div>
-      <div><span>Seguradora</span><strong>${esc(r.data.insurer||'—')}</strong></div>
-      <div><span>Ramo</span><strong>${esc(r.data.branch||'—')}</strong></div>
-      <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
-      <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
-    </div>`).join(''):'<div class="empty compact">Nenhuma proposta ou apólice cadastrada.</div>';
-  const docsHtml=docs.length?docs.map(doc=>`
-    <div class="document-row">
-      <div>
-        <strong>${esc(doc.data.name||doc.data.documentType||'Documento')}</strong>
-        <span>${esc(doc.data.documentType||'Documento')} · ${date(doc.data.referenceDate)}</span>
-      </div>
-      ${doc.data.storageKey?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir arquivo</button>`:`<span class="file-missing">Arquivo ainda não anexado</span>`}
-    </div>`).join(''):'<div class="empty compact">Nenhum arquivo anexado a este cliente.</div>';
+  const storedDocs=docs.filter(doc=>doc.data.storageKey);
+  const pendingDocs=docs.filter(doc=>!doc.data.storageKey);
+  const activePolicies=insurances.filter(r=>r.kind==='policy'&&r.data.status!=='Cancelada'&&(!r.data.end||r.data.end>=today()));
+  const totalPremium=activePolicies.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
+
+  const insuranceHtml=insurances.length?insurances.map(r=>{
+    const doc=primaryInsuranceDocument(r);
+    const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
+    const fileAction=doc?.data.storageKey
+      ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir PDF</button>`
+      :`<button class="btn primary small" data-client-upload-doc="${r.id}" data-client-id="${clientId}">${doc?'Anexar PDF pendente':'Anexar PDF'}</button>`;
+    const fileState=doc?.data.storageKey
+      ?'<span class="contract-file-state ready">Arquivo disponível</span>'
+      :doc
+        ?'<span class="contract-file-state pending">Arquivo pendente</span>'
+        :'<span class="contract-file-state neutral">Sem arquivo</span>';
+    return `
+      <article class="insurance-card">
+        <div class="insurance-card-head">
+          <div>
+            <span class="record-type">${r.kind==='policy'?'APÓLICE':'PROPOSTA'}</span>
+            <h4>${esc(r.data.number||'Sem número')}</h4>
+          </div>
+          <span class="status-pill">${esc(r.data.status||'Cadastrado')}</span>
+        </div>
+        <div class="insurance-card-grid">
+          <div><span>Seguradora</span><strong>${esc(r.data.insurer||'—')}</strong></div>
+          <div><span>Ramo</span><strong>${esc(r.data.branch||'—')}</strong></div>
+          <div><span>Corretora</span><strong>${esc(broker)}</strong></div>
+          <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
+          <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
+        </div>
+        <div class="insurance-card-foot">${fileState}${fileAction}</div>
+      </article>`;
+  }).join(''):'<div class="empty compact">Nenhuma proposta ou apólice cadastrada.</div>';
+
+  const docsHtml=docs.length?docs.map(doc=>{
+    const linked=rowById(doc.data.policyId||doc.data.proposalId);
+    const linkedLabel=linked?insuranceLabel(linked):'Documento geral do cliente';
+    const action=doc.data.storageKey
+      ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir arquivo</button>`
+      :linked
+        ?`<button class="btn primary small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Anexar arquivo</button>`
+        :'<span class="file-missing">Arquivo pendente</span>';
+    return `
+      <div class="document-row">
+        <div>
+          <strong>${esc(doc.data.name||doc.data.documentType||'Documento')}</strong>
+          <span>${esc(doc.data.documentType||'Documento')} · ${date(doc.data.referenceDate)} · ${esc(linkedLabel)}</span>
+        </div>
+        ${action}
+      </div>`;
+  }).join(''):'<div class="empty compact">Nenhum arquivo vinculado a este cliente.</div>';
+
   $('#clientDetailTitle').textContent=d.name||'Cliente';
   $('#clientDetailBody').innerHTML=`
+    <div class="client-kpis">
+      <div><span>Apólices ativas</span><strong>${activePolicies.length}</strong></div>
+      <div><span>Propostas e apólices</span><strong>${insurances.length}</strong></div>
+      <div><span>Arquivos disponíveis</span><strong>${storedDocs.length}</strong></div>
+      <div><span>Arquivos pendentes</span><strong>${pendingDocs.length}</strong></div>
+    </div>
     <div class="detail-grid">
       <div><span>CPF/CNPJ</span><strong>${esc(d.document||'—')}</strong></div>
       <div><span>Telefone</span><strong>${esc(d.phone||'—')}</strong></div>
       <div><span>E-mail</span><strong>${esc(d.email||'—')}</strong></div>
       <div><span>Cidade/UF</span><strong>${esc([d.city,d.state].filter(Boolean).join('/')||'—')}</strong></div>
       <div class="wide"><span>Endereço</span><strong>${esc(d.address||'—')}</strong></div>
+      <div class="wide"><span>Prêmio vigente</span><strong>${money(totalPremium)}</strong></div>
     </div>
-    <section class="detail-section"><h3>Propostas e apólices</h3>${insuranceHtml}</section>
-    <section class="detail-section"><h3>Arquivos</h3>${docsHtml}</section>`;
+    <section class="detail-section"><div class="section-title-row"><div><h3>Propostas e apólices</h3><p>O PDF fica associado diretamente ao respectivo contrato.</p></div></div><div class="insurance-grid">${insuranceHtml}</div></section>
+    <section class="detail-section"><div class="section-title-row"><div><h3>Documentos</h3><p>Arquivos gerais e documentos vinculados aos seguros.</p></div></div>${docsHtml}</section>`;
   $('#clientDialog').dataset.clientId=clientId;
   $('#clientDialog').showModal();
   document.querySelectorAll('[data-client-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.clientOpenDoc)));
+  document.querySelectorAll('[data-client-upload-doc]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.clientUploadDoc));
 }
 
-function openClientUpload(){
-  const clientId=$('#clientDialog').dataset.clientId;
-  $('#clientDialog').close();
+function openClientUpload(clientIdOverride='',insuranceId=''){
+  const clientId=clientIdOverride||$('#clientDialog').dataset.clientId||'';
+  uploadPrefill={clientId:String(clientId||''),insuranceId:String(insuranceId||'')};
+  if($('#clientDialog').open)$('#clientDialog').close();
   navigate('imports');
-  renderImportClients();
-  setTimeout(()=>{if($('#uploadClient'))$('#uploadClient').value=clientId},0);
 }
 
 function editClientFromDetail(){
@@ -443,26 +517,86 @@ function editClientFromDetail(){
 }
 
 async function renderImportClients(){
-  $('#uploadClient').innerHTML='<option value="">Selecione</option>'+list('client').map(r=>`<option value="${r.id}">${esc(r.data.name)}</option>`).join('');
+  $('#uploadClient').innerHTML='<option value="">Selecione</option>'+list('client')
+    .sort((a,b)=>String(a.data.name||'').localeCompare(String(b.data.name||''),'pt-BR'))
+    .map(r=>`<option value="${r.id}">${esc(r.data.name)}</option>`).join('');
+  if(uploadPrefill.clientId)$('#uploadClient').value=uploadPrefill.clientId;
+  renderUploadInsurances(uploadPrefill.insuranceId);
+}
+
+function renderUploadInsurances(preferredInsuranceId=''){
+  const clientId=$('#uploadClient').value;
+  const options=[...list('proposal'),...list('policy')]
+    .filter(r=>String(r.data.clientId||'')===String(clientId||''))
+    .sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
+  $('#uploadInsurance').innerHTML='<option value="">Documento geral do cliente</option>'+options
+    .map(r=>`<option value="${r.id}">${esc(insuranceLabel(r))}</option>`).join('');
+  const preferred=preferredInsuranceId||uploadPrefill.insuranceId;
+  if(preferred&&options.some(r=>r.id===preferred))$('#uploadInsurance').value=preferred;
+  syncUploadType();
+}
+
+function syncUploadType(){
+  const insurance=rowById($('#uploadInsurance').value);
+  const hint=$('#uploadLinkHint');
+  if(!insurance){
+    if(hint)hint.textContent='Documento geral do cliente: o arquivo ficará na ficha do cliente, sem vínculo com uma proposta ou apólice específica.';
+    return;
+  }
+  $('#uploadType').value=insurance.kind==='policy'?'Apólice':'Proposta';
+  if(hint)hint.innerHTML=`Vínculo selecionado: <strong>${esc(insuranceLabel(insurance))}</strong>. O arquivo será exibido diretamente nesse seguro.`;
 }
 
 async function uploadDocument(e){
-  e.preventDefault();const f=$('#uploadFile').files[0];if(!f)return;
+  e.preventDefault();
+  const f=$('#uploadFile').files[0];if(!f)return;
   if(f.size>15*1024*1024){$('#uploadStatus').textContent='Arquivo acima de 15 MB.';return}
   const clientId=$('#uploadClient').value;if(!clientId)return;
+  const insurance=rowById($('#uploadInsurance').value);
+  if(insurance&&String(insurance.data.clientId||'')!==String(clientId)){
+    $('#uploadStatus').textContent='O seguro selecionado não pertence a este cliente.';return;
+  }
+  const policyId=insurance?.kind==='policy'?insurance.id:'';
+  const proposalId=insurance?.kind==='proposal'?insurance.id:'';
+  const documentType=$('#uploadType').value;
   const key=`clients/${clientId}/${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth()+1).padStart(2,'0')}/${uuid()}-${f.name.replace(/[^a-zA-Z0-9._-]+/g,'-')}`;
-  $('#uploadStatus').textContent='Enviando...';
+  $('#uploadStatus').textContent='Enviando e vinculando arquivo...';
   try{
     await api('storage-put',f,{raw:true,key,headers:{'content-type':f.type||'application/octet-stream'}});
     const stamp=now();
-    const data={clientId,policyId:'',proposalId:'',insuredItemId:'',name:f.name,documentType:$('#uploadType').value,referenceDate:today(),source:'Upload interno',status:'Recebido',storageKey:key,originalFileName:f.name,mimeType:f.type||'application/octet-stream',fileSize:f.size,notes:$('#uploadNotes').value};
-    await api('write',{ops:[{type:'insert',id:uuid(),kind:'document',data,version:1,created_at:stamp,updated_at:stamp}]});
-    $('#uploadForm').reset();$('#uploadStatus').textContent='Documento armazenado com sucesso.';
-    await loadRecords();renderImportClients();
+    const placeholder=insurance?list('document').find(doc=>{
+      const sameClient=String(doc.data.clientId||'')===String(clientId);
+      const sameContract=policyId?String(doc.data.policyId||'')===policyId:String(doc.data.proposalId||'')===proposalId;
+      const sameType=String(doc.data.documentType||'')===String(documentType);
+      return sameClient&&sameContract&&sameType&&!doc.data.storageKey;
+    }):null;
+    const data={
+      ...(placeholder?.data||{}),
+      clientId,policyId,proposalId,insuredItemId:placeholder?.data.insuredItemId||'',
+      name:f.name,documentType,referenceDate:placeholder?.data.referenceDate||today(),
+      source:placeholder?'Upload interno — arquivo recuperado':'Upload interno',
+      status:'Recebido',storageKey:key,originalFileName:f.name,
+      mimeType:f.type||'application/octet-stream',fileSize:f.size,
+      notes:$('#uploadNotes').value||placeholder?.data.notes||''
+    };
+    const op=placeholder
+      ?{type:'update',id:placeholder.id,kind:'document',data,version:placeholder.version,updated_at:stamp,strict:true}
+      :{type:'insert',id:uuid(),kind:'document',data,version:1,created_at:stamp,updated_at:stamp};
+    await api('write',{ops:[op]});
+    $('#uploadForm').reset();
+    $('#uploadStatus').textContent=placeholder
+      ?'Arquivo recuperado e vinculado ao seguro com sucesso.'
+      :insurance
+        ?'Documento armazenado e vinculado ao seguro com sucesso.'
+        :'Documento armazenado na ficha do cliente com sucesso.';
+    await loadRecords();
+    uploadPrefill={clientId:'',insuranceId:''};
+    await renderImportClients();
   }catch(err){$('#uploadStatus').textContent=err.message}
 }
 
 async function openDocument(entry){
+  if(!entry?.data?.storageKey){alert('Este registro ainda não possui arquivo armazenado. Use “Anexar arquivo” para regularizar o documento.');return;}
   try{
     const blob=await api('storage-get',null,{blob:true,key:entry.data.storageKey});
     const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');
@@ -483,6 +617,8 @@ $('#closeEditor').onclick=()=>$('#editorDialog').close();
 $('#cancelEditor').onclick=()=>$('#editorDialog').close();
 $('#editorForm').onsubmit=saveCurrent;
 $('#searchInput').oninput=()=>{if(current!=='overview'&&current!=='imports')renderList()};
+$('#uploadClient').onchange=()=>{uploadPrefill.insuranceId='';renderUploadInsurances('')};
+$('#uploadInsurance').onchange=syncUploadType;
 $('#uploadForm').onsubmit=uploadDocument;
 
 boot();
