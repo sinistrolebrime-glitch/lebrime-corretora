@@ -94,17 +94,34 @@ const commissionForInsurance=insurance=>list('commission').find(c=>
 
 const daysUntil=v=>v?Math.ceil((new Date(v+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000):null;
 
+const renewalTrackerFor=r=>list('renewal').find(t=>
+  (r.kind==='policy'&&String(t.data.policyId||'')===String(r.id))||
+  (r.kind==='proposal'&&String(t.data.proposalId||'')===String(r.id))
+)||null;
+
+const automaticRenewalPriority=r=>{
+  if(r.kind==='proposal')return 'Alta';
+  const d=daysUntil(r.data.end);
+  if(d===null)return 'Baixa';
+  if(d<=30)return 'Crítica';
+  if(d<=60)return 'Alta';
+  if(d<=90)return 'Média';
+  return 'Baixa';
+};
+
 const renewalStatus=r=>{
+  const tracker=renewalTrackerFor(r);
+  if(tracker?.data?.status)return tracker.data.status;
   if(r.kind==='proposal')return `Em renovação · ${r.data.status||'Em andamento'}`;
   const d=daysUntil(r.data.end);
   if(d===null)return 'Sem vigência';
   if(d<0)return 'Vencida';
-  if(d<=30)return 'Até 30 dias';
-  if(d<=60)return '31–60 dias';
-  if(d<=90)return '61–90 dias';
-  if(d<=120)return '91–120 dias';
-  return 'Futura';
+  return 'A iniciar';
 };
+
+const renewalPriority=r=>renewalTrackerFor(r)?.data?.priority||automaticRenewalPriority(r);
+const renewalNextAction=r=>renewalTrackerFor(r)?.data?.nextAction||'—';
+const renewalNextActionDate=r=>renewalTrackerFor(r)?.data?.nextActionDate||'';
 
 let renewalFilters={window:'all',producer:'all',insurer:'all',brokerage:'all',status:'all'};
 
@@ -325,11 +342,11 @@ const config={
       ['clientId','Cliente','ref','client'],
       ['producerId','Produtor','ref','producer'],
       ['brokerages','Corretoras','brokerages'],
-      ['insurer','Seguradora','select',insurers],
-      ['branch','Ramo','select',branches],
+      ['insurer','Seguradora','combo',insurers],
+      ['branch','Ramo','combo',branches],
       ['subBranches','Ramos / seções internas','textarea'],
       ['number','Nº proposta / apólice','text'],
-      ['policyType','Operação','select',['Seguro novo','Renovação']],
+      ['policyType','Operação','select',['Seguro novo','Renovação','Endosso','Cancelamento']],
       ['netPremium','Prêmio líquido','money'],
       ['premium','Prêmio total','money'],
       ['start','Início vigência','date'],
@@ -379,10 +396,19 @@ const config={
       ['Seguradora',r=>r.data.insurer],
       ['Produtor',r=>nameById(r.data.producerId)],
       ['Corretora',r=>String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ')],
+      ['Prioridade',r=>renewalPriority(r)],
       ['Situação',r=>renewalStatus(r)],
-      ['Fim da vigência',r=>r.kind==='policy'?date(r.data.end):'Em andamento']
+      ['Dias',r=>r.kind==='policy'?(daysUntil(r.data.end)===null?'—':String(daysUntil(r.data.end))):'—'],
+      ['Próxima ação',r=>renewalNextAction(r)],
+      ['Data',r=>renewalNextActionDate(r)?date(renewalNextActionDate(r)):'—']
     ],
-    fields:[]
+    fields:[
+      ['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['producerId','Produtor','ref','producer'],
+      ['status','Status','select',['A iniciar','Em cotação','Propostas recebidas','Enviado ao cliente','Em negociação','Renovado','Perdido','Não renovar']],
+      ['priority','Prioridade','select',['Crítica','Alta','Média','Baixa']],
+      ['nextAction','Próxima ação','text'],['nextActionDate','Data próxima ação','date'],['lastContactDate','Último contato','date'],
+      ['lastContactChannel','Canal','select',['','Ligação','WhatsApp','E-mail','Reunião','Outro']],['notes','Observações','textarea']
+    ]
   },
   claim:{
     title:'Sinistro',columns:[['Cliente',r=>nameById(r.data.clientId)],['Apólice',r=>nameById(r.data.policyId)],['Número',r=>r.data.number],['Ocorrência',r=>date(r.data.incidentDate)],['Tipo',r=>r.data.claimType],['Status',r=>r.data.status]],
@@ -408,9 +434,9 @@ const config={
 
 function businessFields(kind){
   return [
-    ['clientId','Cliente','ref','client'],['producerId','Produtor','ref','producer'],['brokerages','Corretoras','brokerages'],['insurer','Seguradora','select',insurers],
-    ['branch','Ramo','select',branches],['subBranches','Ramos / seções internas','textarea'],['number',kind==='policy'?'Nº apólice':'Nº proposta','text'],
-    ['policyType','Tipo','select',['Seguro novo','Renovação']],['netPremium','Prêmio líquido','money'],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
+    ['clientId','Cliente','ref','client'],['producerId','Produtor','ref','producer'],['brokerages','Corretoras','brokerages'],['insurer','Seguradora','combo',insurers],
+    ['branch','Ramo','combo',branches],['subBranches','Ramos / seções internas','textarea'],['number',kind==='policy'?'Nº apólice':'Nº proposta','text'],
+    ['policyType','Tipo','select',['Seguro novo','Renovação','Endosso','Cancelamento']],['netPremium','Prêmio líquido','money'],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
     ['status','Status','select',kind==='policy'?['Ativa','Cancelada','Renovada']:['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida']],
     ['commissionPercent','% comissão','number'],['notes','Observações','textarea']
   ];
@@ -427,7 +453,7 @@ function renewalFilterHtml(rows){
   const producerIds=[...new Set(rows.map(r=>r.data.producerId).filter(Boolean))];
   const insurerValues=[...new Set(rows.map(r=>r.data.insurer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   const brokerageValues=[...new Set(rows.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-  const statusValues=[...new Set(rows.map(r=>r.data.status).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const statusValues=[...new Set(rows.map(r=>renewalStatus(r)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   return `
     <div class="renewal-filters">
       <label>Janela
@@ -459,7 +485,7 @@ function applyRenewalFilters(rows){
     if(renewalFilters.producer!=='all'&&String(r.data.producerId||'')!==renewalFilters.producer)return false;
     if(renewalFilters.insurer!=='all'&&String(r.data.insurer||'')!==renewalFilters.insurer)return false;
     if(renewalFilters.brokerage!=='all'&&!String(r.data.brokerages||r.data.brokerage||'').split('|').includes(renewalFilters.brokerage))return false;
-    if(renewalFilters.status!=='all'&&String(r.data.status||'')!==renewalFilters.status)return false;
+    if(renewalFilters.status!=='all'&&renewalStatus(r)!==renewalFilters.status)return false;
     if(renewalFilters.window!=='all'&&r.kind==='policy'){
       const d=daysUntil(r.data.end);
       const max=Number(renewalFilters.window);
@@ -526,7 +552,7 @@ function renderList(){
       :'';
 
     const editAction=current==='renewal'
-      ?`<button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
+      ?`<button data-renewal-track="${r.id}" class="link-btn">${renewalTrackerFor(r)?'Atualizar acompanhamento':'Acompanhar'}</button><button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
       :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
 
     return '<tr>'+cells+`<td class="actions">${editAction}${openFile}${insuranceFile}</td></tr>`;
@@ -537,6 +563,7 @@ function renderList(){
   document.querySelectorAll('[data-insurance-upload]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.insuranceUpload));
   document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
   document.querySelectorAll('[data-producer-detail]').forEach(b=>b.onclick=()=>openProducerDetail(b.dataset.producerDetail));
+  document.querySelectorAll('[data-renewal-track]').forEach(b=>b.onclick=()=>openRenewalTracker(b.dataset.renewalTrack));
   document.querySelectorAll('[data-renewal-edit]').forEach(b=>b.onclick=()=>editInsuranceFromRenewal(b.dataset.renewalEdit));
   document.querySelectorAll('[data-renew-filter]').forEach(sel=>sel.onchange=()=>{
     renewalFilters[sel.dataset.renewFilter]=sel.value;
@@ -571,6 +598,10 @@ function fieldHtml(f,value){
   const val=value??'';
   if(type==='textarea')return `<label class="span-2">${label}<textarea name="${key}" rows="3">${esc(val)}</textarea></label>`;
   if(type==='select')return `<label>${label}<select name="${key}">${(options||[]).map(o=>`<option value="${esc(o)}" ${String(val)===String(o)?'selected':''}>${esc(o||'Selecione')}</option>`).join('')}</select></label>`;
+  if(type==='combo'){
+    const listId=`list-${key}`;
+    return `<label>${label}<input name="${key}" list="${listId}" value="${esc(val)}"><datalist id="${listId}">${(options||[]).map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist></label>`;
+  }
   if(type==='ref'){
     const opts=list(options).map(r=>`<option value="${r.id}" ${String(val)===r.id?'selected':''}>${esc(r.data.name||r.data.number||r.id)}</option>`).join('');
     return `<label>${label}<select name="${key}"><option value="">Selecione</option>${opts}</select></label>`;
@@ -699,6 +730,26 @@ function editProducerFromDetail(){
   $('#producerDialog').close();
   current='producer';renderNav();
   openEditor(producer);
+}
+
+function openRenewalTracker(id){
+  const insurance=rowById(id);if(!insurance)return;
+  const tracker=renewalTrackerFor(insurance);
+  current='renewal';renderNav();
+  editing=tracker;
+  $('#editorTitle').textContent=tracker?'Atualizar Renovação':'Acompanhar Renovação';
+  const values={
+    ...(tracker?.data||{}),
+    clientId:insurance.data.clientId||'',
+    policyId:insurance.kind==='policy'?insurance.id:'',
+    proposalId:insurance.kind==='proposal'?insurance.id:'',
+    producerId:insurance.data.producerId||'',
+    status:tracker?.data?.status||'A iniciar',
+    priority:tracker?.data?.priority||automaticRenewalPriority(insurance)
+  };
+  $('#editorFields').innerHTML=config.renewal.fields.map(f=>fieldHtml(f,values[f[0]])).join('');
+  $('#editorError').textContent='';
+  $('#editorDialog').showModal();
 }
 
 function editInsuranceFromRenewal(id){
