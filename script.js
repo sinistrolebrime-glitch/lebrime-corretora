@@ -447,13 +447,16 @@ async function renderIntegrations(){
       <div class="integration-kpis">
         <div><span>Última sincronização</span><strong>${integrationDateTime(last?.finishedAt||last?.startedAt)}</strong></div>
         <div><span>Arquivos armazenados</span><strong>${Number(status.totalFiles||0)}</strong></div>
+        <div><span>Arquivos processados</span><strong>${Number(status.processedCount||0)}</strong></div>
+        <div><span>Pendentes de processamento</span><strong>${Number(status.pendingCount||0)}</strong></div>
         <div><span>Últimos 7 dias</span><strong>${Number(status.recentCount||0)}</strong></div>
         <div><span>Erros no último ciclo</span><strong>${Number(last?.errors||0)}</strong></div>
       </div>
       <div class="integration-actions">
         <button id="portoSyncBtn" class="btn primary" type="button" ${ready?'':'disabled'}>Sincronizar agora</button>
+        <button id="portoProcessBtn" class="btn ghost" type="button">Processar arquivos</button>
         <span class="muted">${ready
-          ?'Consulta até 7 dias, baixa somente arquivos novos e mantém histórico.'
+          ?'Baixa arquivos novos e processa automaticamente vínculos seguros com a carteira.'
           :'Código implantado. Cadastre PORTO_SUSEP, PORTO_LOGIN e PORTO_PASSWORD nos segredos do Supabase para ativar.'}</span>
       </div>
       <div id="portoSyncStatus" class="status"></div>
@@ -464,12 +467,14 @@ async function renderIntegrations(){
         </div>
         ${recent.length?recent.map(f=>`
           <div class="integration-file-row">
-            <div><strong>${esc(f.name||'Arquivo Porto')}</strong><span>${esc(f.product||'—')} · ${esc(f.fileType||'—')}</span></div>
-            <div><span>${integrationDateTime(f.generatedAt)}</span><span class="status-pill corporate-status ${f.status==='Erro'?'danger':'info'}">${esc(f.status||'Baixado')}</span></div>
+            <div><strong>${esc(f.name||'Arquivo Porto')}</strong><span>${esc(f.product||'—')} · ${esc(f.fileType||'—')}</span><span>${esc(f.parserStatus||'Aguardando processamento')}</span></div>
+            <div><span>${integrationDateTime(f.generatedAt)}</span><span class="status-pill corporate-status ${f.status==='Erro'?'danger':(f.status==='Processado'?'success':'info')}">${esc(f.status||'Baixado')}</span></div>
           </div>`).join(''):'<div class="empty-state compact">Nenhum arquivo sincronizado ainda.</div>'}
       </div>`;
     const btn=$('#portoSyncBtn');
     if(btn)btn.onclick=syncPortoNow;
+    const processBtn=$('#portoProcessBtn');
+    if(processBtn)processBtn.onclick=processPortoNow;
   }catch(e){
     const porto=root.querySelector('.integration-card');
     if(porto)porto.innerHTML=`
@@ -488,12 +493,30 @@ async function syncPortoNow(){
   if(status)status.textContent='Consultando a Porto e baixando somente arquivos ainda não processados...';
   try{
     const result=await api('porto-sync',{days:7});
-    if(status)status.textContent=`Sincronização concluída: ${result.found||0} encontrado(s), ${result.downloaded||0} novo(s), ${result.skipped||0} já existente(s), ${result.errors||0} erro(s).`;
+    const p=result.processor||{};
+    if(status)status.textContent=`Sincronização concluída: ${result.found||0} encontrado(s), ${result.downloaded||0} novo(s), ${result.skipped||0} já existente(s), ${result.errors||0} erro(s). Processamento: ${p.processed||0} arquivo(s), ${p.linked||0} vinculado(s), ${p.staged||0} em staging.`;
     await loadRecords();
     await renderIntegrations();
   }catch(e){
     if(status)status.textContent=e.message||String(e);
     if(btn){btn.disabled=false;btn.textContent='Sincronizar agora';}
+  }
+}
+
+
+async function processPortoNow(){
+  const btn=$('#portoProcessBtn');
+  const status=$('#portoSyncStatus');
+  if(btn){btn.disabled=true;btn.textContent='Processando...';}
+  if(status)status.textContent='Lendo os arquivos da Porto e vinculando somente dados com correspondência segura...';
+  try{
+    const result=await api('porto-process',{});
+    if(status)status.textContent=`Processamento concluído: ${result.processed||0} arquivo(s), ${result.linked||0} vinculado(s), ${result.staged||0} em staging, ${result.createdClients||0} cliente(s), ${result.createdProposals||0} proposta(s) e ${result.createdPolicies||0} apólice(s) criados.`;
+    await loadRecords();
+    await renderIntegrations();
+  }catch(e){
+    if(status)status.textContent=e.message||String(e);
+    if(btn){btn.disabled=false;btn.textContent='Processar arquivos';}
   }
 }
 
