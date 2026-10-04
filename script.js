@@ -410,18 +410,24 @@ const config={
       ['branch','Ramo','combo',branches],
       ['subBranches','Ramos / seções internas','textarea'],
       ['number','Nº proposta / apólice','text'],
-      ['policyType','Operação','select',['Seguro novo','Renovação','Endosso','Cancelamento']],
+      ['policyType','Operação','select',['Seguro novo','Renovação','Cancelamento']],
       ['netPremium','Prêmio líquido','money'],
       ['premium','Prêmio total','money'],
       ['start','Início vigência','date'],
       ['end','Fim vigência','date'],
       ['status','Status','select',['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida','Ativa','Cancelada','Renovada']],
       ['commissionPercent','% comissão','number'],
+      ['installmentCount','Qtd. parcelas','number'],
+      ['paymentMethod','Forma de pagamento','select',['','Boleto','Débito em conta','Cartão de crédito','Cartão de débito','PIX','Transferência','Outro']],
+      ['firstInstallmentAmount','Valor da 1ª parcela','money'],
+      ['installmentAmount','Valor padrão das demais','money'],
+      ['firstDueDate','1º vencimento (se conhecido)','date'],
+      ['paymentDueText','Referência do vencimento','text'],
       ['notes','Observações','textarea']
     ]
   },
   payment:{
-    title:'Parcela',columns:[['Cliente',r=>nameById(dataById(r.data.policyId||r.data.proposalId).clientId)],['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Parcela',r=>r.data.installment],['Vencimento',r=>date(r.data.due)],['Valor',r=>money(r.data.amount)],['Status',r=>r.data.status],['Cobrança',r=>r.data.collectionStatus]],
+    title:'Parcela',columns:[['Cliente',r=>nameById(r.data.clientId||dataById(r.data.policyId||r.data.proposalId).clientId)],['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Origem',r=>r.data.financialTracking||'—'],['Parcela',r=>r.data.installment],['Vencimento',r=>r.data.due?date(r.data.due):(r.data.dueText||'—')],['Valor',r=>money(r.data.amount)],['Status',r=>r.data.status],['Cobrança',r=>r.data.collectionStatus]],
     fields:[
       ['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['installment','Parcela','text'],['amount','Valor','money'],['due','Vencimento','date'],
       ['status','Status','select',['Em aberto','Pago','Cancelado']],['paidDate','Data pagamento','date'],['paymentMethod','Forma','select',['','Boleto','Débito em conta','Cartão de crédito','Cartão de débito','PIX','Transferência','Outro']],
@@ -505,7 +511,8 @@ function businessFields(kind){
   return [
     ['clientId','Cliente','ref','client'],['producerId','Produtor','ref','producer'],['brokerages','Corretoras','brokerages'],['insurer','Seguradora','combo',insurers],
     ['branch','Ramo','combo',branches],['subBranches','Ramos / seções internas','textarea'],['number',kind==='policy'?'Nº apólice':'Nº proposta','text'],
-    ['policyType','Tipo','select',['Seguro novo','Renovação','Endosso','Cancelamento']],['netPremium','Prêmio líquido','money'],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
+    ['policyType','Tipo','select',['Seguro novo','Renovação','Cancelamento']],['netPremium','Prêmio líquido','money'],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
+    ['installmentCount','Qtd. parcelas','number'],['paymentMethod','Forma de pagamento','select',['','Boleto','Débito em conta','Cartão de crédito','Cartão de débito','PIX','Transferência','Outro']],['firstInstallmentAmount','Valor da 1ª parcela','money'],['installmentAmount','Valor padrão das demais','money'],['firstDueDate','1º vencimento (se conhecido)','date'],['paymentDueText','Referência do vencimento','text'],
     ['status','Status','select',kind==='policy'?['Ativa','Cancelada','Renovada']:['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida']],
     ['commissionPercent','% comissão','number'],['notes','Observações','textarea']
   ];
@@ -644,10 +651,11 @@ function renderList(){
   });
 }
 function paymentSummary(rows){
+  const forecast=rows.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
   const relevant=rows.filter(r=>r.data.financialTracking!=='Previsão da proposta');
   const open=relevant.filter(r=>r.data.status==='Em aberto');
   const overdue=open.filter(r=>r.data.due&&r.data.due<today());
-  return `<span class="chip">Em aberto: ${open.length} · ${money(open.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip danger">Atrasadas: ${overdue.length} · ${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip">Corte da implantação: ${CUTOFF}</span>`;
+  return `<span class="chip">Previsões de propostas: ${forecast.length} · ${money(forecast.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip">Em aberto: ${open.length} · ${money(open.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip danger">Atrasadas: ${overdue.length} · ${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip">Corte da implantação: ${CUTOFF}</span>`;
 }
 
 function editorConfig(){return config[current]}
@@ -717,6 +725,7 @@ function validateBeforeSave(data){
     if(!data.clientId||!data.insurer||!data.branch||!data.number)return 'Preencha cliente, seguradora, ramo e número.';
     if(!String(data.brokerages||'').trim())return 'Selecione a corretora responsável por esta proposta/apólice.';
     if(Number(data.commissionPercent||0)>0&&!Number(data.netPremium||0))return 'Informe o prêmio líquido para calcular a comissão.';
+    if(Number(data.installmentCount||0)>0&&!Number(data.premium||0))return 'Informe o prêmio total para gerar o plano de parcelas.';
     const dup=list(recordKind).find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
     if(dup)return 'Já existe um registro com este cliente, seguradora, ramo, número e vigência.';
   }
@@ -857,6 +866,7 @@ function openClientDetail(clientId){
 
   const insuranceHtml=insurances.length?insurances.map(r=>{
     const doc=primaryInsuranceDocument(r);
+    const endorsementCount=insuranceDocuments(r).filter(d=>fold(d.data.documentType||'')==='endosso').length;
     const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
     const fileAction=doc?.data.storageKey
       ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir PDF</button>`
@@ -883,7 +893,7 @@ function openClientDetail(clientId){
           <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
           <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
         </div>
-        <div class="insurance-card-foot">${fileState}${fileAction}</div>
+        <div class="insurance-card-foot">${fileState}${endorsementCount?`<span class="contract-file-state ready">${endorsementCount} endosso(s)</span>`:''}${fileAction}</div>
       </article>`;
   }).join(''):'<div class="empty compact">Nenhuma proposta ou apólice cadastrada.</div>';
 
@@ -964,15 +974,30 @@ function renderUploadInsurances(preferredInsuranceId=''){
   syncUploadType();
 }
 
+function inferUploadDocumentType(fileName=''){
+  const n=fold(fileName);
+  if(n.includes('endosso'))return 'Endosso';
+  if(n.includes('apolice'))return 'Apólice';
+  if(n.includes('proposta'))return 'Proposta';
+  return '';
+}
+
 function syncUploadType(){
   const insurance=rowById($('#uploadInsurance').value);
+  const file=$('#uploadFile')?.files?.[0];
+  const inferred=inferUploadDocumentType(file?.name||'');
   const hint=$('#uploadLinkHint');
+  if(inferred)$('#uploadType').value=inferred;
   if(!insurance){
-    if(hint)hint.textContent='Documento geral do cliente: o arquivo ficará na ficha do cliente, sem vínculo com uma proposta ou apólice específica.';
+    if(hint)hint.textContent=inferred==='Endosso'
+      ?'Endosso identificado. Selecione obrigatoriamente a proposta/apólice do cliente à qual ele pertence.'
+      :'Documento geral do cliente: o arquivo ficará na ficha do cliente, sem vínculo com uma proposta ou apólice específica.';
     return;
   }
-  $('#uploadType').value=insurance.kind==='policy'?'Apólice':'Proposta';
-  if(hint)hint.innerHTML=`Vínculo selecionado: <strong>${esc(insuranceLabel(insurance))}</strong>. O arquivo será exibido diretamente nesse seguro.`;
+  if(!inferred&&$('#uploadType').value!=='Endosso')$('#uploadType').value=insurance.kind==='policy'?'Apólice':'Proposta';
+  if(hint)hint.innerHTML=$('#uploadType').value==='Endosso'
+    ?`Endosso vinculado ao contrato: <strong>${esc(insuranceLabel(insurance))}</strong>. Ele ficará no histórico deste contrato e não criará um novo seguro.`
+    :`Vínculo selecionado: <strong>${esc(insuranceLabel(insurance))}</strong>. O arquivo será exibido diretamente nesse seguro.`;
 }
 
 async function uploadDocument(e){
@@ -986,7 +1011,12 @@ async function uploadDocument(e){
   }
   const policyId=insurance?.kind==='policy'?insurance.id:'';
   const proposalId=insurance?.kind==='proposal'?insurance.id:'';
-  const documentType=$('#uploadType').value;
+  const documentType=inferUploadDocumentType(f.name)||$('#uploadType').value;
+  if(documentType==='Endosso'&&!insurance){
+    $('#uploadStatus').textContent='Endosso identificado: selecione a proposta ou apólice correspondente antes de enviar.';
+    return;
+  }
+  $('#uploadType').value=documentType;
   const key=`clients/${clientId}/${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth()+1).padStart(2,'0')}/${uuid()}-${f.name.replace(/[^a-zA-Z0-9._-]+/g,'-')}`;
   $('#uploadStatus').textContent='Enviando e vinculando arquivo...';
   let uploaded=false;
@@ -1005,6 +1035,8 @@ async function uploadDocument(e){
       clientId,policyId,proposalId,insuredItemId:placeholder?.data.insuredItemId||'',
       name:f.name,documentType,referenceDate:placeholder?.data.referenceDate||today(),
       source:placeholder?'Upload interno — arquivo recuperado':'Upload interno',
+      contractId:insurance?.id||'',contractNumber:insurance?.data?.number||'',
+      isEndorsement:documentType==='Endosso',
       status:'Recebido',storageKey:key,originalFileName:f.name,
       mimeType:f.type||'application/octet-stream',fileSize:f.size,
       notes:$('#uploadNotes').value||placeholder?.data.notes||''
@@ -1055,6 +1087,8 @@ $('#editorForm').onsubmit=saveCurrent;
 $('#searchInput').oninput=()=>{if(current!=='overview'&&current!=='imports')renderList()};
 $('#uploadClient').onchange=()=>{uploadPrefill.insuranceId='';renderUploadInsurances('')};
 $('#uploadInsurance').onchange=syncUploadType;
+$('#uploadType').onchange=syncUploadType;
+$('#uploadFile').onchange=syncUploadType;
 $('#uploadForm').onsubmit=uploadDocument;
 
 boot();
