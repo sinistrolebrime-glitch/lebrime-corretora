@@ -114,7 +114,7 @@ const list=kind=>records.filter(r=>r.kind===kind);
 const insuranceDocuments=insurance=>list('document').filter(d=>
   String(d.data.policyId||'')===insurance.id||String(d.data.proposalId||'')===insurance.id
 );
-const documentExternalUrl=doc=>doc?.data?.externalUrl||doc?.data?.sourceDriveUrl||'';
+const documentExternalUrl=doc=>doc?.data?.externalUrl||doc?.data?.sourceDriveUrl||(doc?.data?.sourceDriveFileId?`https://drive.google.com/file/d/${encodeURIComponent(doc.data.sourceDriveFileId)}/view`:'');
 const documentAvailable=doc=>Boolean(doc?.data?.storageKey||documentExternalUrl(doc));
 const primaryInsuranceDocument=insurance=>{
   const docs=insuranceDocuments(insurance);
@@ -263,7 +263,7 @@ const importedInsuranceDocument=insurance=>{
   if(!insurance||!['proposal','policy'].includes(insurance.kind))return null;
   const expected=insurance.kind==='policy'?'apólice':'proposta';
   return insuranceDocuments(insurance).find(d=>
-    d.data.storageKey&&fold(d.data.documentType||'').includes(fold(expected))
+    documentAvailable(d)&&fold(d.data.documentType||'').includes(fold(expected))
   )||null;
 };
 
@@ -2178,7 +2178,7 @@ async function uploadDocument(e){
       const sameClient=String(doc.data.clientId||'')===String(clientId);
       const sameContract=policyId?String(doc.data.policyId||'')===policyId:String(doc.data.proposalId||'')===proposalId;
       const sameType=String(doc.data.documentType||'')===String(documentType);
-      return sameClient&&sameContract&&sameType&&!doc.data.storageKey;
+      return sameClient&&sameContract&&sameType&&!documentAvailable(doc);
     }):null;
     const data={
       ...(placeholder?.data||{}),
