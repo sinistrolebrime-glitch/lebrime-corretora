@@ -173,3 +173,12 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - Exceções de integração permanecem na fila operacional enquanto não houver vínculo seguro.
 - Uma pendência pode estar vinculada a uma proposta ou a uma apólice, nunca às duas simultaneamente.
 - O vínculo da pendência serve para navegação e acompanhamento e não deve criar um novo contrato.
+
+
+### Documentos e endossos — centro documental
+- A biblioteca documental pode ser filtrada por tipo, status, disponibilidade do arquivo e corretora.
+- O documento pode estar vinculado a um cliente e, quando aplicável, a uma única proposta ou apólice.
+- Se houver contrato selecionado, ele deve pertencer ao cliente informado.
+- Endosso exige vínculo com a proposta ou apólice correspondente.
+- Endosso continua sendo documento/evento do contrato e não cria um novo contrato.
+- Filtros e navegação da biblioteca não alteram conteúdo, vínculo financeiro ou situação da apólice.
