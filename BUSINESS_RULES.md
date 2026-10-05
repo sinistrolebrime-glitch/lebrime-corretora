@@ -120,3 +120,34 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - Nunca aplicar valor financeiro sem vínculo seguro.
 - Endosso não deve virar novo contrato.
 - O arquivo original da Porto deve permanecer preservado para auditoria.
+
+
+## Navegação operacional — clientes, contratos e renovações
+
+### Busca de clientes
+- A pesquisa de clientes é instantânea enquanto o usuário digita.
+- A localização deve considerar nome, CPF/CNPJ, placa, número de proposta e número de apólice.
+- A busca é somente uma forma de localizar registros existentes; ela não cria nem altera vínculos.
+
+### Ficha do cliente
+- A ficha do cliente consolida dados cadastrais, propostas, apólices, parcelas, pendências, renovações, comissões e documentos vinculados.
+- O campo de corretora pertence à proposta/apólice. O mesmo cliente pode possuir contratos de corretoras diferentes.
+- O filtro por corretora na ficha do cliente deve filtrar os contratos e os dados operacionais vinculados aos contratos exibidos, sem alterar os registros originais.
+
+### Ficha da proposta/apólice
+- A ficha do contrato é uma visão consolidada do registro já existente.
+- Itens segurados, veículos, condutores, coberturas, parcelas, comissão, documentos, endossos, pendências e sinistros devem ser exibidos somente quando houver vínculo com aquele contrato.
+- Endosso permanece como documento/evento do contrato e nunca cria automaticamente uma nova apólice.
+- Informações ausentes são exibidas como não cadastradas; o sistema não deve preencher dados por suposição.
+
+### Renovações
+- A central de renovações permite consulta direta na tela por período de vencimento.
+- Os filtros incluem produtor, seguradora, ramo, corretora e status.
+- A exportação e o espelho são saídas da consulta; não são requisito para visualizar as renovações.
+- O espelho deve refletir somente os registros que atendem aos filtros ativos.
+
+### Preservação das regras financeiras
+- Melhorias de navegação e visualização não alteram as regras de comissão.
+- O sistema continua proibido de inventar produtor, percentual de comissão ou prêmio líquido.
+- A comissão só é reconciliada quando prêmio líquido, percentual de comissão e produtor estiverem presentes.
+- As regras especiais de Lebrime, FF Apolinário/Homeni/Eólica e Leandro permanecem vigentes conforme as seções financeiras deste documento.
