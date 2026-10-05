@@ -314,6 +314,7 @@ let renewalFilters={dateFrom:'',dateTo:'',producer:'all',insurer:'all',branch:'a
 let paymentFilters={dateFrom:'',dateTo:'',status:'all',collection:'all',kind:'all',brokerage:'all',insurer:'all'};
 let commissionFilters={receivedFrom:'',receivedTo:'',producer:'all',brokerage:'all',insurer:'all',status:'all'};
 let taskFilters={dueFrom:'',dueTo:'',status:'all',source:'all',destination:'all',responsible:'all'};
+let documentFilters={type:'all',status:'all',file:'all',brokerage:'all'};
 
 const contractForRow=row=>rowById(row?.data?.policyId||row?.data?.proposalId)||null;
 const brokerageLabelOf=insurance=>String(insurance?.data?.brokerages||insurance?.data?.brokerage||'—').replace(/\|/g,' · ');
@@ -898,8 +899,22 @@ const config={
     ]
   },
   document:{
-    title:'Documento',columns:[['Cliente',r=>nameById(r.data.clientId)],['Nome',r=>r.data.name],['Tipo',r=>r.data.documentType],['Data',r=>date(r.data.referenceDate)],['Status',r=>r.data.status],['Arquivo',r=>r.data.storageKey?'Disponível':'—']],
-    fields:[['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['name','Nome','text'],['documentType','Tipo','text'],['referenceDate','Data de referência','date'],['status','Status','select',['Recebido','Conferido','Pendente']],['notes','Observações','textarea']]
+    title:'Documento',
+    columns:[
+      ['Cliente',r=>nameById(r.data.clientId)],
+      ['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],
+      ['Corretora',r=>brokerageLabelOf(contractForRow(r))],
+      ['Nome',r=>r.data.name],
+      ['Tipo',r=>r.data.documentType],
+      ['Data',r=>date(r.data.referenceDate)],
+      ['Status',r=>r.data.status],
+      ['Arquivo',r=>r.data.storageKey?'Disponível':'Pendente']
+    ],
+    fields:[
+      ['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],
+      ['name','Nome','text'],['documentType','Tipo','text'],['referenceDate','Data de referência','date'],
+      ['status','Status','select',['Recebido','Conferido','Pendente']],['notes','Observações','textarea']
+    ]
   }
 };
 
@@ -1043,6 +1058,7 @@ function renderList(){
   else if(current==='payment')rows=applyPaymentFilters([...list('payment')]);
   else if(current==='commission')rows=applyCommissionFilters([...list('commission')]);
   else if(current==='task')rows=applyTaskFilters([...list('task')]);
+  else if(current==='document')rows=applyDocumentFilters([...list('document')]);
   else rows=[...list(current)];
 
   const q=searchKey($('#searchInput').value);
@@ -1061,6 +1077,7 @@ function renderList(){
   else if(current==='commission')$('#filters').innerHTML=commissionFilterHtml(list('commission'))+commissionSummary(rows);
   else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
   else if(current==='task')$('#filters').innerHTML=taskFilterHtml(list('task'))+taskSummary(rows);
+  else if(current==='document')$('#filters').innerHTML=documentFilterHtml(list('document'))+documentSummary(rows);
   else if(current==='insurance'){
     const pendingProducer=rows.filter(r=>r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId).length;
     $('#filters').innerHTML=pendingProducer
@@ -1080,8 +1097,12 @@ function renderList(){
         const insurance=contractForRow(r);
         return insurance?`<td><button class="name-link" data-linked-insurance="${insurance.id}">${esc(value)}</button></td>`:`<td>${esc(value)}</td>`;
       }
-      if(current==='task'&&label==='Cliente'&&r.data.clientId){
+      if(['task','document'].includes(current)&&label==='Cliente'&&r.data.clientId){
         return `<td><button class="name-link" data-linked-client="${r.data.clientId}">${esc(value)}</button></td>`;
+      }
+      if(current==='document'&&label==='Contrato'){
+        const insurance=contractForRow(r);
+        return insurance?`<td><button class="name-link" data-linked-insurance="${insurance.id}">${esc(value)}</button></td>`:`<td>${esc(value)}</td>`;
       }
       if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
         return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
@@ -1101,7 +1122,7 @@ function renderList(){
         :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Regularizar PDF':'Anexar PDF'}</button>`)
       :'';
 
-    const linkedInsurance=['payment','commission','task'].includes(current)?contractForRow(r):null;
+    const linkedInsurance=['payment','commission','task','document'].includes(current)?contractForRow(r):null;
     const relatedAction=linkedInsurance?`<button data-linked-insurance="${linkedInsurance.id}" class="link-btn">Abrir seguro</button>`:'';
     const editAction=current==='renewal'
       ?`<button data-renewal-track="${r.id}" class="link-btn">${renewalTrackerFor(r)?'Atualizar acompanhamento':'Acompanhar'}</button><button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
@@ -1153,6 +1174,12 @@ function renderList(){
   });
   const clearTask=$('#taskClearFilters');
   if(clearTask)clearTask.onclick=()=>{taskFilters={dueFrom:'',dueTo:'',status:'all',source:'all',destination:'all',responsible:'all'};renderList();};
+
+  document.querySelectorAll('[data-document-filter]').forEach(el=>el.onchange=()=>{
+    documentFilters[el.dataset.documentFilter]=el.value;renderList();
+  });
+  const clearDocument=$('#documentClearFilters');
+  if(clearDocument)clearDocument.onclick=()=>{documentFilters={type:'all',status:'all',file:'all',brokerage:'all'};renderList();};
 }
 function paymentFilterHtml(rows){
   const contracts=rows.map(contractForRow).filter(Boolean);
@@ -1345,6 +1372,62 @@ function taskSummary(rows){
     </div>`;
 }
 
+
+function documentFilterHtml(rows){
+  const types=uniqueSorted(rows.map(r=>r.data.documentType));
+  const statuses=uniqueSorted(rows.map(r=>r.data.status));
+  const contracts=rows.map(contractForRow).filter(Boolean);
+  const brokerages=uniqueSorted(contracts.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')));
+  return `
+    <div class="finance-filter-shell">
+      <div class="finance-filter-grid">
+        <label>Tipo
+          <select data-document-filter="type"><option value="all">Todos</option>${types.map(v=>`<option value="${esc(v)}" ${documentFilters.type===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Status
+          <select data-document-filter="status"><option value="all">Todos</option>${statuses.map(v=>`<option value="${esc(v)}" ${documentFilters.status===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Arquivo
+          <select data-document-filter="file">
+            <option value="all">Todos</option>
+            <option value="available" ${documentFilters.file==='available'?'selected':''}>Disponível</option>
+            <option value="missing" ${documentFilters.file==='missing'?'selected':''}>Pendente</option>
+          </select>
+        </label>
+        <label>Corretora
+          <select data-document-filter="brokerage"><option value="all">Todas</option>${brokerages.map(v=>`<option value="${esc(v)}" ${documentFilters.brokerage===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div class="finance-filter-actions">
+        <button type="button" class="btn ghost small" id="documentClearFilters">Limpar filtros</button>
+      </div>
+    </div>`;
+}
+
+function applyDocumentFilters(rows){
+  return rows.filter(r=>{
+    const insurance=contractForRow(r);
+    if(documentFilters.type!=='all'&&String(r.data.documentType||'')!==documentFilters.type)return false;
+    if(documentFilters.status!=='all'&&String(r.data.status||'')!==documentFilters.status)return false;
+    if(documentFilters.file==='available'&&!r.data.storageKey)return false;
+    if(documentFilters.file==='missing'&&r.data.storageKey)return false;
+    if(documentFilters.brokerage!=='all'&&!brokerageMatches(insurance,documentFilters.brokerage))return false;
+    return true;
+  });
+}
+
+function documentSummary(rows){
+  const available=rows.filter(r=>r.data.storageKey).length;
+  const missing=rows.length-available;
+  const endorsements=rows.filter(r=>fold(r.data.documentType||'')==='endosso').length;
+  return `<div class="summary-strip">
+    <span class="chip">Documentos: ${rows.length}</span>
+    <span class="chip">Arquivos disponíveis: ${available}</span>
+    <span class="chip ${missing?'danger':''}">Arquivos pendentes: ${missing}</span>
+    <span class="chip">Endossos: ${endorsements}</span>
+  </div>`;
+}
+
 function editorConfig(){return config[current]}
 function openEditor(entry=null){
   const c=editorConfig();if(!c)return;
@@ -1425,6 +1508,12 @@ function validateBeforeSave(data){
   }
   if(current==='task'){
     if(data.policyId&&data.proposalId)return 'Vincule a pendência a apenas uma apólice ou proposta.';
+  }
+  if(current==='document'){
+    if(data.policyId&&data.proposalId)return 'Vincule o documento a apenas uma apólice ou proposta.';
+    const insurance=rowById(data.policyId||data.proposalId);
+    if(insurance&&data.clientId&&String(insurance.data.clientId||'')!==String(data.clientId))return 'O contrato selecionado não pertence ao cliente informado.';
+    if(fold(data.documentType||'')==='endosso'&&!insurance)return 'Endosso deve ser vinculado à proposta ou apólice correspondente.';
   }
   if(current==='payment'){
     if(!data.policyId&&!data.proposalId)return 'Vincule a parcela a uma apólice ou proposta.';
