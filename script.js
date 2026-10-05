@@ -816,8 +816,10 @@ const config={
       ['Cliente',r=>nameById(r.data.clientId)],
       ['Número',r=>r.data.number],
       ['Seguradora',r=>r.data.insurer],
-      ['Produtor',r=>nameById(r.data.producerId)],
+      ['Ramo',r=>r.data.branch],
+      ['Produtor',r=>producerLabelOf(r)],
       ['Corretora',r=>String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ')],
+      ['Vencimento',r=>date(r.data.end)],
       ['Prioridade',r=>renewalPriority(r)],
       ['Situação',r=>renewalStatus(r)],
       ['Dias',r=>r.kind==='policy'?(daysUntil(r.data.end)===null?'—':String(daysUntil(r.data.end))):'—'],
@@ -949,7 +951,9 @@ function filteredRenewalRows(){
 }
 
 function csvValue(value){
-  return '"'+String(value??'').replace(/"/g,'""')+'"';
+  let text=String(value??'');
+  if(/^[=+\-@]/.test(text))text="'"+text;
+  return '"'+text.replace(/"/g,'""')+'"';
 }
 
 function exportRenewalsCsv(){
@@ -1737,6 +1741,13 @@ $('#searchInput').oninput=()=>{
   renderSearchSuggestions();
 };
 $('#searchInput').onfocus=renderSearchSuggestions;
+document.addEventListener('click',event=>{
+  const shell=event.target.closest?.('.search-shell');
+  if(!shell){
+    const root=$('#searchSuggestions');
+    if(root)root.classList.add('hidden');
+  }
+});
 $('#uploadClient').onchange=()=>{uploadPrefill.insuranceId='';renderUploadInsurances('')};
 $('#uploadInsurance').onchange=syncUploadType;
 $('#uploadType').onchange=syncUploadType;
