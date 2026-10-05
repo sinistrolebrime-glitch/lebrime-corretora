@@ -182,3 +182,23 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - Endosso exige vínculo com a proposta ou apólice correspondente.
 - Endosso continua sendo documento/evento do contrato e não cria um novo contrato.
 - Filtros e navegação da biblioteca não alteram conteúdo, vínculo financeiro ou situação da apólice.
+
+
+## Sinistros e visão do produtor
+
+### Sinistros
+- Sinistro é um registro operacional vinculado a uma apólice existente; ele não cria proposta, apólice ou contrato paralelo.
+- O sinistro deve estar vinculado ao cliente e à apólice correspondente.
+- A apólice selecionada deve pertencer ao cliente informado.
+- Quando houver item/risco selecionado, ele deve pertencer à apólice vinculada.
+- O sistema não inventa número do sinistro, datas, oficina, responsável, status ou dados do evento.
+- A combinação número do sinistro + apólice não pode ser duplicada.
+- Filtros de sinistro por período, seguradora, ramo, status e responsável são apenas de consulta.
+- O painel e a ficha do cliente podem exibir sinistros em acompanhamento sem alterar os registros originais.
+
+### Produtores
+- A visão do produtor consolida apenas contratos realmente vinculados ao produtor.
+- Indicadores financeiros do produtor devem usar os mesmos registros de comissão da carteira; não devem recalcular ou sobrescrever valores manualmente lançados sem regra.
+- Comissão bruta prevista e comissão do produtor prevista seguem as regras financeiras vigentes.
+- Valores “recebida pela Lebrime” e “paga ao produtor” refletem os registros de comissão associados aos contratos do produtor.
+- A navegação pela ficha do produtor para cliente ou contrato é somente consulta e não altera vínculos.
