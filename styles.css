@@ -1794,3 +1794,82 @@ html[data-theme="dark"] .contract-summary-grid>div{
   .contract-summary-grid{grid-template-columns:1fr}
   .entity-grid{grid-template-columns:1fr 1fr}
 }
+
+
+/* v20.2 finance and operations */
+.finance-filter-shell{
+  display:grid;
+  gap:10px;
+  width:100%;
+}
+.finance-filter-grid{
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+  width:100%;
+}
+.finance-filter-grid label{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-width:150px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+}
+.finance-filter-grid input,
+.finance-filter-grid select{
+  height:38px;
+  min-width:150px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel);
+  color:var(--text);
+  padding:0 10px;
+  font-size:12px;
+  font-weight:650;
+  text-transform:none;
+  letter-spacing:0;
+  outline:none;
+}
+.finance-filter-grid input:focus,
+.finance-filter-grid select:focus{
+  border-color:#8299aa;
+  box-shadow:0 0 0 3px rgba(24,58,86,.07);
+}
+.finance-filter-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.summary-strip{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  padding-top:2px;
+}
+html[data-theme="dark"] .finance-filter-grid input,
+html[data-theme="dark"] .finance-filter-grid select{
+  background:#101a23;
+  border-color:#293944;
+  color:#e7edf2;
+}
+@media(max-width:760px){
+  .finance-filter-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  .finance-filter-grid label,
+  .finance-filter-grid input,
+  .finance-filter-grid select{
+    min-width:0;
+    width:100%;
+  }
+  .finance-filter-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+}
