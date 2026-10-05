@@ -99,6 +99,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const digits=v=>String(v||'').replace(/\D/g,'');
 const norm=v=>String(v||'').trim().toLocaleLowerCase('pt-BR');
 const fold=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const searchKey=v=>fold(v).replace(/[^a-z0-9]/g,'');
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(v)||0)/100);
 const parseMoney=v=>Math.max(0,Math.round(Number(String(v||'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))*100)||0);
 const date=v=>v?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(new Date(v+'T12:00:00Z')):'—';
@@ -143,19 +144,19 @@ const clientSearchText=client=>{
   const items=list('insuredItem').filter(r=>
     ids.has(String(r.data.policyId||''))||ids.has(String(r.data.proposalId||''))
   );
-  return fold([
+  return searchKey([
     JSON.stringify(client.data||{}),
     ...insurances.map(r=>JSON.stringify(r.data||{})),
     ...items.map(r=>JSON.stringify(r.data||{}))
   ].join(' '));
 };
 
-const genericSearchText=row=>fold(
+const genericSearchText=row=>searchKey(
   JSON.stringify(row.data||{})+' '+nameById(row.data?.clientId)+' '+nameById(row.data?.producerId)
 );
 
 function matchingClients(query){
-  const q=fold(query);
+  const q=searchKey(query);
   if(!q)return [];
   return list('client')
     .filter(r=>clientSearchText(r).includes(q))
@@ -967,7 +968,7 @@ function applyRenewalFilters(rows){
 
 function filteredRenewalRows(){
   let rows=applyRenewalFilters(renewalSourceRows());
-  const q=fold($('#searchInput')?.value||'');
+  const q=searchKey($('#searchInput')?.value||'');
   if(q)rows=rows.filter(r=>genericSearchText(r).includes(q));
   return rows.sort((a,b)=>String(a.data.end||'').localeCompare(String(b.data.end||'')));
 }
@@ -1048,7 +1049,7 @@ function renderList(){
   else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
   else rows=[...list(current)];
 
-  const q=fold($('#searchInput').value);
+  const q=searchKey($('#searchInput').value);
   if(q)rows=rows.filter(r=>current==='client'?clientSearchText(r).includes(q):genericSearchText(r).includes(q));
 
   if(current==='payment')rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
