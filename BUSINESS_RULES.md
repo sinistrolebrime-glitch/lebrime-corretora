@@ -151,3 +151,25 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - O sistema continua proibido de inventar produtor, percentual de comissão ou prêmio líquido.
 - A comissão só é reconciliada quando prêmio líquido, percentual de comissão e produtor estiverem presentes.
 - As regras especiais de Lebrime, FF Apolinário/Homeni/Eólica e Leandro permanecem vigentes conforme as seções financeiras deste documento.
+
+
+## Financeiro e operação — filtros e tratamento
+
+### Central de parcelas
+- Previsões de proposta e parcelas efetivas permanecem separadas por origem financeira.
+- A tela pode filtrar por período, tipo, status, etapa de cobrança, corretora e seguradora sem alterar os dados.
+- “Somente atrasadas” considera apenas parcelas efetivas em aberto com vencimento anterior à data atual.
+- Parcelas anteriores ao corte de implantação continuam respeitando a regra de migração já definida; a melhoria de tela não altera essa regra.
+- Uma parcela deve estar vinculada a apenas uma proposta ou apólice.
+
+### Comissões
+- Os filtros de produtor, corretora, seguradora, status e data de recebimento são somente de consulta.
+- Lucro realizado continua sendo **comissão recebida − comissão paga ao produtor**.
+- Taxa FF não é tratada como despesa adicional no cálculo do lucro realizado; ela permanece parte do desdobramento da comissão conforme a regra financeira.
+- Nenhuma melhoria visual pode criar comissão sem prêmio líquido, percentual de comissão e produtor válidos.
+
+### Pendências
+- Pendências podem ser filtradas por prazo, status, origem, destino e responsável.
+- Exceções de integração permanecem na fila operacional enquanto não houver vínculo seguro.
+- Uma pendência pode estar vinculada a uma proposta ou a uma apólice, nunca às duas simultaneamente.
+- O vínculo da pendência serve para navegação e acompanhamento e não deve criar um novo contrato.
