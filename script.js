@@ -1033,23 +1033,6 @@ function printRenewalMirror(){
   win.document.close();
 }
 
-function commissionSummary(rows){
-  const gross=rows.reduce((sum,r)=>sum+Number(r.data.expected||0),0);
-  const ff=rows.reduce((sum,r)=>sum+Number(r.data.ffFee||0),0);
-  const producer=rows.reduce((sum,r)=>sum+Number(r.data.producerExpected||0),0);
-  const lebrime=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeFee||0),0);
-  const lebrimeNet=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeNet||0),0);
-  const received=rows.reduce((sum,r)=>sum+Number(r.data.received||0),0);
-  const paid=rows.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
-  return `
-    <span class="chip">Comissão bruta: ${money(gross)}</span>
-    <span class="chip">Taxa FF: ${money(ff)}</span>
-    <span class="chip">Produtores: ${money(producer)}</span>
-    <span class="chip">Taxa Lebrime: ${money(lebrime)}</span>
-    <span class="chip">Líquido Lebrime: ${money(lebrimeNet)}</span>
-    <span class="chip">Lucro realizado: ${money(received-paid)}</span>`;
-}
-
 function renderList(){
   const c=config[current];if(!c)return;
   let rows;
@@ -1516,7 +1499,7 @@ function openProducerDetail(producerId){
   const totalLebrimeNet=insurances.reduce((sum,r)=>sum+lebrimeNetOf(r),0);
   const special=isLeandro(producerId);
   const rule=special
-    ?'LEANDRO: nas operações Lebrime recebe 100% da comissão bruta. Em FF Apolinário/Homeni/Eólica, recebe 70% e a Taxa FF fica com 30%. Taxa Lebrime = 0%.'
+    ?'LEANDRO: em operações da corretora Lebrime, Leandro recebe 100% da comissão bruta. Em FF Apolinário/Homeni/Eólica, Leandro recebe 70% e a Taxa FF fica com 30%. Taxa Lebrime = 0%.'
     :'Produtor recebe 60% da comissão bruta. Taxa Lebrime = 40%. Em FF Apolinário/Homeni/Eólica, a Taxa FF de 30% é descontada da parte da Lebrime, restando 10% líquido para a Lebrime.';
 
   const rows=insurances.length?insurances.map(r=>`
