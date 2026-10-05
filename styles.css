@@ -1482,3 +1482,315 @@ html[data-theme="dark"] .integration-provider{color:#c5a05b}
   .integration-file-row{align-items:flex-start;flex-direction:column}
   .integration-file-row>div:last-child{align-items:flex-start}
 }
+
+
+/* v20 client, contract and renewal workflow */
+.search-shell{
+  position:relative;
+  width:320px;
+  max-width:42vw;
+}
+.search-shell .search{
+  width:100%;
+}
+.search-suggestions{
+  position:absolute;
+  top:calc(100% + 7px);
+  right:0;
+  z-index:30;
+  width:min(520px,78vw);
+  max-height:360px;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--panel);
+  box-shadow:0 18px 48px rgba(13,33,49,.16);
+  padding:7px;
+}
+.search-suggestion{
+  display:grid;
+  gap:3px;
+  width:100%;
+  padding:10px 11px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+}
+.search-suggestion:hover{
+  background:var(--panel-2);
+}
+.search-suggestion strong{
+  font-size:12px;
+}
+.search-suggestion span,
+.search-suggestion-empty{
+  color:var(--muted);
+  font-size:11px;
+}
+.search-suggestion-empty{
+  padding:14px;
+  text-align:center;
+}
+
+.client-contract-heading{
+  align-items:flex-end;
+}
+.inline-filter{
+  display:grid;
+  gap:5px;
+  min-width:190px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+}
+.inline-filter select{
+  height:37px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel);
+  color:var(--text);
+  padding:0 9px;
+  font-size:12px;
+  font-weight:650;
+  text-transform:none;
+  letter-spacing:0;
+}
+
+.detail-columns,
+.contract-sections{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.detail-columns .detail-section,
+.contract-sections .detail-section{
+  margin-top:20px;
+  min-width:0;
+}
+#clientDetailBody .detail-row,
+#insuranceDetailBody .detail-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:var(--panel);
+  margin-bottom:7px;
+}
+#clientDetailBody .detail-row>div,
+#insuranceDetailBody .detail-row>div{
+  min-width:0;
+}
+#clientDetailBody .detail-row span,
+#insuranceDetailBody .detail-row span{
+  margin:3px 0 0;
+  text-transform:none;
+  letter-spacing:0;
+  font-size:11px;
+}
+.row-end{
+  display:grid;
+  justify-items:end;
+  gap:5px;
+  text-align:right;
+}
+.row-end span{
+  white-space:nowrap;
+}
+
+#insuranceDialog{
+  width:min(1180px,calc(100% - 34px));
+}
+.contract-detail-shell{
+  min-width:0;
+}
+.contract-hero{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:18px;
+  padding:2px 0 18px;
+}
+.contract-hero h3{
+  margin:5px 0 2px;
+  font-size:20px;
+  letter-spacing:-.015em;
+}
+.contract-hero p{
+  margin:0;
+  color:var(--muted);
+  font-size:12px;
+}
+.contract-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:9px;
+}
+.contract-summary-grid>div{
+  min-width:0;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:var(--panel-2);
+}
+.contract-summary-grid span{
+  display:block;
+  margin-bottom:4px;
+  color:var(--muted);
+  font-size:9.5px;
+  font-weight:800;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+}
+.contract-summary-grid strong{
+  display:block;
+  overflow-wrap:anywhere;
+  color:var(--text);
+  font-size:12px;
+}
+.entity-card{
+  display:grid;
+  gap:10px;
+  padding:13px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--panel);
+  margin-bottom:8px;
+}
+.entity-card>div:first-child span{
+  display:block;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+}
+.entity-card>div:first-child strong{
+  display:block;
+  margin-top:3px;
+  font-size:13px;
+}
+.entity-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+.entity-grid span{
+  color:var(--muted);
+  font-size:10px;
+}
+.entity-grid strong{
+  display:block;
+  margin-top:2px;
+  color:var(--text);
+  font-size:11px;
+}
+.profile-note{
+  min-height:62px;
+  padding:12px 13px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:var(--panel);
+  color:var(--text);
+  font-size:12px;
+  line-height:1.55;
+  white-space:pre-wrap;
+}
+
+.renewal-filter-shell{
+  display:grid;
+  gap:10px;
+  width:100%;
+}
+.renewal-period{
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.renewal-period label,
+.renewal-filters label{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  min-width:150px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+}
+.renewal-period input,
+.renewal-filters select{
+  height:38px;
+  min-width:150px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel);
+  color:var(--text);
+  padding:0 10px;
+  font-size:12px;
+  font-weight:650;
+  text-transform:none;
+  letter-spacing:0;
+  outline:none;
+}
+.renewal-period input:focus,
+.renewal-filters select:focus,
+.inline-filter select:focus{
+  border-color:#8299aa;
+  box-shadow:0 0 0 3px rgba(24,58,86,.07);
+}
+.renewal-filter-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  padding-top:2px;
+}
+
+html[data-theme="dark"] .search-suggestions,
+html[data-theme="dark"] #clientDetailBody .detail-row,
+html[data-theme="dark"] #insuranceDetailBody .detail-row,
+html[data-theme="dark"] .entity-card,
+html[data-theme="dark"] .profile-note{
+  background:#111b24;
+  border-color:#263641;
+}
+html[data-theme="dark"] .search-suggestion:hover{
+  background:#17242e;
+}
+html[data-theme="dark"] .inline-filter select,
+html[data-theme="dark"] .renewal-period input,
+html[data-theme="dark"] .renewal-filters select{
+  background:#101a23;
+  border-color:#293944;
+  color:#e7edf2;
+}
+html[data-theme="dark"] .contract-summary-grid>div{
+  background:#14212b;
+  border-color:#263641;
+}
+
+@media(max-width:1200px){
+  .contract-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .detail-columns,.contract-sections{grid-template-columns:1fr}
+  .contract-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .search-shell{width:100%;max-width:none;flex:1}
+  .search-suggestions{left:0;right:auto;width:min(560px,calc(100vw - 32px))}
+  .client-contract-heading{align-items:flex-start;flex-direction:column}
+  .inline-filter{width:100%}
+  .inline-filter select{width:100%}
+  .renewal-period,.renewal-filter-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .renewal-period label,.renewal-period input{min-width:0;width:100%}
+  .contract-summary-grid{grid-template-columns:1fr}
+  .entity-grid{grid-template-columns:1fr 1fr}
+}
