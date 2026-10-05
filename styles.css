@@ -634,7 +634,7 @@ dialog{
 
 .operational-strip{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:1px;
   margin:2px 0 18px;
   overflow:hidden;
@@ -1872,4 +1872,22 @@ html[data-theme="dark"] .finance-filter-grid select{
     display:grid;
     grid-template-columns:1fr 1fr;
   }
+}
+
+
+/* v20.4 claims and producer polish */
+#producerDialog .client-kpis{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+#producerDialog .producer-insurance-row .name-link{
+  max-width:100%;
+  overflow-wrap:anywhere;
+}
+@media(max-width:1200px){
+  .operational-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #producerDialog .client-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .operational-strip{grid-template-columns:1fr}
+  #producerDialog .client-kpis{grid-template-columns:1fr 1fr}
 }
