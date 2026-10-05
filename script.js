@@ -1486,15 +1486,15 @@ function applyDocumentFilters(rows){
     const insurance=contractForRow(r);
     if(documentFilters.type!=='all'&&String(r.data.documentType||'')!==documentFilters.type)return false;
     if(documentFilters.status!=='all'&&String(r.data.status||'')!==documentFilters.status)return false;
-    if(documentFilters.file==='available'&&!r.data.storageKey)return false;
-    if(documentFilters.file==='missing'&&r.data.storageKey)return false;
+    if(documentFilters.file==='available'&&!documentAvailable(r))return false;
+    if(documentFilters.file==='missing'&&documentAvailable(r))return false;
     if(documentFilters.brokerage!=='all'&&!brokerageMatches(insurance,documentFilters.brokerage))return false;
     return true;
   });
 }
 
 function documentSummary(rows){
-  const available=rows.filter(r=>r.data.storageKey).length;
+  const available=rows.filter(documentAvailable).length;
   const missing=rows.length-available;
   const endorsements=rows.filter(r=>fold(r.data.documentType||'')==='endosso').length;
   return `<div class="summary-strip">
