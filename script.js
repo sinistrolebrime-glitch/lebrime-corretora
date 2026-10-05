@@ -125,6 +125,24 @@ const primaryInsuranceDocument=insurance=>{
     ||docs[0]
     ||null;
 };
+const insuranceDocumentAvailable=insurance=>{
+  const doc=primaryInsuranceDocument(insurance);
+  return documentAvailable(doc)||Boolean(documentExternalUrl(insurance));
+};
+async function openInsuranceDocument(insurance){
+  if(!insurance)return;
+  const doc=primaryInsuranceDocument(insurance);
+  if(documentAvailable(doc)){
+    await openDocument(doc);
+    return;
+  }
+  const externalUrl=documentExternalUrl(insurance);
+  if(externalUrl){
+    window.open(externalUrl,'_blank','noopener');
+    return;
+  }
+  alert('Nenhum PDF disponível para esta proposta/apólice.');
+}
 
 const isInsuranceActive=insurance=>{
   const status=fold(insurance?.data?.status||'');
@@ -1188,8 +1206,8 @@ function renderList(){
     const openFile=current==='document'&&documentAvailable(r)?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:'';
     const insuranceDoc=current==='insurance'?primaryInsuranceDocument(r):null;
     const insuranceFile=current==='insurance'
-      ?(documentAvailable(insuranceDoc)
-        ?`<button data-open="${insuranceDoc.id}" class="link-btn file-action">Abrir PDF</button>`
+      ?(insuranceDocumentAvailable(r)
+        ?`<button data-open-insurance-pdf="${r.id}" class="link-btn file-action">Abrir PDF</button>`
         :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Regularizar PDF':'Anexar PDF'}</button>`)
       :'';
 
@@ -1206,6 +1224,7 @@ function renderList(){
 
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.edit)));
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.open)));
+  document.querySelectorAll('[data-open-insurance-pdf]').forEach(b=>b.onclick=()=>openInsuranceDocument(rowById(b.dataset.openInsurancePdf)));
   document.querySelectorAll('[data-insurance-upload]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.insuranceUpload));
   document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
   document.querySelectorAll('[data-producer-detail]').forEach(b=>b.onclick=()=>openProducerDetail(b.dataset.producerDetail));
@@ -1863,9 +1882,10 @@ function renderClientDetail(clientId,brokerageFilter='all'){
 
   const insuranceHtml=insurances.length?insurances.map(r=>{
     const doc=primaryInsuranceDocument(r);
+    const hasPdf=insuranceDocumentAvailable(r);
     const endorsementCount=insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso').length;
     const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
-    const fileState=documentAvailable(doc)?'Arquivo disponível':doc?'PDF pendente':'Sem arquivo';
+    const fileState=hasPdf?'Arquivo disponível':doc?'PDF pendente':'Sem arquivo';
     return `
       <article class="insurance-card">
         <div class="insurance-card-head">
@@ -1881,8 +1901,9 @@ function renderClientDetail(clientId,brokerageFilter='all'){
           <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
         </div>
         <div class="insurance-card-foot">
-          <span class="contract-file-state ${documentAvailable(doc)?'ready':doc?'pending':'neutral'}">${esc(fileState)}</span>
+          <span class="contract-file-state ${hasPdf?'ready':doc?'pending':'neutral'}">${esc(fileState)}</span>
           ${endorsementCount?`<span class="contract-file-state ready">${endorsementCount} endosso(s)</span>`:''}
+          ${hasPdf?`<button class="btn ghost small" data-client-open-insurance-pdf="${r.id}">Abrir PDF</button>`:''}
           <button class="btn primary small" data-client-open-insurance="${r.id}">Abrir ficha</button>
         </div>
       </article>`;
@@ -1975,6 +1996,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     if(policy){$('#clientDialog').close();openInsuranceDetail(policy.id);}
   });
   document.querySelectorAll('[data-client-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.clientOpenDoc)));
+  document.querySelectorAll('[data-client-open-insurance-pdf]').forEach(b=>b.onclick=()=>openInsuranceDocument(rowById(b.dataset.clientOpenInsurancePdf)));
   document.querySelectorAll('[data-client-upload-doc]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.clientUploadDoc));
 }
 
@@ -2023,10 +2045,14 @@ function openInsuranceDetail(insuranceId){
     <div class="detail-row"><div><strong>Comissão ${esc(r.data.status||'Prevista')}</strong><span>Bruta: ${money(r.data.expected)} · Produtor: ${money(r.data.producerExpected)}</span></div><div class="row-end"><strong>Recebida ${money(r.data.received)}</strong><span>Líquido Lebrime ${money(r.data.lebrimeNet)}</span></div></div>
   `).join(''):'<div class="empty compact">Nenhuma comissão calculada. O sistema não cria comissão sem produtor, percentual e prêmio líquido válidos.</div>';
 
+  const directInsurancePdf=documentExternalUrl(insurance);
   const docHtml=docs.length?docs.map(r=>`
     <div class="detail-row"><div><strong>${esc(r.data.name||r.data.documentType||'Documento')}</strong><span>${esc(r.data.documentType||'Documento')} · ${date(r.data.referenceDate)}</span></div>
-      ${documentAvailable(r)?`<button class="btn ghost small" data-insurance-open-doc="${r.id}">Abrir</button>`:`<span class="file-missing">PDF pendente</span>`}</div>
-  `).join(''):'<div class="empty compact">Nenhum documento vinculado.</div>';
+      ${documentAvailable(r)?`<button class="btn ghost small" data-insurance-open-doc="${r.id}">Abrir</button>`:(directInsurancePdf?`<button class="btn ghost small" data-insurance-open-source="${insurance.id}">Abrir PDF</button>`:`<span class="file-missing">PDF pendente</span>`)}</div>
+  `).join(''):(directInsurancePdf?`
+    <div class="detail-row"><div><strong>${esc(insurance.data.sourceFileName||'PDF original')}</strong><span>${insurance.kind==='policy'?'Apólice':'Proposta'} · arquivo de origem</span></div>
+      <button class="btn ghost small" data-insurance-open-source="${insurance.id}">Abrir PDF</button></div>
+  `:'<div class="empty compact">Nenhum documento vinculado.</div>');
 
   const pendingTasks=tasks.filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
   const taskHtml=pendingTasks.length?pendingTasks.map(r=>`
@@ -2072,6 +2098,7 @@ function openInsuranceDetail(insuranceId){
   $('#insuranceDialog').dataset.insuranceId=insurance.id;
   $('#insuranceDialog').showModal();
   document.querySelectorAll('[data-insurance-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.insuranceOpenDoc)));
+  document.querySelectorAll('[data-insurance-open-source]').forEach(b=>b.onclick=()=>openInsuranceDocument(rowById(b.dataset.insuranceOpenSource)));
 }
 
 function editInsuranceFromDetail(){
