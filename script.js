@@ -156,7 +156,11 @@ const clientSearchText=client=>{
 };
 
 const genericSearchText=row=>searchKey(
-  JSON.stringify(row.data||{})+' '+nameById(row.data?.clientId)+' '+nameById(row.data?.producerId)
+  JSON.stringify(row.data||{})+' '+
+  nameById(row.data?.clientId)+' '+
+  nameById(row.data?.producerId)+' '+
+  nameById(row.data?.policyId||row.data?.proposalId)+' '+
+  nameById(row.data?.insuredItemId)
 );
 
 function matchingClients(query){
