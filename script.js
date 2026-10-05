@@ -976,7 +976,7 @@ function printRenewalMirror(){
   const rows=filteredRenewalRows();
   if(!rows.length){alert('Nenhuma renovação encontrada para os filtros selecionados.');return;}
   const period=[renewalFilters.dateFrom?date(renewalFilters.dateFrom):'',renewalFilters.dateTo?date(renewalFilters.dateTo):''].filter(Boolean).join(' a ')||'Todos os vencimentos';
-  const win=window.open('','_blank','noopener');
+  const win=window.open('','_blank');
   if(!win){alert('O navegador bloqueou a abertura do espelho. Permita pop-ups para este sistema.');return;}
   const body=rows.map(r=>`<tr>
     <td>${esc(nameById(r.data.clientId))}</td>
@@ -1050,8 +1050,8 @@ function renderList(){
       const value=x[1](r)??'—';
       if(current==='client'&&i===0)return `<td><button class="name-link" data-client-detail="${r.id}">${esc(value)}</button></td>`;
       if(current==='producer'&&i===0)return `<td><button class="name-link" data-producer-detail="${r.id}">${esc(value)}</button></td>`;
-      if(current==='insurance'&&label==='Número')return `<td><button class="name-link" data-insurance-detail="${r.id}">${esc(value)}</button></td>`;
       const label=x[0];
+      if(current==='insurance'&&label==='Número')return `<td><button class="name-link" data-insurance-detail="${r.id}">${esc(value)}</button></td>`;
       if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
         return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
       }
@@ -1357,18 +1357,18 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const activeInsurances=insurances.filter(isInsuranceActive);
   const totalPremium=activeInsurances.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
   const payments=list('payment').filter(r=>
-    String(r.data.clientId||'')===String(clientId)||
     visibleInsuranceIds.has(String(r.data.policyId||''))||
-    visibleInsuranceIds.has(String(r.data.proposalId||''))
+    visibleInsuranceIds.has(String(r.data.proposalId||''))||
+    (brokerageFilter==='all'&&String(r.data.clientId||'')===String(clientId))
   );
   const openPayments=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
   const commissions=list('commission').filter(r=>
     visibleInsuranceIds.has(String(r.data.policyId||''))||visibleInsuranceIds.has(String(r.data.proposalId||''))
   );
   const tasks=list('task').filter(r=>
-    String(r.data.clientId||'')===String(clientId)||
     visibleInsuranceIds.has(String(r.data.policyId||''))||
-    visibleInsuranceIds.has(String(r.data.proposalId||''))
+    visibleInsuranceIds.has(String(r.data.proposalId||''))||
+    (brokerageFilter==='all'&&String(r.data.clientId||'')===String(clientId))
   ).filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
   const renewals=renewalSourceRows().filter(r=>visibleInsuranceIds.has(r.id));
   const brokeragesForClient=clientBrokerageOptions(allInsurances);
