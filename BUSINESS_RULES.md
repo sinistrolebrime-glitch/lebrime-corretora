@@ -44,8 +44,12 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 - Parcelas ligadas a propostas são previsão financeira, não cobrança efetiva de apólice.
 
 ## Documentos
-- O PDF original deve ficar armazenado no Supabase Storage e vinculado ao cliente e à proposta/apólice correta.
-- Reanexar um documento pendente deve completar o registro existente, sem duplicar o documento.
+- Todo PDF deve ficar vinculado ao cliente e, quando aplicável, à proposta/apólice correta.
+- Arquivos enviados internamente devem permanecer armazenados no Supabase Storage.
+- Na migração SegFlex, enquanto o PDF original permanecer na pasta controlada do Google Drive, o sistema pode manter o vínculo direto ao arquivo de origem, desde que ele apareça como disponível na ficha do cliente e da proposta e possa ser aberto pelo usuário.
+- O vínculo documental da SegFlex deve preservar o ID do arquivo do Drive, nome original, tamanho, proposta e cliente para auditoria e deduplicação.
+- Um mesmo arquivo SegFlex não pode gerar mais de um documento para a mesma proposta.
+- Reanexar ou migrar fisicamente um documento já vinculado deve completar o registro existente, sem duplicar o documento.
 
 ## Renovações
 - Não criar automaticamente uma nova proposta apenas porque uma apólice está próxima do vencimento.
