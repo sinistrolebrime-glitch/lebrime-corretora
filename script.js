@@ -114,7 +114,9 @@ const list=kind=>records.filter(r=>r.kind===kind);
 const insuranceDocuments=insurance=>list('document').filter(d=>
   String(d.data.policyId||'')===insurance.id||String(d.data.proposalId||'')===insurance.id
 );
-const documentExternalUrl=doc=>doc?.data?.externalUrl||doc?.data?.sourceDriveUrl||(doc?.data?.sourceDriveFileId?`https://drive.google.com/file/d/${encodeURIComponent(doc.data.sourceDriveFileId)}/view`:'');
+const recordExternalUrl=row=>row?.data?.externalUrl||row?.data?.sourceDriveUrl||(row?.data?.sourceDriveFileId?`https://drive.google.com/file/d/${encodeURIComponent(row.data.sourceDriveFileId)}/view`:'');
+const documentLinkedInsurance=doc=>rowById(doc?.data?.policyId||doc?.data?.proposalId);
+const documentExternalUrl=doc=>recordExternalUrl(doc)||recordExternalUrl(documentLinkedInsurance(doc));
 const documentAvailable=doc=>Boolean(doc?.data?.storageKey||documentExternalUrl(doc));
 const primaryInsuranceDocument=insurance=>{
   const docs=insuranceDocuments(insurance);
