@@ -27,12 +27,12 @@ const NAV_GROUPS=[
 
 const PAGE_CONTEXT={
   overview:'Visão executiva da operação, carteira e financeiro.',
-  client:'Cadastro mestre e visão 360º dos segurados.',
+  client:'Cadastro mestre, busca inteligente e visão 360º dos segurados.',
   producer:'Produção, carteira e resultado por produtor.',
-  insurance:'Gestão unificada de propostas e apólices.',
+  insurance:'Gestão unificada de propostas, apólices e detalhes de cada contrato.',
   payment:'Previsões, parcelas efetivas e acompanhamento financeiro.',
   commission:'Comissões recebidas, repasses e resultado da Lebrime.',
-  renewal:'Agenda comercial e acompanhamento das próximas renovações.',
+  renewal:'Consulta por período, filtros comerciais e acompanhamento das renovações.',
   task:'Pendências operacionais e próximos passos da equipe.',
   document:'Biblioteca documental vinculada à carteira.',
   imports:'Entrada e vinculação de documentos aos contratos.',
@@ -706,10 +706,32 @@ function miniTable(rows,cols){
 
 const config={
   client:{
-    title:'Cliente',columns:[['Nome',r=>r.data.name],['CPF/CNPJ',r=>r.data.document],['Telefone',r=>r.data.phone],['Cidade',r=>[r.data.city,r.data.state].filter(Boolean).join('/')]],
+    title:'Cliente',
+    columns:[
+      ['Nome',r=>r.data.name],
+      ['CPF/CNPJ',r=>r.data.document],
+      ['Telefone',r=>r.data.mobile||r.data.phone],
+      ['Cidade',r=>[r.data.city,r.data.state].filter(Boolean).join('/')]
+    ],
     fields:[
-      ['personType','Tipo','select',['Pessoa Jurídica','Pessoa Física']],['name','Nome / Razão social','text'],['fantasyName','Nome fantasia','text'],['document','CPF/CNPJ','text'],
-      ['email','E-mail','email'],['phone','Telefone','text'],['responsible','Responsável','text'],['address','Endereço','text'],['city','Cidade','text'],['state','UF','text'],['notes','Observações','textarea']
+      ['personType','Tipo','select',['Pessoa Jurídica','Pessoa Física']],
+      ['name','Nome / Razão social','text'],
+      ['fantasyName','Nome fantasia','text'],
+      ['document','CPF/CNPJ','text'],
+      ['rg','RG / Inscrição estadual','text'],
+      ['birthDate','Nascimento / Fundação','date'],
+      ['responsible','Responsável','text'],
+      ['email','E-mail','email'],
+      ['phone','Telefone','text'],
+      ['mobile','Celular / WhatsApp','text'],
+      ['zipCode','CEP','text'],
+      ['address','Endereço','text'],
+      ['addressNumber','Número','text'],
+      ['complement','Complemento','text'],
+      ['neighborhood','Bairro','text'],
+      ['city','Cidade','text'],
+      ['state','UF','text'],
+      ['notes','Observações','textarea']
     ]
   },
   producer:{
@@ -1436,12 +1458,17 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     </div>
     <div class="detail-grid">
       <div><span>CPF/CNPJ</span><strong>${esc(d.document||'—')}</strong></div>
+      <div><span>RG / Inscrição estadual</span><strong>${esc(d.rg||'—')}</strong></div>
+      <div><span>Nascimento / Fundação</span><strong>${d.birthDate?date(d.birthDate):'—'}</strong></div>
       <div><span>Telefone</span><strong>${esc(d.phone||'—')}</strong></div>
+      <div><span>Celular / WhatsApp</span><strong>${esc(d.mobile||'—')}</strong></div>
       <div><span>E-mail</span><strong>${esc(d.email||'—')}</strong></div>
       <div><span>Responsável</span><strong>${esc(d.responsible||'—')}</strong></div>
+      <div><span>CEP</span><strong>${esc(d.zipCode||'—')}</strong></div>
       <div><span>Cidade/UF</span><strong>${esc([d.city,d.state].filter(Boolean).join('/')||'—')}</strong></div>
       <div><span>Nome fantasia</span><strong>${esc(d.fantasyName||'—')}</strong></div>
-      <div class="wide"><span>Endereço</span><strong>${esc(d.address||'—')}</strong></div>
+      <div><span>Bairro</span><strong>${esc(d.neighborhood||'—')}</strong></div>
+      <div class="wide"><span>Endereço</span><strong>${esc([d.address,d.addressNumber,d.complement].filter(Boolean).join(', ')||'—')}</strong></div>
     </div>
 
     <section class="detail-section">
