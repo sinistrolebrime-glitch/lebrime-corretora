@@ -601,6 +601,9 @@ function renderDashboard(){
     const d=(new Date(r.data.end+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000;
     return d>=0&&d<=60;
   });
+  const claims=list('claim');
+  const activeClaims=claims.filter(r=>!['Pago','Encerrado','Negado'].includes(String(r.data.status||'')));
+  const claimActionsDue=activeClaims.filter(r=>r.data.nextActionDate&&r.data.nextActionDate<today());
   const comm=list('commission');
   const received=comm.reduce((s,r)=>s+Number(r.data.received||0),0);
   const paid=comm.reduce((s,r)=>s+Number(r.data.transferPaid||0),0);
@@ -652,6 +655,11 @@ function renderDashboard(){
         <strong>${renew60.length}</strong>
         <small>Acompanhamento prioritário</small>
       </div>
+      <div class="operational-item ${claimActionsDue.length?'attention':''}">
+        <span>Sinistros em acompanhamento</span>
+        <strong>${activeClaims.length}</strong>
+        <small>${claimActionsDue.length?claimActionsDue.length+' ação(ões) vencida(s)':'Operação regular'}</small>
+      </div>
     </div>
 
     <div class="dashboard-grid corporate-grid">
@@ -696,6 +704,16 @@ function renderDashboard(){
 
       <div class="panel">
         <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">Operação</span><h2>Sinistros em acompanhamento</h2></div>
+          <button class="link-btn" data-go="claim">Abrir sinistros</button>
+        </div>
+        ${miniTable(activeClaims.sort((a,b)=>String(b.data.incidentDate||'').localeCompare(String(a.data.incidentDate||''))).slice(0,8),[
+          ['Cliente',r=>nameById(r.data.clientId)],['Sinistro',r=>r.data.number],['Status',r=>r.data.status],['Próxima ação',r=>r.data.nextActionDate?date(r.data.nextActionDate):'—']
+        ])}
+      </div>
+
+      <div class="panel">
+        <div class="panel-head corporate-panel-head">
           <div><span class="section-kicker">Financeiro</span><h2>Parcelas atrasadas</h2></div>
           <button class="link-btn" data-go="payment">Abrir parcelas</button>
         </div>
@@ -708,9 +726,9 @@ function renderDashboard(){
 }
 function statusTone(value){
   const v=fold(value);
-  if(['recebida','pago','regularizado','ativa','aprovada','seguro novo'].some(x=>v.includes(x)))return 'success';
-  if(['atrasad','cancel','recus','perdid'].some(x=>v.includes(x)))return 'danger';
-  if(['em aberto','em analise','acompanhar','previsao','renovacao','pendente'].some(x=>v.includes(x)))return 'warning';
+  if(['recebida','pago','regularizado','ativa','aprovada','seguro novo','encerrado'].some(x=>v.includes(x)))return 'success';
+  if(['atrasad','cancel','recus','perdid','negad'].some(x=>v.includes(x)))return 'danger';
+  if(['em aberto','em analise','acompanhar','previsao','renovacao','pendente','aguardando','documentacao','regulacao','aviso'].some(x=>v.includes(x)))return 'warning';
   if(['proposta','apolice','importacao'].some(x=>v.includes(x)))return 'info';
   return 'neutral';
 }
@@ -1830,6 +1848,11 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     (brokerageFilter==='all'&&String(r.data.clientId||'')===String(clientId))
   ).filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
   const renewals=renewalSourceRows().filter(r=>visibleInsuranceIds.has(r.id));
+  const claims=list('claim').filter(r=>
+    visibleInsuranceIds.has(String(r.data.policyId||''))||
+    (brokerageFilter==='all'&&String(r.data.clientId||'')===String(clientId))
+  );
+  const openClaims=claims.filter(r=>!['Pago','Encerrado','Negado'].includes(String(r.data.status||'')));
   const brokeragesForClient=clientBrokerageOptions(allInsurances);
 
   const insuranceHtml=insurances.length?insurances.map(r=>{
@@ -1871,6 +1894,13 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     <div class="detail-row"><div><strong>${esc(r.data.number||'Contrato')}</strong><span>${esc(r.data.insurer||'—')} · vence em ${date(r.data.end)}</span></div><span class="status-pill corporate-status ${statusTone(renewalStatus(r))}">${esc(renewalStatus(r))}</span></div>
   `).join(''):'<div class="empty compact">Nenhuma renovação identificada.</div>';
 
+  const claimHtml=claims.length?claims.slice(0,10).map(r=>`
+    <div class="detail-row">
+      <div><strong>${esc(r.data.number||'Sinistro')}</strong><span>${r.data.incidentDate?date(r.data.incidentDate):'Data não informada'} · ${esc(r.data.claimType||'Sinistro')}</span></div>
+      <div class="row-end"><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span><button class="link-btn" data-client-claim-policy="${r.data.policyId||''}">Abrir apólice</button></div>
+    </div>
+  `).join(''):'<div class="empty compact">Nenhum sinistro vinculado aos contratos exibidos.</div>';
+
   const docHtml=docs.length?docs.slice(0,12).map(doc=>{
     const linked=rowById(doc.data.policyId||doc.data.proposalId);
     const action=doc.data.storageKey
@@ -1887,6 +1917,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
       <div><span>Parcelas em aberto</span><strong>${openPayments.length}</strong></div>
       <div><span>Pendências</span><strong>${tasks.length}</strong></div>
       <div><span>Comissões</span><strong>${commissions.length}</strong></div>
+      <div><span>Sinistros abertos</span><strong>${openClaims.length}</strong></div>
       <div><span>Documentos</span><strong>${storedDocs.length}</strong></div>
     </div>
     <div class="detail-grid">
@@ -1921,6 +1952,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
       <section class="detail-section"><div class="section-title-row"><div><h3>Parcelas em aberto</h3><p>Somente parcelas efetivas vinculadas aos contratos exibidos.</p></div></div>${paymentHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Pendências</h3><p>Ações operacionais que ainda exigem acompanhamento.</p></div></div>${taskHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Renovações</h3><p>Contratos do cliente em acompanhamento de renovação.</p></div></div>${renewalHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Sinistros</h3><p>Sinistros vinculados às apólices exibidas.</p></div></div>${claimHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Documentos</h3><p>Documentos gerais e vinculados a cada seguro.</p></div></div>${docHtml}</section>
     </div>`;
 
@@ -1931,6 +1963,10 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   document.querySelectorAll('[data-client-open-insurance]').forEach(b=>b.onclick=()=>{
     $('#clientDialog').close();
     openInsuranceDetail(b.dataset.clientOpenInsurance);
+  });
+  document.querySelectorAll('[data-client-claim-policy]').forEach(b=>b.onclick=()=>{
+    const policy=rowById(b.dataset.clientClaimPolicy);
+    if(policy){$('#clientDialog').close();openInsuranceDetail(policy.id);}
   });
   document.querySelectorAll('[data-client-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.clientOpenDoc)));
   document.querySelectorAll('[data-client-upload-doc]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.clientUploadDoc));
