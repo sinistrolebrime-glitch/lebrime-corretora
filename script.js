@@ -49,7 +49,7 @@ const NEW_LABELS={
 };
 
 const SEARCH_LABELS={
-  client:'Pesquisar cliente, CPF/CNPJ...',
+  client:'Pesquisar nome, CPF/CNPJ, placa, proposta ou apólice...',
   producer:'Pesquisar produtor...',
   insurance:'Pesquisar cliente, proposta, apólice...',
   payment:'Pesquisar parcela ou cliente...',
@@ -126,6 +126,72 @@ const isInsuranceActive=insurance=>{
 };
 
 const activeInsuranceRows=()=>[...list('proposal'),...list('policy')].filter(isInsuranceActive);
+
+const insuranceRowsForClient=clientId=>[...list('proposal'),...list('policy')]
+  .filter(r=>String(r.data.clientId||'')===String(clientId||''));
+
+const linkedToInsurance=(row,insurance)=>{
+  if(!row||!insurance)return false;
+  return insurance.kind==='policy'
+    ?String(row.data?.policyId||'')===String(insurance.id)
+    :String(row.data?.proposalId||'')===String(insurance.id);
+};
+
+const clientSearchText=client=>{
+  const insurances=insuranceRowsForClient(client.id);
+  const ids=new Set(insurances.map(r=>r.id));
+  const items=list('insuredItem').filter(r=>
+    ids.has(String(r.data.policyId||''))||ids.has(String(r.data.proposalId||''))
+  );
+  return fold([
+    JSON.stringify(client.data||{}),
+    ...insurances.map(r=>JSON.stringify(r.data||{})),
+    ...items.map(r=>JSON.stringify(r.data||{}))
+  ].join(' '));
+};
+
+const genericSearchText=row=>fold(
+  JSON.stringify(row.data||{})+' '+nameById(row.data?.clientId)+' '+nameById(row.data?.producerId)
+);
+
+function matchingClients(query){
+  const q=fold(query);
+  if(!q)return [];
+  return list('client')
+    .filter(r=>clientSearchText(r).includes(q))
+    .sort((a,b)=>String(a.data.name||'').localeCompare(String(b.data.name||''),'pt-BR'));
+}
+
+function renderSearchSuggestions(){
+  const root=$('#searchSuggestions');
+  if(!root)return;
+  if(current!=='client'){
+    root.classList.add('hidden');root.innerHTML='';return;
+  }
+  const q=$('#searchInput').value.trim();
+  if(!q){
+    root.classList.add('hidden');root.innerHTML='';return;
+  }
+  const matches=matchingClients(q).slice(0,8);
+  root.innerHTML=matches.length?matches.map(client=>{
+    const ins=insuranceRowsForClient(client.id);
+    const ids=new Set(ins.map(r=>r.id));
+    const plates=list('insuredItem')
+      .filter(r=>ids.has(String(r.data.policyId||''))||ids.has(String(r.data.proposalId||'')))
+      .map(r=>r.data.plate).filter(Boolean).slice(0,3);
+    const contracts=ins.map(r=>r.data.number).filter(Boolean).slice(0,3);
+    const secondary=[client.data.document,...plates,...contracts].filter(Boolean).join(' · ');
+    return `<button type="button" class="search-suggestion" data-search-client="${client.id}">
+      <strong>${esc(client.data.name||'Cliente')}</strong>
+      <span>${esc(secondary||'Cadastro do cliente')}</span>
+    </button>`;
+  }).join(''):'<div class="search-suggestion-empty">Nenhum cliente localizado.</div>';
+  root.classList.remove('hidden');
+  root.querySelectorAll('[data-search-client]').forEach(b=>b.onclick=()=>{
+    root.classList.add('hidden');
+    openClientDetail(b.dataset.searchClient);
+  });
+}
 const producerLabelOf=insurance=>{
   if(insurance?.data?.producerId)return nameById(insurance.data.producerId);
   if(insurance?.kind==='proposal'&&insurance?.data?.producerPending)return 'Pendente — preencher';
@@ -242,7 +308,7 @@ const renewalPriority=r=>renewalTrackerFor(r)?.data?.priority||automaticRenewalP
 const renewalNextAction=r=>renewalTrackerFor(r)?.data?.nextAction||'—';
 const renewalNextActionDate=r=>renewalTrackerFor(r)?.data?.nextActionDate||'';
 
-let renewalFilters={window:'all',producer:'all',insurer:'all',brokerage:'all',status:'all'};
+let renewalFilters={dateFrom:'',dateTo:'',producer:'all',insurer:'all',branch:'all',brokerage:'all',status:'all'};
 
 async function api(action,body={},opts={}){
   const headers={...(opts.headers||{})};
@@ -385,6 +451,8 @@ function navigate(view){
   $('#newBtn').textContent=NEW_LABELS[view]||'+ Novo';
   $('#searchInput').value='';
   $('#searchInput').placeholder=SEARCH_LABELS[view]||'Pesquisar...';
+  const suggestionRoot=$('#searchSuggestions');
+  if(suggestionRoot){suggestionRoot.innerHTML='';suggestionRoot.classList.add('hidden');}
   const label=menu.find(x=>x[0]===view)?.[1]||'Lebrime';
   $('#pageTitle').textContent=label;
   if($('#pageContext'))$('#pageContext').textContent=PAGE_CONTEXT[view]||'';
@@ -821,31 +889,41 @@ function renewalSourceRows(){
 function renewalFilterHtml(rows){
   const producerIds=[...new Set(rows.map(r=>r.data.producerId).filter(Boolean))];
   const insurerValues=[...new Set(rows.map(r=>r.data.insurer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const branchValues=[...new Set(rows.map(r=>r.data.branch).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   const brokerageValues=[...new Set(rows.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   const statusValues=[...new Set(rows.map(r=>renewalStatus(r)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
   return `
-    <div class="renewal-filters">
-      <label>Janela
-        <select data-renew-filter="window">
-          <option value="all" ${renewalFilters.window==='all'?'selected':''}>Todas</option>
-          <option value="30" ${renewalFilters.window==='30'?'selected':''}>Até 30 dias</option>
-          <option value="60" ${renewalFilters.window==='60'?'selected':''}>Até 60 dias</option>
-          <option value="90" ${renewalFilters.window==='90'?'selected':''}>Até 90 dias</option>
-          <option value="120" ${renewalFilters.window==='120'?'selected':''}>Até 120 dias</option>
-        </select>
-      </label>
-      <label>Produtor
-        <select data-renew-filter="producer"><option value="all">Todos</option>${producerIds.map(id=>`<option value="${id}" ${renewalFilters.producer===id?'selected':''}>${esc(nameById(id))}</option>`).join('')}</select>
-      </label>
-      <label>Seguradora
-        <select data-renew-filter="insurer"><option value="all">Todas</option>${insurerValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.insurer===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
-      </label>
-      <label>Corretora
-        <select data-renew-filter="brokerage"><option value="all">Todas</option>${brokerageValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.brokerage===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
-      </label>
-      <label>Status
-        <select data-renew-filter="status"><option value="all">Todos</option>${statusValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.status===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
-      </label>
+    <div class="renewal-filter-shell">
+      <div class="renewal-period">
+        <label>Vencimento inicial
+          <input type="date" data-renew-filter="dateFrom" value="${esc(renewalFilters.dateFrom)}">
+        </label>
+        <label>Vencimento final
+          <input type="date" data-renew-filter="dateTo" value="${esc(renewalFilters.dateTo)}">
+        </label>
+      </div>
+      <div class="renewal-filters">
+        <label>Produtor
+          <select data-renew-filter="producer"><option value="all">Todos</option>${producerIds.map(id=>`<option value="${id}" ${renewalFilters.producer===id?'selected':''}>${esc(nameById(id))}</option>`).join('')}</select>
+        </label>
+        <label>Seguradora
+          <select data-renew-filter="insurer"><option value="all">Todas</option>${insurerValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.insurer===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Ramo
+          <select data-renew-filter="branch"><option value="all">Todos</option>${branchValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.branch===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Corretora
+          <select data-renew-filter="brokerage"><option value="all">Todas</option>${brokerageValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.brokerage===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Status
+          <select data-renew-filter="status"><option value="all">Todos</option>${statusValues.map(v=>`<option value="${esc(v)}" ${renewalFilters.status===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div class="renewal-filter-actions">
+        <button type="button" class="btn ghost small" id="renewalClearFilters">Limpar filtros</button>
+        <button type="button" class="btn ghost small" id="renewalExportCsv">Exportar Excel (CSV)</button>
+        <button type="button" class="btn primary small" id="renewalPrintMirror">Gerar espelho</button>
+      </div>
     </div>`;
 }
 
@@ -853,15 +931,69 @@ function applyRenewalFilters(rows){
   return rows.filter(r=>{
     if(renewalFilters.producer!=='all'&&String(r.data.producerId||'')!==renewalFilters.producer)return false;
     if(renewalFilters.insurer!=='all'&&String(r.data.insurer||'')!==renewalFilters.insurer)return false;
+    if(renewalFilters.branch!=='all'&&String(r.data.branch||'')!==renewalFilters.branch)return false;
     if(renewalFilters.brokerage!=='all'&&!String(r.data.brokerages||r.data.brokerage||'').split('|').includes(renewalFilters.brokerage))return false;
     if(renewalFilters.status!=='all'&&renewalStatus(r)!==renewalFilters.status)return false;
-    if(renewalFilters.window!=='all'&&r.kind==='policy'){
-      const d=daysUntil(r.data.end);
-      const max=Number(renewalFilters.window);
-      if(d===null||d<0||d>max)return false;
-    }
+    const ref=String(r.data.end||'');
+    if(renewalFilters.dateFrom&&(!ref||ref<renewalFilters.dateFrom))return false;
+    if(renewalFilters.dateTo&&(!ref||ref>renewalFilters.dateTo))return false;
     return true;
   });
+}
+
+function filteredRenewalRows(){
+  let rows=applyRenewalFilters(renewalSourceRows());
+  const q=fold($('#searchInput')?.value||'');
+  if(q)rows=rows.filter(r=>genericSearchText(r).includes(q));
+  return rows.sort((a,b)=>String(a.data.end||'').localeCompare(String(b.data.end||'')));
+}
+
+function csvValue(value){
+  return '"'+String(value??'').replace(/"/g,'""')+'"';
+}
+
+function exportRenewalsCsv(){
+  const rows=filteredRenewalRows();
+  if(!rows.length){alert('Nenhuma renovação encontrada para os filtros selecionados.');return;}
+  const headers=['Cliente','CPF/CNPJ','Tipo','Número','Seguradora','Ramo','Produtor','Corretora','Fim da vigência','Status','Prêmio'];
+  const lines=[headers,...rows.map(r=>{
+    const client=dataById(r.data.clientId);
+    return [
+      client.name||'',client.document||'',r.kind==='policy'?'Apólice':'Proposta de renovação',
+      r.data.number||'',r.data.insurer||'',r.data.branch||'',producerLabelOf(r),
+      String(r.data.brokerages||r.data.brokerage||'').replace(/\|/g,' / '),
+      r.data.end||'',renewalStatus(r),(Number(r.data.premium||0)/100).toFixed(2).replace('.',',')
+    ];
+  })].map(row=>row.map(csvValue).join(';')).join('\r\n');
+  const blob=new Blob(['\ufeff'+lines],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`renovacoes-${today()}.csv`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function printRenewalMirror(){
+  const rows=filteredRenewalRows();
+  if(!rows.length){alert('Nenhuma renovação encontrada para os filtros selecionados.');return;}
+  const period=[renewalFilters.dateFrom?date(renewalFilters.dateFrom):'',renewalFilters.dateTo?date(renewalFilters.dateTo):''].filter(Boolean).join(' a ')||'Todos os vencimentos';
+  const win=window.open('','_blank','noopener');
+  if(!win){alert('O navegador bloqueou a abertura do espelho. Permita pop-ups para este sistema.');return;}
+  const body=rows.map(r=>`<tr>
+    <td>${esc(nameById(r.data.clientId))}</td>
+    <td>${esc(r.data.number||'—')}</td>
+    <td>${esc(r.data.insurer||'—')}</td>
+    <td>${esc(r.data.branch||'—')}</td>
+    <td>${esc(producerLabelOf(r))}</td>
+    <td>${esc(String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · '))}</td>
+    <td>${date(r.data.end)}</td>
+    <td>${esc(renewalStatus(r))}</td>
+  </tr>`).join('');
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Espelho de Renovações</title>
+    <style>body{font-family:Arial,sans-serif;color:#162235;padding:28px}h1{font-size:22px;margin:0}p{color:#5f6b7a}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:11px}th,td{border:1px solid #d9dee7;padding:7px;text-align:left}th{background:#f4f6f8}.head{display:flex;justify-content:space-between;gap:24px}.brand{font-weight:700;letter-spacing:.08em}</style>
+    </head><body><div class="head"><div><div class="brand">LEBRIME CORRETORA DE SEGUROS</div><h1>Espelho de Renovações</h1><p>Período: ${esc(period)} · ${rows.length} registro(s)</p></div><div>Gerado em ${date(today())}</div></div>
+    <table><thead><tr><th>Cliente</th><th>Contrato</th><th>Seguradora</th><th>Ramo</th><th>Produtor</th><th>Corretora</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>
+    <script>window.onload=()=>window.print()<\/script></body></html>`);
+  win.document.close();
 }
 
 function commissionSummary(rows){
@@ -890,8 +1022,8 @@ function renderList(){
   else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
   else rows=[...list(current)];
 
-  const q=norm($('#searchInput').value);
-  if(q)rows=rows.filter(r=>norm(JSON.stringify(r.data)+' '+nameById(r.data.clientId)+' '+nameById(r.data.producerId)).includes(q));
+  const q=fold($('#searchInput').value);
+  if(q)rows=rows.filter(r=>current==='client'?clientSearchText(r).includes(q):genericSearchText(r).includes(q));
 
   if(current==='payment')rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
   if(current==='insurance')rows.sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
@@ -918,6 +1050,7 @@ function renderList(){
       const value=x[1](r)??'—';
       if(current==='client'&&i===0)return `<td><button class="name-link" data-client-detail="${r.id}">${esc(value)}</button></td>`;
       if(current==='producer'&&i===0)return `<td><button class="name-link" data-producer-detail="${r.id}">${esc(value)}</button></td>`;
+      if(current==='insurance'&&label==='Número')return `<td><button class="name-link" data-insurance-detail="${r.id}">${esc(value)}</button></td>`;
       const label=x[0];
       if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
         return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
@@ -939,7 +1072,9 @@ function renderList(){
 
     const editAction=current==='renewal'
       ?`<button data-renewal-track="${r.id}" class="link-btn">${renewalTrackerFor(r)?'Atualizar acompanhamento':'Acompanhar'}</button><button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
-      :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
+      :current==='insurance'
+        ?`<button data-insurance-detail="${r.id}" class="link-btn">Abrir ficha</button><button data-edit="${r.id}" class="link-btn">Editar</button>`
+        :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
 
     return '<tr>'+cells+`<td class="actions">${editAction}${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
@@ -949,12 +1084,22 @@ function renderList(){
   document.querySelectorAll('[data-insurance-upload]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.insuranceUpload));
   document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
   document.querySelectorAll('[data-producer-detail]').forEach(b=>b.onclick=()=>openProducerDetail(b.dataset.producerDetail));
+  document.querySelectorAll('[data-insurance-detail]').forEach(b=>b.onclick=()=>openInsuranceDetail(b.dataset.insuranceDetail));
   document.querySelectorAll('[data-renewal-track]').forEach(b=>b.onclick=()=>openRenewalTracker(b.dataset.renewalTrack));
   document.querySelectorAll('[data-renewal-edit]').forEach(b=>b.onclick=()=>editInsuranceFromRenewal(b.dataset.renewalEdit));
-  document.querySelectorAll('[data-renew-filter]').forEach(sel=>sel.onchange=()=>{
-    renewalFilters[sel.dataset.renewFilter]=sel.value;
+  document.querySelectorAll('[data-renew-filter]').forEach(el=>el.onchange=()=>{
+    renewalFilters[el.dataset.renewFilter]=el.value;
     renderList();
   });
+  const clearRenewal=$('#renewalClearFilters');
+  if(clearRenewal)clearRenewal.onclick=()=>{
+    renewalFilters={dateFrom:'',dateTo:'',producer:'all',insurer:'all',branch:'all',brokerage:'all',status:'all'};
+    renderList();
+  };
+  const exportRenewal=$('#renewalExportCsv');
+  if(exportRenewal)exportRenewal.onclick=exportRenewalsCsv;
+  const printRenewal=$('#renewalPrintMirror');
+  if(printRenewal)printRenewal.onclick=printRenewalMirror;
 }
 function paymentSummary(rows){
   const forecast=rows.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
@@ -1183,10 +1328,7 @@ function openRenewalTracker(id){
 }
 
 function editInsuranceFromRenewal(id){
-  const insurance=rowById(id);if(!insurance)return;
-  current='insurance';renderNav();
-  $('#pageTitle').textContent='Propostas e Apólices';
-  openEditor(insurance);
+  openInsuranceDetail(id);
 }
 
 function clientRelatedDocuments(clientId){
@@ -1195,90 +1337,250 @@ function clientRelatedDocuments(clientId){
   return list('document').filter(r=>String(r.data.clientId||'')===String(clientId)||insuranceIds.has(String(r.data.policyId||''))||insuranceIds.has(String(r.data.proposalId||'')));
 }
 
-function openClientDetail(clientId){
+function clientBrokerageOptions(insurances){
+  return [...new Set(insurances.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+}
+
+function renderClientDetail(clientId,brokerageFilter='all'){
   const client=rowById(clientId);if(!client)return;
   const d=client.data;
-  const insurances=[...list('proposal'),...list('policy')].filter(r=>String(r.data.clientId||'')===String(clientId))
+  const allInsurances=insuranceRowsForClient(clientId)
     .sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
+  const insurances=brokerageFilter==='all'
+    ?allInsurances
+    :allInsurances.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(brokerageFilter));
+  const insuranceIds=new Set(allInsurances.map(r=>r.id));
+  const visibleInsuranceIds=new Set(insurances.map(r=>r.id));
   const docs=clientRelatedDocuments(clientId);
   const storedDocs=docs.filter(doc=>doc.data.storageKey);
-  const pendingDocs=docs.filter(doc=>!doc.data.storageKey);
   const activeInsurances=insurances.filter(isInsuranceActive);
   const totalPremium=activeInsurances.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
+  const payments=list('payment').filter(r=>
+    String(r.data.clientId||'')===String(clientId)||
+    visibleInsuranceIds.has(String(r.data.policyId||''))||
+    visibleInsuranceIds.has(String(r.data.proposalId||''))
+  );
+  const openPayments=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
+  const commissions=list('commission').filter(r=>
+    visibleInsuranceIds.has(String(r.data.policyId||''))||visibleInsuranceIds.has(String(r.data.proposalId||''))
+  );
+  const tasks=list('task').filter(r=>
+    String(r.data.clientId||'')===String(clientId)||
+    visibleInsuranceIds.has(String(r.data.policyId||''))||
+    visibleInsuranceIds.has(String(r.data.proposalId||''))
+  ).filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
+  const renewals=renewalSourceRows().filter(r=>visibleInsuranceIds.has(r.id));
+  const brokeragesForClient=clientBrokerageOptions(allInsurances);
 
   const insuranceHtml=insurances.length?insurances.map(r=>{
     const doc=primaryInsuranceDocument(r);
-    const endorsementCount=insuranceDocuments(r).filter(d=>fold(d.data.documentType||'')==='endosso').length;
+    const endorsementCount=insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso').length;
     const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
-    const fileAction=doc?.data.storageKey
-      ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir PDF</button>`
-      :`<button class="btn primary small" data-client-upload-doc="${r.id}" data-client-id="${clientId}">${doc?'Regularizar PDF':'Anexar PDF'}</button>`;
-    const fileState=doc?.data.storageKey
-      ?'<span class="contract-file-state ready">Arquivo disponível</span>'
-      :doc
-        ?'<span class="contract-file-state pending">Registro localizado — PDF ainda não migrado</span>'
-        :'<span class="contract-file-state neutral">Sem arquivo</span>';
+    const fileState=doc?.data.storageKey?'Arquivo disponível':doc?'PDF pendente':'Sem arquivo';
     return `
       <article class="insurance-card">
         <div class="insurance-card-head">
-          <div>
-            <span class="record-type">${r.kind==='policy'?'APÓLICE':'PROPOSTA'}</span>
-            <h4>${esc(r.data.number||'Sem número')}</h4>
-          </div>
-          <span class="status-pill">${esc(r.data.status||'Cadastrado')}</span>
+          <div><span class="record-type">${r.kind==='policy'?'APÓLICE':'PROPOSTA'}</span><h4>${esc(r.data.number||'Sem número')}</h4></div>
+          <span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'Cadastrado')}</span>
         </div>
         <div class="insurance-card-grid">
           <div><span>Seguradora</span><strong>${esc(r.data.insurer||'—')}</strong></div>
           <div><span>Ramo</span><strong>${esc(r.data.branch||'—')}</strong></div>
+          <div><span>Produtor</span><strong>${esc(producerLabelOf(r))}</strong></div>
           <div><span>Corretora</span><strong>${esc(broker)}</strong></div>
-          <div><span>Operação</span><strong>${esc(r.data.policyType||'—')}</strong></div>
           <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
           <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
         </div>
-        <div class="insurance-card-foot">${fileState}${endorsementCount?`<span class="contract-file-state ready">${endorsementCount} endosso(s)</span>`:''}${fileAction}</div>
-      </article>`;
-  }).join(''):'<div class="empty compact">Nenhuma proposta ou apólice cadastrada.</div>';
-
-  const docsHtml=docs.length?docs.map(doc=>{
-    const linked=rowById(doc.data.policyId||doc.data.proposalId);
-    const linkedLabel=linked?insuranceLabel(linked):'Documento geral do cliente';
-    const action=doc.data.storageKey
-      ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir arquivo</button>`
-      :linked
-        ?`<button class="btn primary small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Regularizar arquivo</button>`
-        :'<span class="file-missing">Registro localizado — PDF ainda não migrado</span>';
-    return `
-      <div class="document-row">
-        <div>
-          <strong>${esc(doc.data.name||doc.data.documentType||'Documento')}</strong>
-          <span>${esc(doc.data.documentType||'Documento')} · ${date(doc.data.referenceDate)} · ${esc(linkedLabel)}</span>
+        <div class="insurance-card-foot">
+          <span class="contract-file-state ${doc?.data.storageKey?'ready':doc?'pending':'neutral'}">${esc(fileState)}</span>
+          ${endorsementCount?`<span class="contract-file-state ready">${endorsementCount} endosso(s)</span>`:''}
+          <button class="btn primary small" data-client-open-insurance="${r.id}">Abrir ficha</button>
         </div>
-        ${action}
-      </div>`;
-  }).join(''):'<div class="empty compact">Nenhum arquivo vinculado a este cliente.</div>';
+      </article>`;
+  }).join(''):'<div class="empty compact">Nenhuma proposta ou apólice encontrada para o filtro selecionado.</div>';
+
+  const paymentHtml=openPayments.length?openPayments.slice(0,10).map(r=>`
+    <div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')}</strong><span>${date(r.data.due)} · ${esc(r.data.collectionStatus||'Acompanhar')}</span></div><strong>${money(r.data.amount)}</strong></div>
+  `).join(''):'<div class="empty compact">Nenhuma parcela efetiva em aberto.</div>';
+
+  const taskHtml=tasks.length?tasks.slice(0,10).map(r=>`
+    <div class="detail-row"><div><strong>${esc(r.data.title||'Pendência')}</strong><span>${esc(r.data.source||'Operação')} · ${r.data.due?date(r.data.due):'Sem prazo'}</span></div><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'Pendente')}</span></div>
+  `).join(''):'<div class="empty compact">Nenhuma pendência aberta.</div>';
+
+  const renewalHtml=renewals.length?renewals.slice(0,10).map(r=>`
+    <div class="detail-row"><div><strong>${esc(r.data.number||'Contrato')}</strong><span>${esc(r.data.insurer||'—')} · vence em ${date(r.data.end)}</span></div><span class="status-pill corporate-status ${statusTone(renewalStatus(r))}">${esc(renewalStatus(r))}</span></div>
+  `).join(''):'<div class="empty compact">Nenhuma renovação identificada.</div>';
+
+  const docHtml=docs.length?docs.slice(0,12).map(doc=>{
+    const linked=rowById(doc.data.policyId||doc.data.proposalId);
+    const action=doc.data.storageKey
+      ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir</button>`
+      :linked?`<button class="btn ghost small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Anexar PDF</button>`:'';
+    return `<div class="detail-row"><div><strong>${esc(doc.data.name||doc.data.documentType||'Documento')}</strong><span>${esc(doc.data.documentType||'Documento')} · ${linked?esc(insuranceLabel(linked)):'Documento geral'}</span></div>${action}</div>`;
+  }).join(''):'<div class="empty compact">Nenhum documento vinculado.</div>';
 
   $('#clientDetailTitle').textContent=d.name||'Cliente';
   $('#clientDetailBody').innerHTML=`
     <div class="client-kpis">
-      <div><span>Propostas e apólices ativas</span><strong>${activeInsurances.length}</strong></div>
-      <div><span>Propostas e apólices</span><strong>${insurances.length}</strong></div>
-      <div><span>Arquivos disponíveis</span><strong>${storedDocs.length}</strong></div>
-      <div><span>Arquivos pendentes</span><strong>${pendingDocs.length}</strong></div>
+      <div><span>Seguros ativos</span><strong>${activeInsurances.length}</strong></div>
+      <div><span>Prêmio vigente</span><strong>${money(totalPremium)}</strong></div>
+      <div><span>Parcelas em aberto</span><strong>${openPayments.length}</strong></div>
+      <div><span>Pendências</span><strong>${tasks.length}</strong></div>
+      <div><span>Comissões</span><strong>${commissions.length}</strong></div>
+      <div><span>Documentos</span><strong>${storedDocs.length}</strong></div>
     </div>
     <div class="detail-grid">
       <div><span>CPF/CNPJ</span><strong>${esc(d.document||'—')}</strong></div>
       <div><span>Telefone</span><strong>${esc(d.phone||'—')}</strong></div>
       <div><span>E-mail</span><strong>${esc(d.email||'—')}</strong></div>
+      <div><span>Responsável</span><strong>${esc(d.responsible||'—')}</strong></div>
       <div><span>Cidade/UF</span><strong>${esc([d.city,d.state].filter(Boolean).join('/')||'—')}</strong></div>
+      <div><span>Nome fantasia</span><strong>${esc(d.fantasyName||'—')}</strong></div>
       <div class="wide"><span>Endereço</span><strong>${esc(d.address||'—')}</strong></div>
-      <div class="wide"><span>Prêmio vigente</span><strong>${money(totalPremium)}</strong></div>
     </div>
-    <section class="detail-section"><div class="section-title-row"><div><h3>Propostas e apólices</h3><p>O PDF fica associado diretamente ao respectivo contrato.</p></div></div><div class="insurance-grid">${insuranceHtml}</div></section>
-    <section class="detail-section"><div class="section-title-row"><div><h3>Documentos</h3><p>Arquivos gerais e documentos vinculados aos seguros.</p></div></div>${docsHtml}</section>`;
+
+    <section class="detail-section">
+      <div class="section-title-row client-contract-heading">
+        <div><h3>Propostas e apólices</h3><p>Histórico consolidado do cliente, mantendo a corretora vinculada a cada contrato.</p></div>
+        <label class="inline-filter">Corretora
+          <select id="clientBrokerageFilter">
+            <option value="all">Todas</option>
+            ${brokeragesForClient.map(v=>`<option value="${esc(v)}" ${brokerageFilter===v?'selected':''}>${esc(v)}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <div class="insurance-grid">${insuranceHtml}</div>
+    </section>
+
+    <div class="detail-columns">
+      <section class="detail-section"><div class="section-title-row"><div><h3>Parcelas em aberto</h3><p>Somente parcelas efetivas vinculadas aos contratos exibidos.</p></div></div>${paymentHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Pendências</h3><p>Ações operacionais que ainda exigem acompanhamento.</p></div></div>${taskHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Renovações</h3><p>Contratos do cliente em acompanhamento de renovação.</p></div></div>${renewalHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Documentos</h3><p>Documentos gerais e vinculados a cada seguro.</p></div></div>${docHtml}</section>
+    </div>`;
+
   $('#clientDialog').dataset.clientId=clientId;
-  $('#clientDialog').showModal();
+  $('#clientDialog').dataset.brokerageFilter=brokerageFilter;
+  const brokerFilter=$('#clientBrokerageFilter');
+  if(brokerFilter)brokerFilter.onchange=()=>renderClientDetail(clientId,brokerFilter.value);
+  document.querySelectorAll('[data-client-open-insurance]').forEach(b=>b.onclick=()=>{
+    $('#clientDialog').close();
+    openInsuranceDetail(b.dataset.clientOpenInsurance);
+  });
   document.querySelectorAll('[data-client-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.clientOpenDoc)));
   document.querySelectorAll('[data-client-upload-doc]').forEach(b=>b.onclick=()=>openClientUpload(b.dataset.clientId,b.dataset.clientUploadDoc));
+}
+
+function openClientDetail(clientId){
+  renderClientDetail(clientId,'all');
+  $('#clientDialog').showModal();
+}
+
+function insuranceLinkedRows(kind,insurance){
+  return list(kind).filter(r=>linkedToInsurance(r,insurance));
+}
+
+function openInsuranceDetail(insuranceId){
+  const insurance=rowById(insuranceId);if(!insurance||!['proposal','policy'].includes(insurance.kind))return;
+  const client=dataById(insurance.data.clientId);
+  const items=insuranceLinkedRows('insuredItem',insurance);
+  const coverages=insuranceLinkedRows('coverage',insurance);
+  const payments=insuranceLinkedRows('payment',insurance).sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
+  const commissions=insuranceLinkedRows('commission',insurance);
+  const docs=insuranceDocuments(insurance);
+  const tasks=insuranceLinkedRows('task',insurance);
+  const claims=list('claim').filter(r=>linkedToInsurance(r,insurance)||String(r.data.policyId||'')===String(insurance.id));
+  const driverRecords=insuranceLinkedRows('driver',insurance);
+  const embeddedDrivers=Array.isArray(insurance.data.drivers)?insurance.data.drivers:[];
+  const broker=String(insurance.data.brokerages||insurance.data.brokerage||'—').replace(/\|/g,' · ');
+
+  const itemsHtml=items.length?items.map(r=>`
+    <div class="entity-card"><div><span>${esc(r.data.itemType||'Item segurado')}</span><strong>${esc(r.data.makeModel||r.data.description||'—')}</strong></div>
+    <div class="entity-grid"><span>Placa <strong>${esc(r.data.plate||'—')}</strong></span><span>Chassi <strong>${esc(r.data.chassis||'—')}</strong></span><span>Ano <strong>${esc(r.data.year||'—')}</strong></span><span>Valor <strong>${money(r.data.insuredValue)}</strong></span></div></div>
+  `).join(''):'<div class="empty compact">Nenhum item ou veículo cadastrado neste contrato.</div>';
+
+  const drivers=[...driverRecords.map(r=>r.data),...embeddedDrivers];
+  const driverHtml=drivers.length?drivers.map(d=>`
+    <div class="detail-row"><div><strong>${esc(d.name||d.driverName||'Condutor')}</strong><span>${esc(d.license||d.cnh||'CNH não informada')} · ${d.birthDate?date(d.birthDate):'Nascimento não informado'}</span></div><span>${d.primary||d.isPrimary?'Principal':''}</span></div>
+  `).join(''):'<div class="empty compact">Nenhum condutor cadastrado neste contrato.</div>';
+
+  const coverageHtml=coverages.length?coverages.map(r=>`
+    <div class="detail-row"><div><strong>${esc(r.data.name||'Cobertura')}</strong><span>Franquia: ${esc(r.data.deductible||'—')}</span></div><strong>${money(r.data.limit)}</strong></div>
+  `).join(''):'<div class="empty compact">Nenhuma cobertura detalhada cadastrada.</div>';
+
+  const paymentHtml=payments.length?payments.map(r=>`
+    <div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')}</strong><span>${r.data.due?date(r.data.due):(r.data.dueText||'Sem vencimento')} · ${esc(r.data.paymentMethod||'Forma não informada')}</span></div><div class="row-end"><strong>${money(r.data.amount)}</strong><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span></div></div>
+  `).join(''):'<div class="empty compact">Nenhuma parcela vinculada.</div>';
+
+  const commissionHtml=commissions.length?commissions.map(r=>`
+    <div class="detail-row"><div><strong>Comissão ${esc(r.data.status||'Prevista')}</strong><span>Bruta: ${money(r.data.expected)} · Produtor: ${money(r.data.producerExpected)}</span></div><div class="row-end"><strong>Recebida ${money(r.data.received)}</strong><span>Líquido Lebrime ${money(r.data.lebrimeNet)}</span></div></div>
+  `).join(''):'<div class="empty compact">Nenhuma comissão calculada. O sistema não cria comissão sem produtor, percentual e prêmio líquido válidos.</div>';
+
+  const docHtml=docs.length?docs.map(r=>`
+    <div class="detail-row"><div><strong>${esc(r.data.name||r.data.documentType||'Documento')}</strong><span>${esc(r.data.documentType||'Documento')} · ${date(r.data.referenceDate)}</span></div>
+      ${r.data.storageKey?`<button class="btn ghost small" data-insurance-open-doc="${r.id}">Abrir</button>`:`<span class="file-missing">PDF pendente</span>`}</div>
+  `).join(''):'<div class="empty compact">Nenhum documento vinculado.</div>';
+
+  const pendingTasks=tasks.filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
+  const taskHtml=pendingTasks.length?pendingTasks.map(r=>`
+    <div class="detail-row"><div><strong>${esc(r.data.title||'Pendência')}</strong><span>${esc(r.data.source||'Operação')} · ${r.data.due?date(r.data.due):'Sem prazo'}</span></div><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'Pendente')}</span></div>
+  `).join(''):'<div class="empty compact">Nenhuma pendência aberta.</div>';
+
+  const claimHtml=claims.length?claims.map(r=>`
+    <div class="detail-row"><div><strong>${esc(r.data.number||'Sinistro')}</strong><span>${r.data.incidentDate?date(r.data.incidentDate):'Data não informada'} · ${esc(r.data.claimType||'Sinistro')}</span></div><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span></div>
+  `).join(''):'<div class="empty compact">Nenhum sinistro vinculado.</div>';
+
+  $('#insuranceDetailTitle').textContent=`${insurance.kind==='policy'?'Apólice':'Proposta'} ${insurance.data.number||'sem número'}`;
+  $('#insuranceDetailBody').innerHTML=`
+    <div class="contract-hero">
+      <div><span class="record-type">${insurance.kind==='policy'?'APÓLICE':'PROPOSTA'}</span><h3>${esc(client.name||'Cliente')}</h3><p>${esc(insurance.data.insurer||'—')} · ${esc(insurance.data.branch||'—')}</p></div>
+      <span class="status-pill corporate-status ${statusTone(insurance.data.status)}">${esc(insurance.data.status||'Cadastrado')}</span>
+    </div>
+    ${insurance.kind==='proposal'&&insurance.data.producerPending&&!insurance.data.producerId?`<div class="rule-callout producer-pending-callout"><strong>Produtor pendente</strong><span>Proposta importada da Porto sem produtor. O produtor deve ser definido manualmente antes do cálculo da comissão.</span></div>`:''}
+    <div class="contract-summary-grid">
+      <div><span>Cliente</span><strong>${esc(client.name||'—')}</strong></div>
+      <div><span>CPF/CNPJ</span><strong>${esc(client.document||'—')}</strong></div>
+      <div><span>Produtor</span><strong>${esc(producerLabelOf(insurance))}</strong></div>
+      <div><span>Corretora</span><strong>${esc(broker)}</strong></div>
+      <div><span>Operação</span><strong>${esc(insurance.data.policyType||'—')}</strong></div>
+      <div><span>Vigência</span><strong>${date(insurance.data.start)} a ${date(insurance.data.end)}</strong></div>
+      <div><span>Prêmio líquido</span><strong>${money(insurance.data.netPremium)}</strong></div>
+      <div><span>Prêmio total</span><strong>${money(insurance.data.premium)}</strong></div>
+      <div><span>Comissão</span><strong>${Number(insurance.data.commissionPercent||0)}%</strong></div>
+      <div><span>Pagamento</span><strong>${esc(insurance.data.paymentMethod||'—')}</strong></div>
+    </div>
+
+    <div class="contract-sections">
+      <section class="detail-section"><div class="section-title-row"><div><h3>Itens segurados / veículos</h3><p>Riscos vinculados exclusivamente a este contrato.</p></div></div>${itemsHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Condutores</h3><p>Condutores associados ao seguro, quando cadastrados.</p></div></div>${driverHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Coberturas</h3><p>Limites e franquias cadastrados.</p></div></div>${coverageHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Perfil e observações</h3><p>Informações complementares do risco.</p></div></div><div class="profile-note">${esc(insurance.data.profile||insurance.data.notes||'Nenhuma informação complementar cadastrada.')}</div></section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Parcelas</h3><p>Previsões e parcelas efetivas deste contrato.</p></div></div>${paymentHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Comissão</h3><p>Cálculo conforme produtor, corretora e regras financeiras vigentes.</p></div></div>${commissionHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Documentos e endossos</h3><p>Endosso permanece como documento/evento do contrato e não cria nova apólice.</p></div></div>${docHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Pendências</h3><p>Ações operacionais abertas para este contrato.</p></div></div>${taskHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Sinistros</h3><p>Avisos e acompanhamentos vinculados à apólice.</p></div></div>${claimHtml}</section>
+    </div>`;
+
+  $('#insuranceDialog').dataset.insuranceId=insurance.id;
+  $('#insuranceDialog').showModal();
+  document.querySelectorAll('[data-insurance-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.insuranceOpenDoc)));
+}
+
+function editInsuranceFromDetail(){
+  const insurance=rowById($('#insuranceDialog').dataset.insuranceId);
+  if(!insurance)return;
+  $('#insuranceDialog').close();
+  navigate('insurance');
+  openEditor(insurance);
+}
+
+function uploadInsuranceFromDetail(){
+  const insurance=rowById($('#insuranceDialog').dataset.insuranceId);
+  if(!insurance)return;
+  $('#insuranceDialog').close();
+  openClientUpload(insurance.data.clientId,insurance.id);
 }
 
 function openClientUpload(clientIdOverride='',insuranceId=''){
@@ -1423,11 +1725,18 @@ $('#closeClientDetail').onclick=()=>$('#clientDialog').close();
 $('#clientUploadBtn').onclick=openClientUpload;
 $('#clientEditBtn').onclick=editClientFromDetail;
 $('#closeProducerDetail').onclick=()=>$('#producerDialog').close();
+$('#closeInsuranceDetail').onclick=()=>$('#insuranceDialog').close();
+$('#insuranceEditBtn').onclick=editInsuranceFromDetail;
+$('#insuranceUploadBtn').onclick=uploadInsuranceFromDetail;
 $('#producerEditBtn').onclick=editProducerFromDetail;
 $('#closeEditor').onclick=()=>$('#editorDialog').close();
 $('#cancelEditor').onclick=()=>$('#editorDialog').close();
 $('#editorForm').onsubmit=saveCurrent;
-$('#searchInput').oninput=()=>{if(current!=='overview'&&current!=='imports')renderList()};
+$('#searchInput').oninput=()=>{
+  if(current!=='overview'&&current!=='imports'&&current!=='integrations')renderList();
+  renderSearchSuggestions();
+};
+$('#searchInput').onfocus=renderSearchSuggestions;
 $('#uploadClient').onchange=()=>{uploadPrefill.insuranceId='';renderUploadInsurances('')};
 $('#uploadInsurance').onchange=syncUploadType;
 $('#uploadType').onchange=syncUploadType;
