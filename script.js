@@ -30,10 +30,10 @@ const PAGE_CONTEXT={
   client:'Cadastro mestre, busca inteligente e visão 360º dos segurados.',
   producer:'Produção, carteira e resultado por produtor.',
   insurance:'Gestão unificada de propostas, apólices e detalhes de cada contrato.',
-  payment:'Previsões, parcelas efetivas e acompanhamento financeiro.',
-  commission:'Comissões recebidas, repasses e resultado da Lebrime.',
+  payment:'Controle de parcelas, inadimplência e etapas de cobrança sem misturar previsões com recebimentos efetivos.',
+  commission:'Comissões, repasses e resultado realizado conforme as regras financeiras da carteira.',
   renewal:'Consulta por período, filtros comerciais e acompanhamento das renovações.',
-  task:'Pendências operacionais e próximos passos da equipe.',
+  task:'Fila operacional da equipe, incluindo exceções de integração e próximos passos.',
   document:'Biblioteca documental vinculada à carteira.',
   imports:'Entrada e vinculação de documentos aos contratos.',
   integrations:'Conectores oficiais com seguradoras e trilha de sincronização.'
@@ -52,10 +52,10 @@ const SEARCH_LABELS={
   client:'Pesquisar nome, CPF/CNPJ, placa, proposta ou apólice...',
   producer:'Pesquisar produtor...',
   insurance:'Pesquisar cliente, proposta, apólice...',
-  payment:'Pesquisar parcela ou cliente...',
-  commission:'Pesquisar comissão, cliente, produtor...',
+  payment:'Pesquisar cliente, contrato, parcela ou cobrança...',
+  commission:'Pesquisar cliente, contrato, produtor ou corretora...',
   renewal:'Pesquisar renovação...',
-  task:'Pesquisar pendência...',
+  task:'Pesquisar título, cliente, origem ou destino...',
   document:'Pesquisar documento...'
 };
 
@@ -310,6 +310,15 @@ const renewalNextAction=r=>renewalTrackerFor(r)?.data?.nextAction||'—';
 const renewalNextActionDate=r=>renewalTrackerFor(r)?.data?.nextActionDate||'';
 
 let renewalFilters={dateFrom:'',dateTo:'',producer:'all',insurer:'all',branch:'all',brokerage:'all',status:'all'};
+
+let paymentFilters={dateFrom:'',dateTo:'',status:'all',collection:'all',kind:'all',brokerage:'all',insurer:'all'};
+let commissionFilters={receivedFrom:'',receivedTo:'',producer:'all',brokerage:'all',insurer:'all',status:'all'};
+let taskFilters={dueFrom:'',dueTo:'',status:'all',source:'all',destination:'all',responsible:'all'};
+
+const contractForRow=row=>rowById(row?.data?.policyId||row?.data?.proposalId)||null;
+const brokerageLabelOf=insurance=>String(insurance?.data?.brokerages||insurance?.data?.brokerage||'—').replace(/\|/g,' · ');
+const brokerageMatches=(insurance,value)=>value==='all'||String(insurance?.data?.brokerages||insurance?.data?.brokerage||'').split('|').includes(value);
+const uniqueSorted=values=>[...new Set(values.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'));
 
 async function api(action,body={},opts={}){
   const headers={...(opts.headers||{})};
@@ -874,6 +883,7 @@ const config={
     columns:[
       ['Título',r=>r.data.title],
       ['Cliente',r=>nameById(r.data.clientId)],
+      ['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],
       ['Origem',r=>r.data.source||'Manual'],
       ['Destino',r=>r.data.destination||'—'],
       ['Responsável',r=>r.data.responsible],
@@ -881,7 +891,7 @@ const config={
       ['Status',r=>r.data.status]
     ],
     fields:[
-      ['title','Título','text'],['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],
+      ['title','Título','text'],['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],
       ['responsible','Responsável','text'],['due','Prazo','date'],
       ['status','Status','select',['Pendente','Aberta','Em andamento','Concluída']],
       ['notes','Observações','textarea']
@@ -1047,6 +1057,9 @@ function renderList(){
 
   if(current==='insurance')rows=[...list('proposal'),...list('policy')];
   else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
+  else if(current==='payment')rows=applyPaymentFilters([...list('payment')]);
+  else if(current==='commission')rows=applyCommissionFilters([...list('commission')]);
+  else if(current==='task')rows=applyTaskFilters([...list('task')]);
   else rows=[...list(current)];
 
   const q=searchKey($('#searchInput').value);
@@ -1061,9 +1074,10 @@ function renderList(){
   });
 
   $('#listMeta').textContent=`${rows.length} registro(s)`;
-  if(current==='payment')$('#filters').innerHTML=paymentSummary(rows);
-  else if(current==='commission')$('#filters').innerHTML=commissionSummary(rows);
+  if(current==='payment')$('#filters').innerHTML=paymentFilterHtml(list('payment'))+paymentSummary(rows);
+  else if(current==='commission')$('#filters').innerHTML=commissionFilterHtml(list('commission'))+commissionSummary(rows);
   else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
+  else if(current==='task')$('#filters').innerHTML=taskFilterHtml(list('task'))+taskSummary(rows);
   else if(current==='insurance'){
     const pendingProducer=rows.filter(r=>r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId).length;
     $('#filters').innerHTML=pendingProducer
@@ -1079,6 +1093,13 @@ function renderList(){
       if(current==='producer'&&i===0)return `<td><button class="name-link" data-producer-detail="${r.id}">${esc(value)}</button></td>`;
       const label=x[0];
       if(current==='insurance'&&label==='Número')return `<td><button class="name-link" data-insurance-detail="${r.id}">${esc(value)}</button></td>`;
+      if(['payment','commission'].includes(current)&&label==='Contrato'){
+        const insurance=contractForRow(r);
+        return insurance?`<td><button class="name-link" data-linked-insurance="${insurance.id}">${esc(value)}</button></td>`:`<td>${esc(value)}</td>`;
+      }
+      if(current==='task'&&label==='Cliente'&&r.data.clientId){
+        return `<td><button class="name-link" data-linked-client="${r.data.clientId}">${esc(value)}</button></td>`;
+      }
       if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
         return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
       }
@@ -1097,11 +1118,13 @@ function renderList(){
         :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Regularizar PDF':'Anexar PDF'}</button>`)
       :'';
 
+    const linkedInsurance=['payment','commission','task'].includes(current)?contractForRow(r):null;
+    const relatedAction=linkedInsurance?`<button data-linked-insurance="${linkedInsurance.id}" class="link-btn">Abrir seguro</button>`:'';
     const editAction=current==='renewal'
       ?`<button data-renewal-track="${r.id}" class="link-btn">${renewalTrackerFor(r)?'Atualizar acompanhamento':'Acompanhar'}</button><button data-renewal-edit="${r.id}" class="link-btn">Abrir seguro</button>`
       :current==='insurance'
         ?`<button data-insurance-detail="${r.id}" class="link-btn">Abrir ficha</button><button data-edit="${r.id}" class="link-btn">Editar</button>`
-        :`<button data-edit="${r.id}" class="link-btn">Editar</button>`;
+        :`${relatedAction}<button data-edit="${r.id}" class="link-btn">Editar</button>`;
 
     return '<tr>'+cells+`<td class="actions">${editAction}${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
@@ -1112,6 +1135,8 @@ function renderList(){
   document.querySelectorAll('[data-client-detail]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.clientDetail));
   document.querySelectorAll('[data-producer-detail]').forEach(b=>b.onclick=()=>openProducerDetail(b.dataset.producerDetail));
   document.querySelectorAll('[data-insurance-detail]').forEach(b=>b.onclick=()=>openInsuranceDetail(b.dataset.insuranceDetail));
+  document.querySelectorAll('[data-linked-insurance]').forEach(b=>b.onclick=()=>openInsuranceDetail(b.dataset.linkedInsurance));
+  document.querySelectorAll('[data-linked-client]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.linkedClient));
   document.querySelectorAll('[data-renewal-track]').forEach(b=>b.onclick=()=>openRenewalTracker(b.dataset.renewalTrack));
   document.querySelectorAll('[data-renewal-edit]').forEach(b=>b.onclick=()=>editInsuranceFromRenewal(b.dataset.renewalEdit));
   document.querySelectorAll('[data-renew-filter]').forEach(el=>el.onchange=()=>{
@@ -1127,13 +1152,214 @@ function renderList(){
   if(exportRenewal)exportRenewal.onclick=exportRenewalsCsv;
   const printRenewal=$('#renewalPrintMirror');
   if(printRenewal)printRenewal.onclick=printRenewalMirror;
+
+  document.querySelectorAll('[data-payment-filter]').forEach(el=>el.onchange=()=>{
+    paymentFilters[el.dataset.paymentFilter]=el.value;renderList();
+  });
+  const clearPayment=$('#paymentClearFilters');
+  if(clearPayment)clearPayment.onclick=()=>{paymentFilters={dateFrom:'',dateTo:'',status:'all',collection:'all',kind:'all',brokerage:'all',insurer:'all'};renderList();};
+
+  document.querySelectorAll('[data-commission-filter]').forEach(el=>el.onchange=()=>{
+    commissionFilters[el.dataset.commissionFilter]=el.value;renderList();
+  });
+  const clearCommission=$('#commissionClearFilters');
+  if(clearCommission)clearCommission.onclick=()=>{commissionFilters={receivedFrom:'',receivedTo:'',producer:'all',brokerage:'all',insurer:'all',status:'all'};renderList();};
+
+  document.querySelectorAll('[data-task-filter]').forEach(el=>el.onchange=()=>{
+    taskFilters[el.dataset.taskFilter]=el.value;renderList();
+  });
+  const clearTask=$('#taskClearFilters');
+  if(clearTask)clearTask.onclick=()=>{taskFilters={dueFrom:'',dueTo:'',status:'all',source:'all',destination:'all',responsible:'all'};renderList();};
 }
+function paymentFilterHtml(rows){
+  const contracts=rows.map(contractForRow).filter(Boolean);
+  const brokerageValues=uniqueSorted(contracts.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')));
+  const insurerValues=uniqueSorted(contracts.map(r=>r.data.insurer));
+  const collectionValues=uniqueSorted(rows.map(r=>r.data.collectionStatus));
+  return `
+    <div class="finance-filter-shell">
+      <div class="finance-filter-grid">
+        <label>Vencimento inicial<input type="date" data-payment-filter="dateFrom" value="${esc(paymentFilters.dateFrom)}"></label>
+        <label>Vencimento final<input type="date" data-payment-filter="dateTo" value="${esc(paymentFilters.dateTo)}"></label>
+        <label>Tipo
+          <select data-payment-filter="kind">
+            <option value="all">Todos</option>
+            <option value="effective" ${paymentFilters.kind==='effective'?'selected':''}>Parcelas efetivas</option>
+            <option value="forecast" ${paymentFilters.kind==='forecast'?'selected':''}>Previsões de proposta</option>
+            <option value="overdue" ${paymentFilters.kind==='overdue'?'selected':''}>Somente atrasadas</option>
+          </select>
+        </label>
+        <label>Status
+          <select data-payment-filter="status">
+            <option value="all">Todos</option>
+            ${['Em aberto','Pago','Cancelado'].map(v=>`<option value="${v}" ${paymentFilters.status===v?'selected':''}>${v}</option>`).join('')}
+          </select>
+        </label>
+        <label>Cobrança
+          <select data-payment-filter="collection"><option value="all">Todas</option>${collectionValues.map(v=>`<option value="${esc(v)}" ${paymentFilters.collection===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Corretora
+          <select data-payment-filter="brokerage"><option value="all">Todas</option>${brokerageValues.map(v=>`<option value="${esc(v)}" ${paymentFilters.brokerage===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Seguradora
+          <select data-payment-filter="insurer"><option value="all">Todas</option>${insurerValues.map(v=>`<option value="${esc(v)}" ${paymentFilters.insurer===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div class="finance-filter-actions">
+        <button type="button" class="btn ghost small" id="paymentClearFilters">Limpar filtros</button>
+      </div>
+    </div>`;
+}
+
+function applyPaymentFilters(rows){
+  return rows.filter(r=>{
+    const insurance=contractForRow(r);
+    const forecast=r.data.financialTracking==='Previsão da proposta';
+    const overdue=!forecast&&r.data.status==='Em aberto'&&r.data.due&&r.data.due<today();
+    if(paymentFilters.kind==='forecast'&&!forecast)return false;
+    if(paymentFilters.kind==='effective'&&forecast)return false;
+    if(paymentFilters.kind==='overdue'&&!overdue)return false;
+    if(paymentFilters.status!=='all'&&String(r.data.status||'')!==paymentFilters.status)return false;
+    if(paymentFilters.collection!=='all'&&String(r.data.collectionStatus||'')!==paymentFilters.collection)return false;
+    if(paymentFilters.brokerage!=='all'&&!brokerageMatches(insurance,paymentFilters.brokerage))return false;
+    if(paymentFilters.insurer!=='all'&&String(insurance?.data?.insurer||'')!==paymentFilters.insurer)return false;
+    if(paymentFilters.dateFrom&&(!r.data.due||String(r.data.due)<paymentFilters.dateFrom))return false;
+    if(paymentFilters.dateTo&&(!r.data.due||String(r.data.due)>paymentFilters.dateTo))return false;
+    return true;
+  });
+}
+
 function paymentSummary(rows){
   const forecast=rows.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
   const relevant=rows.filter(r=>r.data.financialTracking!=='Previsão da proposta');
   const open=relevant.filter(r=>r.data.status==='Em aberto');
+  const paid=relevant.filter(r=>r.data.status==='Pago');
   const overdue=open.filter(r=>r.data.due&&r.data.due<today());
-  return `<span class="chip">Previsões de propostas: ${forecast.length} · ${money(forecast.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip">Em aberto: ${open.length} · ${money(open.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip danger">Atrasadas: ${overdue.length} · ${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span><span class="chip">Corte da implantação: ${CUTOFF}</span>`;
+  return `
+    <div class="summary-strip">
+      <span class="chip">Previsões: ${forecast.length} · ${money(forecast.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span>
+      <span class="chip">Em aberto: ${open.length} · ${money(open.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span>
+      <span class="chip danger">Atrasadas: ${overdue.length} · ${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span>
+      <span class="chip">Pagas: ${paid.length} · ${money(paid.reduce((s,r)=>s+Number(r.data.amount||0),0))}</span>
+      <span class="chip">Corte da implantação: ${CUTOFF}</span>
+    </div>`;
+}
+
+function commissionFilterHtml(rows){
+  const contracts=rows.map(contractForRow).filter(Boolean);
+  const producerIds=uniqueSorted(rows.map(r=>r.data.producerId));
+  const brokerageValues=uniqueSorted(contracts.flatMap(r=>String(r.data.brokerages||r.data.brokerage||'').split('|')));
+  const insurerValues=uniqueSorted(contracts.map(r=>r.data.insurer));
+  const statusValues=uniqueSorted(rows.map(r=>r.data.status||'Prevista'));
+  return `
+    <div class="finance-filter-shell">
+      <div class="finance-filter-grid">
+        <label>Recebimento inicial<input type="date" data-commission-filter="receivedFrom" value="${esc(commissionFilters.receivedFrom)}"></label>
+        <label>Recebimento final<input type="date" data-commission-filter="receivedTo" value="${esc(commissionFilters.receivedTo)}"></label>
+        <label>Produtor
+          <select data-commission-filter="producer"><option value="all">Todos</option>${producerIds.map(id=>`<option value="${id}" ${commissionFilters.producer===id?'selected':''}>${esc(nameById(id))}</option>`).join('')}</select>
+        </label>
+        <label>Corretora
+          <select data-commission-filter="brokerage"><option value="all">Todas</option>${brokerageValues.map(v=>`<option value="${esc(v)}" ${commissionFilters.brokerage===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Seguradora
+          <select data-commission-filter="insurer"><option value="all">Todas</option>${insurerValues.map(v=>`<option value="${esc(v)}" ${commissionFilters.insurer===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Status
+          <select data-commission-filter="status"><option value="all">Todos</option>${statusValues.map(v=>`<option value="${esc(v)}" ${commissionFilters.status===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div class="finance-filter-actions">
+        <button type="button" class="btn ghost small" id="commissionClearFilters">Limpar filtros</button>
+      </div>
+    </div>`;
+}
+
+function applyCommissionFilters(rows){
+  return rows.filter(r=>{
+    const insurance=contractForRow(r);
+    if(commissionFilters.producer!=='all'&&String(r.data.producerId||'')!==commissionFilters.producer)return false;
+    if(commissionFilters.brokerage!=='all'&&!brokerageMatches(insurance,commissionFilters.brokerage))return false;
+    if(commissionFilters.insurer!=='all'&&String(insurance?.data?.insurer||'')!==commissionFilters.insurer)return false;
+    if(commissionFilters.status!=='all'&&String(r.data.status||'Prevista')!==commissionFilters.status)return false;
+    if(commissionFilters.receivedFrom&&(!r.data.receivedDate||String(r.data.receivedDate)<commissionFilters.receivedFrom))return false;
+    if(commissionFilters.receivedTo&&(!r.data.receivedDate||String(r.data.receivedDate)>commissionFilters.receivedTo))return false;
+    return true;
+  });
+}
+
+function commissionSummary(rows){
+  const gross=rows.reduce((sum,r)=>sum+Number(r.data.expected||0),0);
+  const ff=rows.reduce((sum,r)=>sum+Number(r.data.ffFee||0),0);
+  const producer=rows.reduce((sum,r)=>sum+Number(r.data.producerExpected||0),0);
+  const lebrime=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeFee||0),0);
+  const lebrimeNet=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeNet||0),0);
+  const received=rows.reduce((sum,r)=>sum+Number(r.data.received||0),0);
+  const paid=rows.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
+  return `
+    <div class="summary-strip">
+      <span class="chip">Comissão bruta: ${money(gross)}</span>
+      <span class="chip">Taxa FF: ${money(ff)}</span>
+      <span class="chip">Produtores: ${money(producer)}</span>
+      <span class="chip">Taxa Lebrime: ${money(lebrime)}</span>
+      <span class="chip">Líquido Lebrime: ${money(lebrimeNet)}</span>
+      <span class="chip">Recebida: ${money(received)}</span>
+      <span class="chip">Paga a produtores: ${money(paid)}</span>
+      <span class="chip">Lucro realizado: ${money(received-paid)}</span>
+    </div>`;
+}
+
+function taskFilterHtml(rows){
+  const statusValues=uniqueSorted(rows.map(r=>r.data.status));
+  const sourceValues=uniqueSorted(rows.map(r=>r.data.source||'Manual'));
+  const destinationValues=uniqueSorted(rows.map(r=>r.data.destination));
+  const responsibleValues=uniqueSorted(rows.map(r=>r.data.responsible));
+  return `
+    <div class="finance-filter-shell">
+      <div class="finance-filter-grid">
+        <label>Prazo inicial<input type="date" data-task-filter="dueFrom" value="${esc(taskFilters.dueFrom)}"></label>
+        <label>Prazo final<input type="date" data-task-filter="dueTo" value="${esc(taskFilters.dueTo)}"></label>
+        <label>Status
+          <select data-task-filter="status"><option value="all">Todos</option>${statusValues.map(v=>`<option value="${esc(v)}" ${taskFilters.status===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Origem
+          <select data-task-filter="source"><option value="all">Todas</option>${sourceValues.map(v=>`<option value="${esc(v)}" ${taskFilters.source===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Destino
+          <select data-task-filter="destination"><option value="all">Todos</option>${destinationValues.map(v=>`<option value="${esc(v)}" ${taskFilters.destination===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+        <label>Responsável
+          <select data-task-filter="responsible"><option value="all">Todos</option>${responsibleValues.map(v=>`<option value="${esc(v)}" ${taskFilters.responsible===v?'selected':''}>${esc(v)}</option>`).join('')}</select>
+        </label>
+      </div>
+      <div class="finance-filter-actions">
+        <button type="button" class="btn ghost small" id="taskClearFilters">Limpar filtros</button>
+      </div>
+    </div>`;
+}
+
+function applyTaskFilters(rows){
+  return rows.filter(r=>{
+    if(taskFilters.status!=='all'&&String(r.data.status||'')!==taskFilters.status)return false;
+    if(taskFilters.source!=='all'&&String(r.data.source||'Manual')!==taskFilters.source)return false;
+    if(taskFilters.destination!=='all'&&String(r.data.destination||'')!==taskFilters.destination)return false;
+    if(taskFilters.responsible!=='all'&&String(r.data.responsible||'')!==taskFilters.responsible)return false;
+    if(taskFilters.dueFrom&&(!r.data.due||String(r.data.due)<taskFilters.dueFrom))return false;
+    if(taskFilters.dueTo&&(!r.data.due||String(r.data.due)>taskFilters.dueTo))return false;
+    return true;
+  });
+}
+
+function taskSummary(rows){
+  const open=rows.filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
+  const integration=open.filter(r=>String(r.data.source||'').includes('Integração')||String(r.data.integrationProvider||''));
+  const overdue=open.filter(r=>r.data.due&&r.data.due<today());
+  return `
+    <div class="summary-strip">
+      <span class="chip">Pendências abertas: ${open.length}</span>
+      <span class="chip danger">Vencidas: ${overdue.length}</span>
+      <span class="chip">Exceções de integração: ${integration.length}</span>
+    </div>`;
 }
 
 function editorConfig(){return config[current]}
@@ -1213,6 +1439,9 @@ function validateBeforeSave(data){
     if(Number(data.installmentCount||0)>0&&!Number(data.premium||0))return 'Informe o prêmio total para gerar o plano de parcelas.';
     const dup=list(recordKind).find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
     if(dup)return 'Já existe um registro com este cliente, seguradora, ramo, número e vigência.';
+  }
+  if(current==='task'){
+    if(data.policyId&&data.proposalId)return 'Vincule a pendência a apenas uma apólice ou proposta.';
   }
   if(current==='payment'){
     if(!data.policyId&&!data.proposalId)return 'Vincule a parcela a uma apólice ou proposta.';
