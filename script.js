@@ -114,11 +114,13 @@ const list=kind=>records.filter(r=>r.kind===kind);
 const insuranceDocuments=insurance=>list('document').filter(d=>
   String(d.data.policyId||'')===insurance.id||String(d.data.proposalId||'')===insurance.id
 );
+const documentExternalUrl=doc=>doc?.data?.externalUrl||doc?.data?.sourceDriveUrl||'';
+const documentAvailable=doc=>Boolean(doc?.data?.storageKey||documentExternalUrl(doc));
 const primaryInsuranceDocument=insurance=>{
   const docs=insuranceDocuments(insurance);
   const expected=insurance.kind==='policy'?'Apólice':'Proposta';
-  return docs.find(d=>d.data.storageKey&&String(d.data.documentType||'')===expected)
-    ||docs.find(d=>d.data.storageKey)
+  return docs.find(d=>documentAvailable(d)&&String(d.data.documentType||'')===expected)
+    ||docs.find(d=>documentAvailable(d))
     ||docs.find(d=>String(d.data.documentType||'')===expected)
     ||docs[0]
     ||null;
@@ -968,7 +970,7 @@ const config={
       ['Tipo',r=>r.data.documentType],
       ['Data',r=>date(r.data.referenceDate)],
       ['Status',r=>r.data.status],
-      ['Arquivo',r=>r.data.storageKey?'Disponível':'Pendente']
+      ['Arquivo',r=>documentAvailable(r)?'Disponível':'Pendente']
     ],
     fields:[
       ['clientId','Cliente','ref','client'],['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],
@@ -1183,10 +1185,10 @@ function renderList(){
       return '<td>'+esc(value)+'</td>';
     }).join('');
 
-    const openFile=current==='document'&&r.data.storageKey?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:'';
+    const openFile=current==='document'&&documentAvailable(r)?`<button data-open="${r.id}" class="link-btn">Abrir</button>`:'';
     const insuranceDoc=current==='insurance'?primaryInsuranceDocument(r):null;
     const insuranceFile=current==='insurance'
-      ?(insuranceDoc?.data.storageKey
+      ?(documentAvailable(insuranceDoc)
         ?`<button data-open="${insuranceDoc.id}" class="link-btn file-action">Abrir PDF</button>`
         :`<button data-insurance-upload="${r.id}" data-client-id="${r.data.clientId||''}" class="link-btn file-action">${insuranceDoc?'Regularizar PDF':'Anexar PDF'}</button>`)
       :'';
@@ -1834,7 +1836,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const insuranceIds=new Set(allInsurances.map(r=>r.id));
   const visibleInsuranceIds=new Set(insurances.map(r=>r.id));
   const docs=clientRelatedDocuments(clientId);
-  const storedDocs=docs.filter(doc=>doc.data.storageKey);
+  const storedDocs=docs.filter(documentAvailable);
   const activeInsurances=insurances.filter(isInsuranceActive);
   const totalPremium=activeInsurances.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
   const payments=list('payment').filter(r=>
@@ -1863,7 +1865,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     const doc=primaryInsuranceDocument(r);
     const endorsementCount=insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso').length;
     const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
-    const fileState=doc?.data.storageKey?'Arquivo disponível':doc?'PDF pendente':'Sem arquivo';
+    const fileState=documentAvailable(doc)?'Arquivo disponível':doc?'PDF pendente':'Sem arquivo';
     return `
       <article class="insurance-card">
         <div class="insurance-card-head">
@@ -1879,7 +1881,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
           <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
         </div>
         <div class="insurance-card-foot">
-          <span class="contract-file-state ${doc?.data.storageKey?'ready':doc?'pending':'neutral'}">${esc(fileState)}</span>
+          <span class="contract-file-state ${documentAvailable(doc)?'ready':doc?'pending':'neutral'}">${esc(fileState)}</span>
           ${endorsementCount?`<span class="contract-file-state ready">${endorsementCount} endosso(s)</span>`:''}
           <button class="btn primary small" data-client-open-insurance="${r.id}">Abrir ficha</button>
         </div>
@@ -1907,7 +1909,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
 
   const docHtml=docs.length?docs.slice(0,12).map(doc=>{
     const linked=rowById(doc.data.policyId||doc.data.proposalId);
-    const action=doc.data.storageKey
+    const action=documentAvailable(doc)
       ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir</button>`
       :linked?`<button class="btn ghost small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Anexar PDF</button>`:'';
     return `<div class="detail-row"><div><strong>${esc(doc.data.name||doc.data.documentType||'Documento')}</strong><span>${esc(doc.data.documentType||'Documento')} · ${linked?esc(insuranceLabel(linked)):'Documento geral'}</span></div>${action}</div>`;
@@ -2023,7 +2025,7 @@ function openInsuranceDetail(insuranceId){
 
   const docHtml=docs.length?docs.map(r=>`
     <div class="detail-row"><div><strong>${esc(r.data.name||r.data.documentType||'Documento')}</strong><span>${esc(r.data.documentType||'Documento')} · ${date(r.data.referenceDate)}</span></div>
-      ${r.data.storageKey?`<button class="btn ghost small" data-insurance-open-doc="${r.id}">Abrir</button>`:`<span class="file-missing">PDF pendente</span>`}</div>
+      ${documentAvailable(r)?`<button class="btn ghost small" data-insurance-open-doc="${r.id}">Abrir</button>`:`<span class="file-missing">PDF pendente</span>`}</div>
   `).join(''):'<div class="empty compact">Nenhum documento vinculado.</div>';
 
   const pendingTasks=tasks.filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
@@ -2210,12 +2212,21 @@ async function uploadDocument(e){
 }
 
 async function openDocument(entry){
-  if(!entry?.data?.storageKey){alert('O registro deste documento foi localizado, mas o arquivo físico ainda não está no Supabase Storage. Use “Regularizar arquivo” para anexar o PDF sem criar duplicidade.');return;}
-  try{
-    const blob=await api('storage-get',null,{blob:true,key:entry.data.storageKey});
-    const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-  }catch(e){alert(e.message)}
+  if(!entry)return;
+  if(entry.data?.storageKey){
+    try{
+      const blob=await api('storage-get',null,{blob:true,key:entry.data.storageKey});
+      const url=URL.createObjectURL(blob);window.open(url,'_blank','noopener');
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){alert(e.message)}
+    return;
+  }
+  const externalUrl=documentExternalUrl(entry);
+  if(externalUrl){
+    window.open(externalUrl,'_blank','noopener');
+    return;
+  }
+  alert('O registro deste documento foi localizado, mas o arquivo físico ainda não está disponível. Use “Regularizar arquivo” para anexar o PDF sem criar duplicidade.');
 }
 
 $('#loginForm').onsubmit=async e=>{
