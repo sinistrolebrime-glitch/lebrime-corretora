@@ -12,7 +12,7 @@
       document.documentElement.dataset.theme=saved||preferred;
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=19.6.1">
+  <link rel="stylesheet" href="styles.css?v=20.0">
 </head>
 <body>
   <div id="loginView" class="auth-shell hidden">
@@ -32,7 +32,7 @@
       <div class="brand">
         <strong>LEBRIME</strong>
         <span>Gestão de Carteira</span>
-        <small class="version-badge">v19.6.1</small>
+        <small class="version-badge">v20.0</small>
       </div>
       <nav id="nav"></nav>
       <div class="sidebar-foot">
@@ -61,7 +61,10 @@
             <span class="theme-toggle-icon" aria-hidden="true"></span>
             <span id="themeToggleText">Tema</span>
           </button>
-          <input id="searchInput" class="search" placeholder="Pesquisar...">
+          <div class="search-shell">
+            <input id="searchInput" class="search" placeholder="Pesquisar..." autocomplete="off">
+            <div id="searchSuggestions" class="search-suggestions hidden"></div>
+          </div>
           <button id="newBtn" class="btn primary">+ Novo</button>
         </div>
       </header>
@@ -143,6 +146,23 @@
     </div>
   </dialog>
 
+  <dialog id="insuranceDialog">
+    <div class="detail-shell contract-detail-shell">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">CONTRATO</p>
+          <h2 id="insuranceDetailTitle">Detalhes do seguro</h2>
+        </div>
+        <button type="button" id="closeInsuranceDetail" class="icon-btn">×</button>
+      </div>
+      <div id="insuranceDetailBody"></div>
+      <div class="dialog-actions">
+        <button type="button" id="insuranceUploadBtn" class="btn ghost">Anexar arquivo</button>
+        <button type="button" id="insuranceEditBtn" class="btn primary">Editar seguro</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="editorDialog">
     <form id="editorForm" method="dialog">
       <div class="dialog-head">
@@ -158,6 +178,6 @@
     </form>
   </dialog>
 
-  <script src="script.js?v=19.6.1"></script>
+  <script src="script.js?v=20.0"></script>
 </body>
 </html>
