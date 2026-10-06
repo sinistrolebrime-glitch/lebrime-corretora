@@ -1,6 +1,6 @@
 const API='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-api';
 const TOKEN_KEY='lebrime_token_v1';
-const THEME_KEY='lebrime_theme_v1';
+const THEME_KEY='lebrime_theme_v2';
 const CUTOFF='2026-10';
 
 const menu=[
