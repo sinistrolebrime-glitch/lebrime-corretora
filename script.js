@@ -75,7 +75,7 @@ let uploadPrefill={clientId:'',insuranceId:''};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-const currentTheme=()=>document.documentElement.dataset.theme==='dark'?'dark':'light';
+const currentTheme=()=> 'light';
 function syncThemeControl(){
   const btn=$('#themeToggle');
   const label=$('#themeToggleText');
@@ -86,15 +86,13 @@ function syncThemeControl(){
   btn.setAttribute('title',theme==='dark'?'Mudar para modo claro':'Mudar para modo escuro');
 }
 function applyTheme(theme,{persist=true}={}){
-  const next=theme==='dark'?'dark':'light';
+  const next='light';
   document.documentElement.dataset.theme=next;
   document.documentElement.style.colorScheme=next;
-  if(persist)localStorage.setItem(THEME_KEY,next);
+  localStorage.removeItem(THEME_KEY);
   syncThemeControl();
 }
-function toggleTheme(){
-  applyTheme(currentTheme()==='dark'?'light':'dark');
-}
+function toggleTheme(){ applyTheme('light'); }
 
 const token=()=>localStorage.getItem(TOKEN_KEY)||'';
 const uuid=()=>crypto.randomUUID();
