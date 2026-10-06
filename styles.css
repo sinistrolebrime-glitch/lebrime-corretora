@@ -1891,3 +1891,181 @@ html[data-theme="dark"] .finance-filter-grid select{
   .operational-strip{grid-template-columns:1fr}
   #producerDialog .client-kpis{grid-template-columns:1fr 1fr}
 }
+
+
+/* v20.12 — Portal Lebrime Corretora | identidade dourada preservando estrutura */
+:root{
+  --bg:#f6f3ed;
+  --panel:#ffffff;
+  --panel-2:#fbf9f5;
+  --text:#211f1b;
+  --muted:#746e64;
+  --line:#e6dfd3;
+  --green:#b8923f;
+  --green-2:#8f6b22;
+  --green-soft:#f5eedf;
+  --gold:#b8923f;
+  --gold-soft:#f7f0e1;
+  --gold-500:#b8923f;
+  --gold-600:#8f6b22;
+  --navy-950:#17150f;
+  --navy-900:#211e17;
+  --navy-800:#302b20;
+  --navy-700:#4a402d;
+  --slate-25:#fcfbf8;
+  --slate-50:#f8f6f1;
+  --slate-100:#f2eee6;
+  --slate-200:#e5ded1;
+  --slate-500:#766f65;
+  --success:#2f6b52;
+  --shadow:0 10px 26px rgba(45,36,22,.07);
+  --shadow-lg:0 28px 80px rgba(31,24,13,.18);
+}
+html,body{background:var(--bg);color:var(--text)}
+.auth-shell{background:linear-gradient(135deg,#f7f2e8 0%,#fbfaf7 52%,#eee4cf 100%)}
+.brand-mini,.eyebrow,.record-type{color:var(--gold-600)}
+.auth-card{border-color:#e6ddce}
+.auth-card input:focus,
+.form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus{
+  border-color:#c9aa67;
+  box-shadow:0 0 0 3px rgba(184,146,63,.12)
+}
+.app-shell{grid-template-columns:264px minmax(0,1fr)}
+.sidebar{
+  background:linear-gradient(180deg,#17150f 0%,#221e17 58%,#17150f 100%);
+  border-right:1px solid rgba(184,146,63,.18);
+  box-shadow:8px 0 30px rgba(38,29,14,.08)
+}
+.brand{border-bottom-color:rgba(255,255,255,.09)}
+.brand:after{background:linear-gradient(90deg,#d5b866,#9e772d);width:54px;height:2px}
+.brand strong{
+  font-family:Georgia,"Times New Roman",serif;
+  color:#f5ead2;
+  font-size:22px;
+  letter-spacing:.08em
+}
+.brand span{color:#b9ad98}
+.version-badge{
+  border-color:rgba(213,184,102,.45);
+  color:#ead7a5;
+  background:rgba(184,146,63,.10)
+}
+.nav-group-title{color:#927f5b}
+#nav button{color:#d8d0c3}
+#nav button:hover{background:rgba(213,184,102,.07);color:#fff7e8}
+#nav button.active{
+  background:linear-gradient(90deg,rgba(184,146,63,.18),rgba(184,146,63,.06));
+  color:#fff8ea;
+  border-left-color:#d1b15e
+}
+#nav button.active:after{background:#d7b963;box-shadow:0 0 0 3px rgba(215,185,99,.12)}
+.sidebar-system-note{
+  border-color:rgba(213,184,102,.16);
+  background:rgba(184,146,63,.055)
+}
+.sidebar-system-note strong{color:#f0e2c4}
+.sidebar-system-note span{color:#a89d8a}
+.sidebar-foot .btn.ghost{
+  color:#eadfc9;
+  background:rgba(255,255,255,.035);
+  border-color:rgba(213,184,102,.16)
+}
+.sidebar-foot .btn.ghost:hover{background:rgba(184,146,63,.10)}
+.main{background:transparent}
+.top{
+  background:rgba(246,243,237,.96);
+  border-bottom:1px solid #ded4c3;
+  box-shadow:0 5px 18px rgba(56,44,23,.025)
+}
+.top:after{
+  content:"";
+  position:absolute;
+  left:32px;
+  right:32px;
+  bottom:-1px;
+  height:2px;
+  background:linear-gradient(90deg,#b8923f 0%,rgba(184,146,63,.28) 38%,transparent 72%)
+}
+.top h1{color:#262118}
+.environment-badge{
+  background:#f6edd9!important;
+  color:#7e5f20!important;
+  border-color:#e2cf9e!important
+}
+.search{
+  background:#fffdf9;
+  border-color:#ddd3c2;
+  color:#302a20
+}
+.search:focus{
+  border-color:#c2a259;
+  box-shadow:0 0 0 3px rgba(184,146,63,.11)
+}
+.search::placeholder{color:#9a9288}
+.btn.primary{
+  background:linear-gradient(180deg,#c6a34f 0%,#aa8230 100%);
+  border-color:#a9802e;
+  color:#fffaf0;
+  box-shadow:0 4px 10px rgba(153,113,34,.18)
+}
+.btn.primary:hover{
+  background:linear-gradient(180deg,#b9943f 0%,#936c22 100%);
+  border-color:#8f681f
+}
+.btn.ghost{
+  background:#fffdf9;
+  border-color:#ddd3c2;
+  color:#3d3528
+}
+.btn.ghost:hover{background:#f9f4e9;border-color:#cfbd95}
+.metric,.panel,.table-wrap,.insurance-card,.client-kpis>div,.document-row{
+  background:#fff;
+  border-color:#e5ddcf;
+  box-shadow:0 4px 14px rgba(60,45,20,.04)
+}
+.metric:before{background:linear-gradient(180deg,#d6b862,#9f772c);opacity:1}
+.metric span{color:#7a7165}
+.metric strong{color:#2c271f}
+.panel h2,.insurance-card-head h4{color:#2c271f}
+th{
+  background:#f8f4eb;
+  color:#675d50;
+  border-bottom-color:#e1d7c6
+}
+td{color:#3b342b;border-bottom-color:#eee7dc}
+tbody tr:hover{background:#fdfaf4}
+.link-btn,.name-link{color:#8c6823}
+.link-btn:hover,.name-link:hover{color:#6f511b}
+.name-link{border-bottom-color:rgba(140,104,35,.28)}
+.chip{
+  background:#f5efe2;
+  color:#7f6128;
+  border-color:#e6d8b7
+}
+.chip.danger{background:#fff2f0;border-color:#efd6d1}
+.status-pill{
+  background:#f2ede3;
+  color:#665c4b;
+  border:1px solid #e4d9c7
+}
+.detail-grid>div{background:#fbf8f2;border-color:#e8e0d4}
+.detail-grid strong,.insurance-card-grid strong,.document-row strong{color:#3c3428}
+.detail-grid span,.insurance-card-grid span,.document-row span{color:#80776c}
+.client-kpis strong{color:#8d6924}
+.insurance-card-foot{border-top-color:#eee6d9}
+.rule-callout,.commission-rule-note{
+  background:#fbf6ea;
+  border-color:#e5d3a8
+}
+.rule-callout strong{color:#7b5a1e}
+.upload-link-hint{background:#faf7f0;border-color:#e8dfd1;color:#71695e}
+.upload-link-hint strong{color:#866423}
+.icon-btn{background:#f3ede2;color:#5e5547}
+dialog::backdrop{background:rgba(28,23,15,.5)}
+.file-missing{background:#fbf0d7;color:#80601e!important}
+.contract-file-state.ready{color:#2f6b52}
+.contract-file-state.pending{color:#8a641e}
+.status{color:#8c6823}
+@media(max-width:760px){
+  .top:after{left:16px;right:16px}
+}
