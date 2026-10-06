@@ -7,11 +7,10 @@
   <title>Portal Lebrime Corretora</title>
   <script>
     (() => {
-      const saved=localStorage.getItem('lebrime_theme_v2');
-      document.documentElement.dataset.theme=saved||'light';
+      document.documentElement.dataset.theme='light';
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20.12">
+  <link rel="stylesheet" href="styles.css?v=20.14">
 </head>
 <body>
   <div id="loginView" class="auth-shell hidden">
@@ -27,46 +26,50 @@
   </div>
 
   <div id="appView" class="app-shell hidden">
-    <aside class="sidebar">
-      <div class="brand">
-        <strong>PORTAL LEBRIME</strong>
-        <span>Corretora de Seguros</span>
-        <small class="version-badge">v20.13</small>
-      </div>
-      <nav id="nav"></nav>
-      <div class="sidebar-foot">
-        <div class="sidebar-system-note">
-          <strong>Ambiente interno</strong>
-          <span>Operação e gestão de carteira</span>
+    <header class="portal-header">
+      <div class="portal-topbar">
+        <div class="portal-brand">
+          <div class="portal-brand-mark">L</div>
+          <div>
+            <strong>Portal Lebrime</strong>
+            <span>Corretora de Seguros</span>
+          </div>
+          <small class="version-badge">v20.14</small>
         </div>
-        <button id="logoutBtn" class="btn ghost full">Sair</button>
-      </div>
-    </aside>
 
-    <main class="main">
-      <header class="top">
-        <div class="top-title-block">
-          <div class="top-title-line">
-            <div>
-              <p class="eyebrow">PORTAL LEBRIME CORRETORA</p>
-              <h1 id="pageTitle">Visão geral</h1>
-            </div>
+        <div class="portal-search">
+          <div class="search-shell">
+            <input id="searchInput" class="search" placeholder="Pesquisar por nome, CPF, CNPJ, proposta ou apólice..." autocomplete="off">
+            <div id="searchSuggestions" class="search-suggestions hidden"></div>
+          </div>
+        </div>
+
+        <div class="portal-actions">
+          <button id="themeToggle" class="theme-toggle portal-theme" type="button" aria-label="Alternar tema" title="Alternar tema">
+            <span class="theme-toggle-icon" aria-hidden="true"></span>
+            <span id="themeToggleText">Tema</span>
+          </button>
+          <button id="newBtn" class="btn primary portal-new">+ Novo</button>
+          <button id="logoutBtn" class="portal-profile" type="button" title="Sair">LB</button>
+        </div>
+      </div>
+
+      <div class="portal-nav-wrap">
+        <nav id="nav" class="portal-nav"></nav>
+      </div>
+    </header>
+
+    <main class="main portal-main">
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">PORTAL LEBRIME CORRETORA</p>
+          <div class="page-heading-line">
+            <h1 id="pageTitle">Visão geral</h1>
             <span class="environment-badge">Ambiente interno</span>
           </div>
           <p id="pageContext" class="page-context">Visão executiva da operação, carteira e financeiro.</p>
         </div>
-        <div class="top-actions">
-          <button id="themeToggle" class="theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
-            <span class="theme-toggle-icon" aria-hidden="true"></span>
-            <span id="themeToggleText">Tema</span>
-          </button>
-          <div class="search-shell">
-            <input id="searchInput" class="search" placeholder="Pesquisar por nome, CPF/CNPJ, proposta ou apólice..." autocomplete="off">
-            <div id="searchSuggestions" class="search-suggestions hidden"></div>
-          </div>
-          <button id="newBtn" class="btn primary">+ Novo</button>
-        </div>
-      </header>
+      </section>
 
       <section id="dashboard" class="view"></section>
 
@@ -177,6 +180,6 @@
     </form>
   </dialog>
 
-  <script src="script.js?v=20.12"></script>
+  <script src="script.js?v=20.14"></script>
 </body>
 </html>
