@@ -644,6 +644,17 @@ function renderDashboard(){
     return {name,count:items.length,premium:items.reduce((sum,r)=>sum+Number(r.data.premium||0),0)};
   }).filter(r=>r.count>0);
 
+  const reliability=list('system_metric').find(r=>r.id==='segflex-reliability-current'||r.data.metricType==='segflex_reliability')?.data||{};
+  const reliabilityPct=Number(reliability.overallReliability||0);
+  const importProgress=Number(reliability.importProgress||0);
+  const cleanImportProgress=Number(reliability.cleanImportProgress||0);
+  const sourceTotal=Number(reliability.sourceTotal||0);
+  const sourceImported=Number(reliability.sourceImported||0);
+  const sourcePendingReview=Number(reliability.sourcePendingReview||0);
+  const sourceUnprocessed=Number(reliability.sourceUnprocessed||0);
+  const reliabilityLabel=reliabilityPct>=97?'Alta confiabilidade':reliabilityPct>=90?'Boa confiabilidade':reliabilityPct>=80?'Atenção':'Revisão necessária';
+  const reliabilityTone=reliabilityPct>=97?'high':reliabilityPct>=90?'good':reliabilityPct>=80?'attention':'critical';
+
   $('#dashboard').innerHTML=`
     <div class="executive-heading">
       <div>
@@ -657,6 +668,8 @@ function renderDashboard(){
     <div class="cards executive-cards">
       ${metric('Clientes',list('client').length,'Cadastro mestre')}
       ${metric('Carteira ativa',activeInsurances.length,`${activeProposals} propostas · ${activePolicies} apólices`)}
+      ${metric('Confiabilidade da base',reliabilityPct?`${reliabilityPct.toFixed(2)}%`:'—',reliabilityLabel)}
+      ${metric('Importação SegFlex',sourceTotal?`${importProgress.toFixed(2)}%`:'—',sourceTotal?`${sourceImported} importados · ${sourcePendingReview} revisão · ${sourceUnprocessed} pendentes`:'Aguardando leitura da base')}
       ${metric('Prêmio em carteira',money(activePremium),'Total vigente')}
       ${metric('Previsão de parcelas',money(forecastTotal),`${forecasts.length} parcelas de propostas`)}
       ${metric('Comissões recebidas',money(received),'Reconhecidas no sistema')}
@@ -687,6 +700,43 @@ function renderDashboard(){
     </div>
 
     <div class="dashboard-grid corporate-grid">
+      <div class="panel reliability-panel">
+        <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">Qualidade dos dados</span><h2>Confiabilidade das informações</h2></div>
+          <span class="reliability-badge ${reliabilityTone}">${reliabilityPct?reliabilityPct.toFixed(2)+'%':'—'}</span>
+        </div>
+        <div class="reliability-layout">
+          <div class="reliability-overview">
+            <div class="reliability-score ${reliabilityTone}">
+              <strong>${reliabilityPct?reliabilityPct.toFixed(2)+'%':'—'}</strong>
+              <span>${reliabilityLabel}</span>
+            </div>
+            <div class="reliability-progress-block">
+              <div class="reliability-progress-head"><span>Progresso da importação</span><strong>${sourceTotal?importProgress.toFixed(2)+'%':'—'}</strong></div>
+              <div class="reliability-progress"><i style="width:${Math.max(0,Math.min(100,importProgress))}%"></i></div>
+              <small>${sourceImported} de ${sourceTotal||0} PDFs importados · ${sourcePendingReview} em revisão · ${sourceUnprocessed} ainda não processados</small>
+            </div>
+          </div>
+          <div class="reliability-dimensions">
+            ${[
+              ['Identidade',reliability.identityReliability],
+              ['Documentos',reliability.documentReliability],
+              ['Contratos',reliability.contractReliability],
+              ['Financeiro',reliability.financialReliability],
+              ['Vínculos',reliability.linkageReliability]
+            ].map(([label,value])=>{
+              const v=Number(value||0);
+              return `<div class="reliability-dimension"><span>${esc(label)}</span><strong>${v?v.toFixed(2)+'%':'—'}</strong><div><i style="width:${Math.max(0,Math.min(100,v))}%"></i></div></div>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="reliability-foot">
+          <span>Importação limpa: <strong>${sourceTotal?cleanImportProgress.toFixed(2)+'%':'—'}</strong></span>
+          <span>Duplicidades: <strong>${Number(reliability.duplicateClients||0)+Number(reliability.duplicateDocuments||0)+Number(reliability.duplicateInsuranceSources||0)+Number(reliability.duplicatePaymentGroups||0)}</strong></span>
+          <span>Registros avaliados: <strong>${Number(reliability.insuranceRecords||0)}</strong></span>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-head corporate-panel-head">
           <div><span class="section-kicker">Carteira</span><h2>Distribuição por corretora</h2></div>
