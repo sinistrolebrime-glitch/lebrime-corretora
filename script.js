@@ -155,6 +155,38 @@ const activeInsuranceRows=()=>[...list('proposal'),...list('policy')].filter(isI
 const insuranceRowsForClient=clientId=>[...list('proposal'),...list('policy')]
   .filter(r=>String(r.data.clientId||'')===String(clientId||''));
 
+// Histórico completo: a vigência encerrada não remove o contrato da ficha.
+// A situação da vigência é diferente da situação comercial (em análise, emitida etc.).
+const insurancePeriodState=row=>{
+  const start=String(row?.data?.start||'');
+  const end=String(row?.data?.end||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(end))
+    return {key:'unknown',label:'Vigência a confirmar'};
+  if(end<today())return {key:'expired',label:'Vigência encerrada'};
+  if(start>today())return {key:'future',label:'Vigência futura'};
+  return {key:'current',label:'Dentro do período de vigência'};
+};
+
+const insuranceHistoryPeriod=row=>{
+  const start=String(row?.data?.start||'');
+  const end=String(row?.data?.end||'');
+  return /^\d{4}-\d{2}-\d{2}$/.test(start)&&/^\d{4}-\d{2}-\d{2}$/.test(end)
+    ?start.slice(0,4)+' / '+end.slice(0,4)
+    :'Vigência não confirmada';
+};
+
+const relatedEndorsementsFor=insurance=>{
+  const policyNumber=String(insurance?.data?.policyNumber||(insurance?.kind==='policy'?insurance?.data?.number:'')).replace(/\D/g,'');
+  const clientId=String(insurance?.data?.clientId||'');
+  if(!clientId||!policyNumber)return [];
+  return list('endorsement').filter(e=>
+    String(e.data.clientId||'')===clientId&&
+    String(e.data.parentPolicyNumber||e.data.originalPolicyNumber||e.data.policyNumber||'').replace(/\D/g,'')===policyNumber&&
+    (!insurance.data.start||!e.data.start||e.data.start>=insurance.data.start)&&
+    (!insurance.data.end||!e.data.start||e.data.start<=insurance.data.end)
+  );
+};
+
 const linkedToInsurance=(row,insurance)=>{
   if(!row||!insurance)return false;
   return insurance.kind==='policy'
@@ -227,7 +259,7 @@ const producerLabelOf=insurance=>{
   return '—';
 };
 const insuranceLabel=insurance=>{
-  const type=insurance.kind==='policy'?'Apólice':'Proposta';
+  const type=insurance.kind==='policy'?'Apólice':insurance.kind==='endorsement'?'Endosso':'Proposta';
   return `${type} ${insurance.data.number||'sem número'} · ${insurance.data.insurer||'—'} · ${insurance.data.branch||'—'}`;
 };
 
@@ -1884,9 +1916,15 @@ function editInsuranceFromRenewal(id){
 }
 
 function clientRelatedDocuments(clientId){
-  const insurances=[...list('proposal'),...list('policy')].filter(r=>String(r.data.clientId||'')===String(clientId));
-  const insuranceIds=new Set(insurances.map(r=>r.id));
-  return list('document').filter(r=>String(r.data.clientId||'')===String(clientId)||insuranceIds.has(String(r.data.policyId||''))||insuranceIds.has(String(r.data.proposalId||'')));
+  const contracts=[...list('proposal'),...list('policy'),...list('endorsement')]
+    .filter(r=>String(r.data.clientId||'')===String(clientId));
+  const insuranceIds=new Set(contracts.map(r=>r.id));
+  return list('document')
+    .filter(r=>String(r.data.clientId||'')===String(clientId)||
+      insuranceIds.has(String(r.data.policyId||''))||
+      insuranceIds.has(String(r.data.proposalId||''))||
+      insuranceIds.has(String(r.data.endorsementId||'')))
+    .sort((a,b)=>String(b.data.referenceDate||b.createdAt||'').localeCompare(String(a.data.referenceDate||a.createdAt||'')));
 }
 
 function clientBrokerageOptions(insurances){
@@ -1906,8 +1944,11 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const visibleInsuranceIds=new Set(insurances.map(r=>r.id));
   const docs=clientRelatedDocuments(clientId);
   const storedDocs=docs.filter(documentAvailable);
-  const activeInsurances=insurances.filter(isInsuranceActive);
-  const totalPremium=activeInsurances.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
+  const currentPeriodInsurances=insurances.filter(r=>insurancePeriodState(r).key==='current');
+  const expiredInsurances=insurances.filter(r=>insurancePeriodState(r).key==='expired');
+  const futureInsurances=insurances.filter(r=>insurancePeriodState(r).key==='future');
+  const undatedInsurances=insurances.filter(r=>insurancePeriodState(r).key==='unknown');
+  const totalPremium=currentPeriodInsurances.reduce((sum,r)=>sum+Number(r.data.premium||0),0);
   const payments=list('payment').filter(r=>
     visibleInsuranceIds.has(String(r.data.policyId||''))||
     visibleInsuranceIds.has(String(r.data.proposalId||''))||
@@ -1930,13 +1971,20 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const openClaims=claims.filter(r=>!['Pago','Encerrado','Negado'].includes(String(r.data.status||'')));
   const brokeragesForClient=clientBrokerageOptions(allInsurances);
 
-  const insuranceHtml=insurances.length?insurances.map(r=>{
+  const insuranceHtml=insurances.length?insurances.map((r,index)=>{
     const doc=primaryInsuranceDocument(r);
     const hasPdf=insuranceDocumentAvailable(r);
-    const endorsementCount=insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso').length;
+    const endorsementCount=relatedEndorsementsFor(r).length+
+      insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso').length;
+    const periodState=insurancePeriodState(r);
+    const periodTitle=insuranceHistoryPeriod(r);
+    const previousPeriod=index>0?insuranceHistoryPeriod(insurances[index-1]):'';
+    const periodHeading=index===0||periodTitle!==previousPeriod
+      ?`<div class="client-history-period-title"><strong>Vigência ${esc(periodTitle)}</strong><span>Histórico do cliente · todas as propostas e apólices</span></div>`
+      :'';
     const broker=String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · ');
     const fileState=hasPdf?'Arquivo disponível':doc?'PDF pendente':'Sem arquivo';
-    return `
+    return `${periodHeading}
       <article class="insurance-card">
         <div class="insurance-card-head">
           <div><span class="record-type">${r.kind==='policy'?'APÓLICE':'PROPOSTA'}</span><h4>${esc(r.data.number||'Sem número')}</h4></div>
@@ -1948,6 +1996,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
           <div><span>Produtor</span><strong>${esc(producerLabelOf(r))}</strong></div>
           <div><span>Corretora</span><strong>${esc(broker)}</strong></div>
           <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
+          <div><span>Situação da vigência</span><strong class="insurance-period-${periodState.key}">${esc(periodState.label)}</strong></div>
           <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
         </div>
         <div class="insurance-card-foot">
@@ -1978,8 +2027,8 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     </div>
   `).join(''):'<div class="empty compact">Nenhum sinistro vinculado aos contratos exibidos.</div>';
 
-  const docHtml=docs.length?docs.slice(0,12).map(doc=>{
-    const linked=rowById(doc.data.policyId||doc.data.proposalId);
+  const docHtml=docs.length?docs.map(doc=>{
+    const linked=rowById(doc.data.policyId||doc.data.proposalId||doc.data.endorsementId);
     const action=documentAvailable(doc)
       ?`<button class="btn ghost small" data-client-open-doc="${doc.id}">Abrir</button>`
       :linked?`<button class="btn ghost small" data-client-upload-doc="${linked.id}" data-client-id="${clientId}">Anexar PDF</button>`:'';
@@ -1989,8 +2038,12 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   $('#clientDetailTitle').textContent=d.name||'Cliente';
   $('#clientDetailBody').innerHTML=`
     <div class="client-kpis">
-      <div><span>Seguros ativos</span><strong>${activeInsurances.length}</strong></div>
-      <div><span>Prêmio vigente</span><strong>${money(totalPremium)}</strong></div>
+      <div><span>Contratos no histórico</span><strong>${insurances.length}</strong></div>
+      <div><span>Vigências no prazo</span><strong>${currentPeriodInsurances.length}</strong></div>
+      <div><span>Vigências encerradas</span><strong>${expiredInsurances.length}</strong></div>
+      <div><span>Vigências futuras</span><strong>${futureInsurances.length}</strong></div>
+      <div><span>Vigências a confirmar</span><strong>${undatedInsurances.length}</strong></div>
+      <div><span>Prêmio dos registros no prazo</span><strong>${money(totalPremium)}</strong></div>
       <div><span>Parcelas em aberto</span><strong>${openPayments.length}</strong></div>
       <div><span>Pendências</span><strong>${tasks.length}</strong></div>
       <div><span>Comissões</span><strong>${commissions.length}</strong></div>
@@ -2014,7 +2067,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
 
     <section class="detail-section">
       <div class="section-title-row client-contract-heading">
-        <div><h3>Propostas e apólices</h3><p>Histórico consolidado do cliente, mantendo a corretora vinculada a cada contrato.</p></div>
+        <div><h3>Propostas e apólices — histórico completo</h3><p>Todas as vigências, inclusive encerradas, futuras e em análise. O status da proposta não é confirmação de emissão. Histórico vinculado ao CPF/CNPJ e à corretora de cada contrato.</p></div>
         <label class="inline-filter">Corretora
           <select id="clientBrokerageFilter">
             <option value="all">Todas</option>
