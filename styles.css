@@ -2936,3 +2936,57 @@ html[data-theme="light"] dialog{
 @media(max-width:760px){
   .client-history-period-title{align-items:flex-start;flex-direction:column;gap:4px}
 }
+
+
+/* Apresentação executiva e operacional da carteira — v20.18 */
+.portfolio-explainer{
+  display:flex;align-items:center;justify-content:space-between;gap:24px;
+  border:1px solid #e6dcc9;border-radius:12px;background:#fcfaf6;
+  padding:18px 20px;margin:12px 0 20px;
+}
+.portfolio-explainer strong,.portfolio-list-guide strong{font-size:14px;color:#342d24}
+.portfolio-explainer p,.portfolio-list-guide p{
+  font-size:12px;line-height:1.65;color:#62594e;margin:5px 0 0;
+}
+.portfolio-explainer small{display:block;font-size:11px;color:#7d756b;margin-top:6px}
+.portfolio-quick-links{display:flex;gap:8px;flex-shrink:0;align-items:center}
+.portfolio-list-guide{
+  display:flex;justify-content:space-between;align-items:center;gap:20px;
+  border:1px solid #e6dcc9;border-radius:10px;background:#fcfaf6;
+  padding:14px 16px;margin-bottom:14px;
+}
+.portfolio-list-guide>div{max-width:760px}
+.portfolio-list-guide label{
+  font-size:11px;font-weight:750;color:#6c6254;flex-shrink:0;
+  display:flex;gap:6px;flex-direction:column;
+}
+.portfolio-list-guide select{
+  min-width:205px;max-width:260px;width:100%;background:#fff;
+  border:1px solid #d7c9b2;border-radius:7px;
+  padding:9px 11px;font-size:12px;color:#322b22;
+}
+.portfolio-stage{
+  display:inline-block;max-width:210px;
+  white-space:normal;line-height:1.3;
+  font-size:11px;font-weight:750;border-radius:7px;
+  background:#f0f2f4;border:1px solid #dee2e5;
+  color:#53606b;padding:6px 8px;
+}
+.portfolio-stage-policy,.portfolio-stage-current{
+  border-color:#cee4d8;background:#eff8f3;color:#276647;
+}
+.portfolio-stage-proposal,.portfolio-stage-review,.portfolio-stage-unknown{
+  border-color:#e7d7bb;background:#fff8ec;color:#855a29;
+}
+.portfolio-stage-expired,.portfolio-stage-history{
+  border-color:#deddd9;background:#f5f4f1;color:#726c64;
+}
+.portfolio-stage-future{
+  border-color:#d5e3f0;background:#f0f6fc;color:#365e87;
+}
+@media(max-width:860px){
+  .portfolio-explainer,.portfolio-list-guide{align-items:flex-start;flex-direction:column;gap:12px}
+  .portfolio-quick-links{flex-wrap:wrap}
+  .portfolio-list-guide label{width:100%}
+  .portfolio-list-guide select{max-width:100%}
+}
