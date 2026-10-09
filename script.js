@@ -900,8 +900,7 @@ function renderDashboard(){
       </div>
     </section>
 
-    <section class="dashboard-topic" aria-labelledby="heading-financeiro">
-      <div class="panel">
+    <section class="panel dashboard-finance-primary" aria-labelledby="heading-financeiro">
         <div class="panel-head corporate-panel-head">
           <div><span class="section-kicker">03 / Financeiro</span><h2 id="heading-financeiro">Comissões e repasses</h2></div>
           <button class="link-btn" data-go="commission">Abrir comissões</button>
@@ -915,8 +914,6 @@ function renderDashboard(){
           <div><span>Pago a produtores</span><strong>${money(paid)}</strong></div>
         </div>
         <p class="muted" style="margin:12px 0 0;font-size:12px">Repasses aos produtores considerados pagos automaticamente nos contratos cadastrados com comissão definida.</p>
-      </div>
-
     </section>
 
     <div class="dashboard-topic-heading dashboard-operations-heading">
