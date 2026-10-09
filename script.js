@@ -5,9 +5,9 @@ const CUTOFF='2026-10';
 
 const menu=[
   ['overview','Visão geral'],
-  ['client','Clientes'],
+  ['client','Cadastro de clientes'],
   ['producer','Produtores'],
-  ['insurance','Propostas e Apólices'],
+  ['insurance','Contratos e histórico'],
   ['payment','Central de parcelas'],
   ['commission','Comissões'],
   ['renewal','Renovações'],
@@ -28,9 +28,9 @@ const NAV_GROUPS=[
 
 const PAGE_CONTEXT={
   overview:'Visão executiva da operação, carteira e financeiro.',
-  client:'Cadastro mestre, busca inteligente e visão 360º dos segurados.',
+  client:'Cadastro por CPF/CNPJ com histórico completo de propostas, apólices e vigências.',
   producer:'Produção, carteira e resultado por produtor.',
-  insurance:'Gestão unificada de propostas, apólices e detalhes de cada contrato.',
+  insurance:'Apólices, propostas em análise e contratos vencidos separados para consulta.',
   payment:'Controle de parcelas, inadimplência e etapas de cobrança sem misturar previsões com recebimentos efetivos.',
   commission:'Comissões, repasses e resultado realizado conforme as regras financeiras da carteira.',
   renewal:'Consulta por período, filtros comerciais e acompanhamento das renovações.',
@@ -71,6 +71,8 @@ let records=[];
 let current='overview';
 let editing=null;
 let uploadPrefill={clientId:'',insuranceId:''};
+let clientPortfolioFilter='all';
+let insurancePortfolioFilter='all';
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -151,6 +153,12 @@ const isInsuranceActive=insurance=>{
 };
 
 const activeInsuranceRows=()=>[...list('proposal'),...list('policy')].filter(isInsuranceActive);
+// Não tratar propostas dentro da vigência como apólices contratadas.
+const isContractInPeriod=row=>insurancePeriodState(row).key==='current'&&
+  !['cancelada','cancelado','recusada','recusado','convertida','convertido','perdida','perdido']
+    .includes(fold(row?.data?.status||''));
+const isPolicyInPeriod=row=>row?.kind==='policy'&&isContractInPeriod(row);
+const isProposalInPeriod=row=>row?.kind==='proposal'&&isContractInPeriod(row);
 
 const insuranceRowsForClient=clientId=>[...list('proposal'),...list('policy')]
   .filter(r=>String(r.data.clientId||'')===String(clientId||''));
@@ -185,6 +193,20 @@ const relatedEndorsementsFor=insurance=>{
     (!insurance.data.start||!e.data.start||e.data.start>=insurance.data.start)&&
     (!insurance.data.end||!e.data.start||e.data.start<=insurance.data.end)
   );
+};
+
+const clientPortfolioState=clientId=>{
+  const rows=insuranceRowsForClient(clientId);
+  if(rows.some(isPolicyInPeriod))return {key:'policy',label:'Apólice no prazo'};
+  if(rows.some(isProposalInPeriod))return {key:'proposal',label:'Somente proposta no período'};
+  if(rows.some(r=>insurancePeriodState(r).key==='future'))return {key:'future',label:'Vigência futura'};
+  if(rows.some(r=>insurancePeriodState(r).key==='unknown'))return {key:'review',label:'Vigência a conferir'};
+  if(rows.length)return {key:'history',label:'Somente histórico vencido'};
+  return {key:'none',label:'Sem contratos'};
+};
+const clientLastPeriod=clientId=>{
+  const ends=insuranceRowsForClient(clientId).map(r=>r.data.end).filter(Boolean);
+  return ends.length?date(ends.sort().at(-1)):'—';
 };
 
 const linkedToInsurance=(row,insurance)=>{
@@ -647,12 +669,17 @@ async function syncPortoNow(){
 
 
 function renderDashboard(){
-  const activeInsurances=activeInsuranceRows();
+  const contracts=[...list('proposal'),...list('policy')];
+  const inPeriodPolicies=contracts.filter(isPolicyInPeriod);
+  const inPeriodProposals=contracts.filter(isProposalInPeriod);
+  const expiredContracts=contracts.filter(r=>insurancePeriodState(r).key==='expired');
+  const futureContracts=contracts.filter(r=>insurancePeriodState(r).key==='future');
+  const undatedContracts=contracts.filter(r=>insurancePeriodState(r).key==='unknown');
   const payments=list('payment');
   const forecasts=payments.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
   const open=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
   const overdue=open.filter(r=>r.data.due&&r.data.due<today());
-  const renew60=activeInsurances.filter(r=>{
+  const renew60=inPeriodPolicies.filter(r=>{
     if(!r.data.end)return false;
     const d=(new Date(r.data.end+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000;
     return d>=0&&d<=60;
@@ -667,12 +694,10 @@ function renderDashboard(){
   const ff=comm.reduce((s,r)=>s+Number(r.data.ffFee||0),0);
   const producerExpected=comm.reduce((s,r)=>s+Number(r.data.producerExpected||0),0);
   const lebrimeNet=comm.reduce((s,r)=>s+Number(r.data.lebrimeNet||0),0);
-  const activePremium=activeInsurances.reduce((s,r)=>s+Number(r.data.premium||0),0);
+  const activePremium=inPeriodPolicies.reduce((s,r)=>s+Number(r.data.premium||0),0);
   const forecastTotal=forecasts.reduce((s,r)=>s+Number(r.data.amount||0),0);
-  const activeProposals=activeInsurances.filter(r=>r.kind==='proposal').length;
-  const activePolicies=activeInsurances.filter(r=>r.kind==='policy').length;
   const brokerRows=brokerages.map(name=>{
-    const items=activeInsurances.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(name));
+    const items=inPeriodPolicies.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(name));
     return {name,count:items.length,premium:items.reduce((sum,r)=>sum+Number(r.data.premium||0),0)};
   }).filter(r=>r.count>0);
 
@@ -691,21 +716,33 @@ function renderDashboard(){
     <div class="executive-heading">
       <div>
         <span class="section-kicker">Resumo executivo</span>
-        <h2>Carteira em números</h2>
-        <p>Consolidado operacional e financeiro da Lebrime.</p>
+        <h2>Visão executiva da carteira</h2>
+        <p>Cadastro, apólices, propostas e histórico em indicadores separados.</p>
       </div>
       <div class="as-of">Posição em ${date(today())}</div>
     </div>
 
+    <div class="portfolio-explainer">
+      <div><strong>Como interpretar os números</strong>
+        <p><b>Clientes</b> são cadastros únicos. <b>Apólices no prazo</b> são documentos de apólice com vigência corrente.
+        <b>Propostas no período</b> podem estar em análise; não comprovam contratação.
+        <b>Histórico</b> permanece na ficha após o vencimento.</p>
+        <small>Vigência não comprova quitação. A importação dos PDFs ainda está em andamento.</small>
+      </div>
+      <div class="portfolio-quick-links">
+        <button type="button" class="btn ghost small" data-go="client">Consultar clientes</button>
+        <button type="button" class="btn primary small" data-go="insurance">Consultar contratos</button>
+      </div>
+    </div>
     <div class="cards executive-cards">
-      ${metric('Clientes',list('client').length,'Cadastro mestre')}
-      ${metric('Carteira ativa',activeInsurances.length,`${activeProposals} propostas · ${activePolicies} apólices`)}
+      ${metric('Clientes cadastrados',list('client').length,'Cadastro mestre · CPF/CNPJ único')}
+      ${metric('Apólices no prazo',inPeriodPolicies.length,'Apólices, não propostas')}
+      ${metric('Propostas no período',inPeriodProposals.length,'Em análise, transmitidas ou emitidas')}
+      ${metric('Histórico de contratos',contracts.length,`${expiredContracts.length} vencidos · ${futureContracts.length} futuros · ${undatedContracts.length} sem datas`)}
       ${metric('Confiabilidade da base',reliabilityPct?`${reliabilityPct.toFixed(2)}%`:'—',reliabilityLabel)}
-      ${metric('Importação SegFlex',sourceTotal?`${importProgress.toFixed(2)}%`:'—',sourceTotal?`${sourceImported} importados · ${sourcePendingReview} revisão · ${sourceUnprocessed} pendentes`:'Aguardando leitura da base')}
-      ${metric('Prêmio em carteira',money(activePremium),'Total vigente')}
-      ${metric('Previsão de parcelas',money(forecastTotal),`${forecasts.length} parcelas de propostas`)}
-      ${metric('Comissões recebidas',money(received),'Reconhecidas no sistema')}
-      ${metric('Resultado realizado',money(received-paid),'Recebida − paga ao produtor')}
+      ${metric('Importação SegFlex',sourceTotal?`${cleanImportProgress.toFixed(2)}%`:'—',sourceTotal?`${sourceImported} importados · ${sourcePendingReview} revisão · ${sourceUnprocessed} pendentes`:'Aguardando leitura')}
+      ${metric('Prêmio das apólices no prazo',money(activePremium),'Total declarado; não é valor recebido')}
+      ${metric('Resultado realizado',money(received-paid),'Comissão recebida − paga ao produtor')}
     </div>
 
     <div class="operational-strip">
@@ -720,7 +757,7 @@ function renderDashboard(){
         <small>${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</small>
       </div>
       <div class="operational-item">
-        <span>Renovações em 60 dias</span>
+        <span>Apólices vencendo em 60 dias</span>
         <strong>${renew60.length}</strong>
         <small>Acompanhamento prioritário</small>
       </div>
@@ -771,15 +808,15 @@ function renderDashboard(){
 
       <div class="panel">
         <div class="panel-head corporate-panel-head">
-          <div><span class="section-kicker">Carteira</span><h2>Distribuição por corretora</h2></div>
+          <div><span class="section-kicker">Apólices no prazo</span><h2>Distribuição por corretora</h2></div>
           <button class="link-btn" data-go="insurance">Abrir carteira</button>
         </div>
         <div class="brokerage-summary">
           ${brokerRows.length?brokerRows.map(r=>`
             <div class="brokerage-summary-row">
-              <div><strong>${esc(r.name)}</strong><span>${r.count} contrato(s) ativo(s)</span></div>
+              <div><strong>${esc(r.name)}</strong><span>${r.count} apólice(s) dentro da vigência</span></div>
               <strong>${money(r.premium)}</strong>
-            </div>`).join(''):'<div class="empty compact">Nenhuma carteira ativa.</div>'}
+            </div>`).join(''):'<div class="empty compact">Nenhuma apólice no período.</div>'}
         </div>
       </div>
 
