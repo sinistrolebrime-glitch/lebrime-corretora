@@ -3154,3 +3154,20 @@ html[data-theme="light"] dialog{
   .dashboard-kpi strong{font-size:26px}
   .dashboard-premium-pair strong{font-size:20px}
 }
+
+/* Regras de comissão da carteira Lebrime */
+.commission-rules-overview{
+  margin:12px 0 16px;
+  padding:17px 19px;
+  border:1px solid #e6ddcb;
+  border-radius:12px;
+  background:#fffaf1;
+  color:#2c3d49;
+}
+.commission-rules-overview>strong{font-size:12px;display:block;margin-bottom:11px}
+.commission-rules-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.commission-rules-grid>div{padding:11px 12px;border:1px solid #eae1d2;border-radius:9px;background:#fff}
+.commission-rules-grid b{display:block;font-size:11px;color:#2d4252;margin-bottom:5px}
+.commission-rules-grid span{font-size:12px;font-weight:750;color:#536f54}
+.commission-rules-overview>small{font-size:11px;display:block;color:#687582;margin-top:11px;line-height:1.5}
+@media(max-width:760px){.commission-rules-grid{grid-template-columns:1fr}}
