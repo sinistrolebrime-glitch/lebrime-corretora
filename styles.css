@@ -2912,3 +2912,27 @@ html[data-theme="light"] dialog{
     grid-template-columns:1fr;
   }
 }
+
+
+/* Histórico completo dos contratos na ficha do cliente (v20.17). */
+.client-history-period-title{
+  grid-column:1 / -1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:8px;
+  padding:11px 14px;
+  border-radius:9px;
+  border:1px solid #e6dac0;
+  background:#faf7ef;
+}
+.client-history-period-title strong{font-size:13px;color:#806022;font-weight:800}
+.client-history-period-title span{font-size:11px;color:#7e796f}
+.insurance-period-current{color:#286a4f}
+.insurance-period-expired{color:#a66b32}
+.insurance-period-future{color:#376b90}
+.insurance-period-unknown{color:#9a572e}
+@media(max-width:760px){
+  .client-history-period-title{align-items:flex-start;flex-direction:column;gap:4px}
+}
