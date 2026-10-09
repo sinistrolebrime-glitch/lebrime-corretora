@@ -762,27 +762,98 @@ function renderDashboard(){
       <div class="as-of">Posição em ${date(today())}</div>
     </div>
 
-    <div class="portfolio-explainer">
-      <div><strong>Como interpretar os números</strong>
-        <p><b>Clientes</b> são cadastros únicos. <b>Contratos</b> incluem propostas e apólices.
-        <b>Prêmio da carteira</b> soma os contratos válidos em todas as vigências, sem repetir contratos idênticos.
-        <b>Histórico</b> permanece disponível após o vencimento.</p>
-        <small>A importação de uma proposta com dados de comissão confirmados reconhece a comissão como recebida pela regra da Lebrime.</small>
+    <section class="dashboard-topic" aria-labelledby="heading-carteira">
+      <div class="dashboard-topic-heading">
+        <div><span class="section-kicker">01 / Carteira de seguros</span>
+          <h3 id="heading-carteira">Clientes e contratos</h3>
+          <p>Um cliente pode ter vários contratos. Propostas e apólices são tratados como contratos na carteira.</p>
+        </div>
+        <div class="dashboard-topic-actions">
+          <button type="button" class="btn ghost small" data-go="client">Ver clientes</button>
+          <button type="button" class="btn primary small" data-go="insurance">Ver contratos</button>
+        </div>
       </div>
-      <div class="portfolio-quick-links">
-        <button type="button" class="btn ghost small" data-go="client">Consultar clientes</button>
-        <button type="button" class="btn primary small" data-go="insurance">Consultar contratos</button>
+      <div class="dashboard-main-kpis">
+        <div class="dashboard-kpi">
+          <span>Clientes únicos</span>
+          <strong>${list('client').length}</strong>
+          <small>Uma ficha por pessoa ou empresa (CPF/CNPJ)</small>
+        </div>
+        <div class="dashboard-kpi">
+          <span>Total de contratos na carteira</span>
+          <strong>${contracts.length}</strong>
+          <small>Histórico completo, incluindo contratos antigos e renovações</small>
+        </div>
+        <div class="dashboard-kpi dashboard-kpi-current">
+          <span>Contratos em vigência hoje</span>
+          <strong>${inPeriodContracts.length} <em>de ${contracts.length}</em></strong>
+          <small>Estão incluídos no total de contratos, não são adicionais</small>
+        </div>
       </div>
-    </div>
-    <div class="cards executive-cards">
-      ${metric('Clientes cadastrados',list('client').length,'Cadastro mestre · CPF/CNPJ único')}
-      ${metric('Contratos no prazo',inPeriodContracts.length,'Propostas e apólices contabilizadas igualmente')}
-      ${metric('Prêmio total da carteira',money(totalPortfolioPremium),`${contracts.length} contratos · ${missingPortfolioPremium} sem prêmio confirmado`)}
-      ${metric('Histórico de contratos',contracts.length,`${expiredContracts.length} vencidos · ${futureContracts.length} futuros · ${undatedContracts.length} sem datas`)}
-      ${metric('Confiabilidade da base',reliabilityPct?`${reliabilityPct.toFixed(2)}%`:'—',reliabilityLabel)}
-      ${metric('Importação SegFlex',sourceTotal?`${cleanImportProgress.toFixed(2)}%`:'—',sourceTotal?`${sourceImported} importados · ${sourcePendingReview} revisão · ${sourceUnprocessed} pendentes`:'Aguardando leitura')}
-      ${metric('Prêmio dos contratos no prazo',money(activePremium),'Propostas e apólices em vigência')}
-      ${metric('Resultado realizado',money(received-paid),'Comissão recebida − paga ao produtor')}
+      <div class="dashboard-relationship">
+        <div class="dashboard-relationship-head">
+          <strong>Situação dos ${contracts.length} contratos cadastrados</strong>
+          <span>${contracts.length?((inPeriodContracts.length/contracts.length)*100).toFixed(1).replace('.',',')+'% em vigência':'Sem contratos'}</span>
+        </div>
+        <div class="dashboard-ratio" role="progressbar" aria-label="Proporção de contratos em vigência" aria-valuenow="${inPeriodContracts.length}" aria-valuemin="0" aria-valuemax="${contracts.length}">
+          <i style="width:${contracts.length?Math.min(100,100*inPeriodContracts.length/contracts.length):0}%"></i>
+        </div>
+        <p><b>${inPeriodContracts.length}</b> em vigência hoje <span aria-hidden="true">·</span> <b>${contracts.length-inPeriodContracts.length}</b> em outras situações
+          <small>(${expiredContracts.length} encerrados, ${futureContracts.length} futuros e ${undatedContracts.length} com vigência a conferir)</small></p>
+      </div>
+      <div class="dashboard-premium-pair">
+        <div><span>Prêmio total do histórico</span><strong>${money(totalPortfolioPremium)}</strong>
+          <small>Soma dos contratos cadastrados, sem duplicar o mesmo contrato</small></div>
+        <div><span>Prêmio dos contratos em vigência</span><strong>${money(activePremium)}</strong>
+          <small>Parte do prêmio histórico referente aos contratos vigentes</small></div>
+      </div>
+      ${missingPortfolioPremium?'<p class="dashboard-caution">'+missingPortfolioPremium+' contrato(s) sem prêmio total confirmado ainda não contribuem para esses valores.</p>':''}
+    </section>
+
+    <section class="dashboard-topic" aria-labelledby="heading-importacao">
+      <div class="dashboard-topic-heading">
+        <div><span class="section-kicker">02 / Importação de documentos</span>
+          <h3 id="heading-importacao">SegFlex — andamento dos PDFs</h3>
+          <p>Este grupo conta arquivos analisados, não pessoas nem contratos novos.</p>
+        </div>
+        <button type="button" class="btn ghost small" data-go="imports">Ver documentos</button>
+      </div>
+      <div class="dashboard-import-grid">
+        <div class="dashboard-import-total"><span>Arquivos processados</span>
+          <strong>${sourceTotal?sourceTotal-sourceUnprocessed:0} <em>de ${sourceTotal||0}</em></strong>
+          <small>${sourceTotal?importProgress.toFixed(2).replace('.',',')+'%':'Aguardando relatório'}</small></div>
+        <div><span>Importados</span><strong>${sourceImported}</strong><small>PDFs incluídos no fluxo</small></div>
+        <div><span>Em revisão</span><strong>${sourcePendingReview}</strong><small>Já analisados; exigem conferência</small></div>
+        <div><span>Não processados</span><strong>${sourceUnprocessed}</strong><small>Arquivos ainda não analisados</small></div>
+      </div>
+      <div class="dashboard-relationship">
+        <div class="dashboard-relationship-head"><strong>Conclusão do processamento</strong><span>${sourceTotal?importProgress.toFixed(2).replace('.',',')+'%':'—'}</span></div>
+        <div class="dashboard-ratio" role="progressbar" aria-label="Progresso da análise de PDFs" aria-valuenow="${sourceTotal?sourceTotal-sourceUnprocessed:0}" aria-valuemin="0" aria-valuemax="${sourceTotal||0}">
+          <i style="width:${Math.max(0,Math.min(100,importProgress))}%"></i>
+        </div>
+        <p>Os ${sourcePendingReview} arquivos em revisão já foram processados, mas ainda precisam de validação.</p>
+      </div>
+    </section>
+
+    <section class="dashboard-topic" aria-labelledby="heading-financeiro">
+      <div class="dashboard-topic-heading">
+        <div><span class="section-kicker">03 / Financeiro</span>
+          <h3 id="heading-financeiro">Comissões e resultado</h3>
+          <p>Valores das comissões cadastradas, separados do prêmio da carteira.</p>
+        </div>
+        <button type="button" class="btn ghost small" data-go="commission">Ver comissões</button>
+      </div>
+      <div class="dashboard-finance-kpis">
+        <div><span>Comissão bruta</span><strong>${money(gross)}</strong></div>
+        <div><span>Comissão recebida</span><strong>${money(received)}</strong></div>
+        <div><span>Repasses pagos aos produtores</span><strong>${money(paid)}</strong></div>
+        <div><span>Resultado realizado</span><strong>${money(received-paid)}</strong><small>Comissão recebida − repasses pagos</small></div>
+      </div>
+    </section>
+
+    <div class="dashboard-topic-heading dashboard-operations-heading">
+      <div><span class="section-kicker">04 / Acompanhamento</span><h3>Pendências operacionais</h3>
+        <p>Parcelas, renovações e sinistros que merecem atenção.</p></div>
     </div>
 
     <div class="operational-strip">
