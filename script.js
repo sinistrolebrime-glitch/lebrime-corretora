@@ -1968,7 +1968,6 @@ function openProducerDetail(producerId){
     <div class="producer-insurance-row">
       <div><span>Cliente</span><button class="name-link" data-producer-client="${r.data.clientId}">${esc(nameById(r.data.clientId))}</button></div>
       <div><span>Contrato</span><button class="name-link" data-producer-insurance="${r.id}">${esc(r.data.number||'—')}</button></div>
-      <div><span>Tipo</span><strong>${r.kind==='policy'?'Apólice':'Proposta'}</strong></div>
       <div><span>Operação</span><strong>${esc(r.data.policyType||'—')}</strong></div>
       <div><span>Prêmio líquido</span><strong>${money(netPremiumOf(r))}</strong></div>
       <div><span>Comissão bruta</span><strong>${money(commissionValueOf(r))}</strong></div>
@@ -2241,7 +2240,7 @@ function openInsuranceDetail(insuranceId){
   const items=insuranceLinkedRows('insuredItem',insurance);
   const coverages=insuranceLinkedRows('coverage',insurance);
   const payments=insuranceLinkedRows('payment',insurance).sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
-  const commissions=insuranceLinkedRows('commission',insurance);
+  const commissions=effectiveCommissionRows().filter(c=>String(c.data.policyId||c.data.proposalId||'')===insurance.id);
   const docs=insuranceDocuments(insurance);
   const tasks=insuranceLinkedRows('task',insurance);
   const claims=list('claim').filter(r=>linkedToInsurance(r,insurance)||String(r.data.policyId||'')===String(insurance.id));
@@ -2276,7 +2275,7 @@ function openInsuranceDetail(insuranceId){
     <div class="detail-row"><div><strong>${esc(r.data.name||r.data.documentType||'Documento')}</strong><span>${esc(r.data.documentType||'Documento')} · ${date(r.data.referenceDate)}</span></div>
       ${documentAvailable(r)?`<button class="btn ghost small" data-insurance-open-doc="${r.id}">Abrir</button>`:(directInsurancePdf?`<button class="btn ghost small" data-insurance-open-source="${insurance.id}">Abrir PDF</button>`:`<span class="file-missing">PDF pendente</span>`)}</div>
   `).join(''):(directInsurancePdf?`
-    <div class="detail-row"><div><strong>${esc(insurance.data.sourceFileName||'PDF original')}</strong><span>${insurance.kind==='policy'?'Apólice':'Proposta'} · arquivo de origem</span></div>
+    <div class="detail-row"><div><strong>${esc(insurance.data.sourceFileName||'PDF original')}</strong><span>Documento · arquivo de origem</span></div>
       <button class="btn ghost small" data-insurance-open-source="${insurance.id}">Abrir PDF</button></div>
   `:'<div class="empty compact">Nenhum documento vinculado.</div>');
 
@@ -2289,10 +2288,10 @@ function openInsuranceDetail(insuranceId){
     <div class="detail-row"><div><strong>${esc(r.data.number||'Sinistro')}</strong><span>${r.data.incidentDate?date(r.data.incidentDate):'Data não informada'} · ${esc(r.data.claimType||'Sinistro')}</span></div><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span></div>
   `).join(''):'<div class="empty compact">Nenhum sinistro vinculado.</div>';
 
-  $('#insuranceDetailTitle').textContent=`${insurance.kind==='policy'?'Apólice':'Proposta'} ${insurance.data.number||'sem número'}`;
+  $('#insuranceDetailTitle').textContent=`Contrato ${insurance.data.number||'sem número'}`;
   $('#insuranceDetailBody').innerHTML=`
     <div class="contract-hero">
-      <div><span class="record-type">${insurance.kind==='policy'?'APÓLICE':'PROPOSTA'}</span><h3>${esc(client.name||'Cliente')}</h3><p>${esc(insurance.data.insurer||'—')} · ${esc(insurance.data.branch||'—')}</p></div>
+      <div><span class="record-type">CONTRATO</span><h3>${esc(client.name||'Cliente')}</h3><p>${esc(insurance.data.insurer||'—')} · ${esc(insurance.data.branch||'—')}</p></div>
       <span class="status-pill corporate-status ${statusTone(insurance.data.status)}">${esc(insurance.data.status||'Cadastrado')}</span>
     </div>
     ${insurance.kind==='proposal'&&insurance.data.producerPending&&!insurance.data.producerId?`<div class="rule-callout producer-pending-callout"><strong>Produtor pendente</strong><span>Proposta importada da Porto sem produtor. O produtor deve ser definido manualmente antes do cálculo da comissão.</span></div>`:''}
