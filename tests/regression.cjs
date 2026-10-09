@@ -9,7 +9,7 @@ function app(file){
   const context=vm.createContext({console,Intl,Date,AbortController,setTimeout,clearTimeout,
     crypto:require('node:crypto').webcrypto,
     localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
-    document:{querySelector:selector=>{
+    document:{querySelectorAll:()=>[],querySelector:selector=>{
       if(!nodes.has(selector))nodes.set(selector,{classList:{add(){},remove(){},toggle(){}},textContent:'',value:'',querySelectorAll:()=>[]});
       return nodes.get(selector);
     }}
@@ -56,6 +56,27 @@ async function main(){
       assert.equal(c.ffFee+c.producerExpected+c.lebrimeFee,20000);
     }
   }
+  // Cadastro de proposta/apólice com comissão apurada implica repasse pago,
+  // sem exigir transferência preenchida manualmente. Não duplicar por comissão repetida.
+  revised.run(`records=records.concat([
+    {id:'cm0',kind:'commission',data:{proposalId:'p0',producerId:'leandro',expected:20000,ffFee:6000,producerExpected:14000,received:14000,transferPaid:0}},
+    {id:'cm1',kind:'commission',data:{proposalId:'p1',producerId:'other',expected:20000,ffFee:0,producerExpected:12000,received:20000,transferPaid:0}},
+    {id:'cm2',kind:'commission',data:{proposalId:'p2',producerId:'other',expected:20000,ffFee:6000,producerExpected:12000,received:14000,transferPaid:0}},
+    {id:'cm_dup',kind:'commission',data:{proposalId:'p0',producerExpected:14000,received:0,transferPaid:0,status:'Duplicada'}}
+  ])`);
+  assert.equal(revised.run('effectiveCommissionRows().length'),3);
+  assert.equal(revised.run('effectiveCommissionRows().reduce((sum,r)=>sum+paidToProducerOf(r),0)'),38000);
+  assert.equal(revised.run("config.commission.columns.find(c=>c[0]==='Paga ao produtor')[1](rowById('cm0'))"),'R$ 140,00');
+  revised.run('renderDashboard()');
+  const dashboard=revised.nodes.get('#dashboard').innerHTML;
+  assert.equal((dashboard.match(/Comissões e repasses/g)||[]).length,1,'only one financial panel');
+  assert.equal(dashboard.includes('Comissões e resultado'),false,'duplicate summary removed');
+  assert.equal(dashboard.includes('dashboard-finance-kpis'),false);
+  assert.match(dashboard,/Pago a produtores<\/span><strong>R\$\s*380,00/);
+  assert.match(dashboard,/Líquido Lebrime/);
+  const summary=revised.run('commissionSummary(effectiveCommissionRows())');
+  assert.match(summary,/Paga a produtores/);
+  assert.match(summary,/Lucro realizado/);
   const a=app('script.js');
   a.context.fetch=async()=>({ok:true,status:200,json:async()=>({rows:fixture})});
   await a.run('loadRecords()');
