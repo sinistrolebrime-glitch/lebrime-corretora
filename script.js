@@ -1285,7 +1285,7 @@ function renderList(){
   if(current==='insurance')rows=portfolioRows();
   else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
   else if(current==='payment')rows=applyPaymentFilters([...list('payment')]);
-  else if(current==='commission')rows=applyCommissionFilters([...list('commission')]);
+  else if(current==='commission')rows=applyCommissionFilters(effectiveCommissionRows());
   else if(current==='task')rows=applyTaskFilters([...list('task')]);
   else if(current==='document')rows=applyDocumentFilters([...list('document')]);
   else if(current==='claim')rows=applyClaimFilters([...list('claim')]);
@@ -1299,7 +1299,6 @@ function renderList(){
     rows=rows.filter(r=>{
       const stage=insurancePeriodState(r).key;
       if(insurancePortfolioFilter==='current')return isContractInPeriod(r);
-      if(insurancePortfolioFilter==='proposal')return isProposalInPeriod(r);
       if(insurancePortfolioFilter==='expired')return stage==='expired';
       if(insurancePortfolioFilter==='future')return stage==='future';
       if(insurancePortfolioFilter==='review')return stage==='unknown';
@@ -1317,8 +1316,7 @@ function renderList(){
   $('#listMeta').textContent=`${rows.length} registro(s)`;
   if(current==='client'){
     const categories=[
-      ['all','Todos os clientes'],['policy','Apólice no prazo'],
-      ['proposal','Somente proposta no período'],['history','Somente histórico vencido'],
+      ['all','Todos os clientes'],['current','Contratos no prazo'],['history','Somente histórico vencido'],
       ['future','Vigência futura'],['review','Vigência a conferir'],['none','Sem contratos']
     ];
     $('#filters').innerHTML=`
@@ -1333,7 +1331,7 @@ function renderList(){
       </div>`;
   }
   else if(current==='payment')$('#filters').innerHTML=paymentFilterHtml(list('payment'))+paymentSummary(rows);
-  else if(current==='commission')$('#filters').innerHTML=commissionFilterHtml(list('commission'))+commissionSummary(rows);
+  else if(current==='commission')$('#filters').innerHTML=commissionFilterHtml(effectiveCommissionRows())+commissionSummary(rows);
   else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
   else if(current==='task')$('#filters').innerHTML=taskFilterHtml(list('task'))+taskSummary(rows);
   else if(current==='document')$('#filters').innerHTML=documentFilterHtml(list('document'))+documentSummary(rows);
@@ -1341,8 +1339,7 @@ function renderList(){
   else if(current==='insurance'){
     const pendingProducer=rows.filter(r=>r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId).length;
     const categories=[
-      ['all','Todo o histórico'],['policy','Apólices no prazo'],
-      ['proposal','Propostas no período'],['expired','Vigências encerradas'],
+      ['all','Todo o histórico'],['current','Contratos no prazo'],['expired','Vigências encerradas'],
       ['future','Vigências futuras'],['review','Vigência sem data']
     ];
     $('#filters').innerHTML=`
@@ -1953,7 +1950,7 @@ function openProducerDetail(producerId){
   const totalProducer=insurances.reduce((sum,r)=>sum+producerCommissionOf(r),0);
   const totalLebrime=insurances.reduce((sum,r)=>sum+lebrimeFeeOf(r),0);
   const totalLebrimeNet=insurances.reduce((sum,r)=>sum+lebrimeNetOf(r),0);
-  const producerCommissions=list('commission').filter(r=>String(r.data.producerId||'')===String(producerId));
+  const producerCommissions=effectiveCommissionRows().filter(r=>String(r.data.producerId||'')===String(producerId));
   const received=producerCommissions.reduce((sum,r)=>sum+Number(r.data.received||0),0);
   const transferPaid=producerCommissions.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
   const activeCount=insurances.filter(isInsuranceActive).length;
