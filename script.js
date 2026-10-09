@@ -382,10 +382,15 @@ const producerClients=producerId=>{
   return ids.map(rowById).filter(Boolean);
 };
 
-const commissionForInsurance=insurance=>list('commission').find(c=>
+// Em vínculos antigos com mais de uma comissão, utilizar o lançamento canônico.
+const commissionForInsurance=insurance=>list('commission').filter(c=>
   (insurance?.kind==='policy'&&String(c.data.policyId||'')===String(insurance.id))||
   (insurance?.kind==='proposal'&&String(c.data.proposalId||'')===String(insurance.id))
-)||null;
+).sort((a,b)=>{
+  const score=c=>(fold(c.data.status||'').includes('duplicada')?-1000000000:0)+
+    Number(c.data.received||0)*2+Number(c.data.expected||0);
+  return score(b)-score(a);
+})[0]||null;
 
 const daysUntil=v=>v?Math.ceil((new Date(v+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000):null;
 
@@ -464,7 +469,7 @@ function logout(){
 function commissionReconcileOps(){
   const stamp=now();
   const ops=[];
-  for(const insurance of [...list('proposal'),...list('policy')]){
+  for(const insurance of portfolioRows()){
     const netPremium=netPremiumOf(insurance);
     const commissionPercent=commissionPercentOf(insurance);
     const producerId=insurance.data.producerId||'';
@@ -2073,7 +2078,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     (brokerageFilter==='all'&&String(r.data.clientId||'')===String(clientId))
   );
   const openPayments=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
-  const commissions=list('commission').filter(r=>
+  const commissions=effectiveCommissionRows().filter(r=>
     visibleInsuranceIds.has(String(r.data.policyId||''))||visibleInsuranceIds.has(String(r.data.proposalId||''))
   );
   const tasks=list('task').filter(r=>
