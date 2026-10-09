@@ -30,7 +30,7 @@ const PAGE_CONTEXT={
   overview:'Visão executiva da operação, carteira e financeiro.',
   client:'Cadastro por CPF/CNPJ com histórico completo de propostas, apólices e vigências.',
   producer:'Produção, carteira e resultado por produtor.',
-  insurance:'Apólices, propostas em análise e contratos vencidos separados para consulta.',
+  insurance:'Carteira unificada de contratos, propostas e apólices.',
   payment:'Controle de parcelas, inadimplência e etapas de cobrança sem misturar previsões com recebimentos efetivos.',
   commission:'Comissões, repasses e resultado realizado conforme as regras financeiras da carteira.',
   renewal:'Consulta por período, filtros comerciais e acompanhamento das renovações.',
@@ -44,7 +44,7 @@ const PAGE_CONTEXT={
 const NEW_LABELS={
   client:'+ Novo cliente',
   producer:'+ Novo produtor',
-  insurance:'+ Nova proposta/apólice',
+  insurance:'+ Novo contrato',
   payment:'+ Nova parcela',
   claim:'+ Novo sinistro',
   task:'+ Nova pendência',
@@ -160,8 +160,36 @@ const isContractInPeriod=row=>insurancePeriodState(row).key==='current'&&
 const isPolicyInPeriod=row=>row?.kind==='policy'&&isContractInPeriod(row);
 const isProposalInPeriod=row=>row?.kind==='proposal'&&isContractInPeriod(row);
 
-const insuranceRowsForClient=clientId=>[...list('proposal'),...list('policy')]
+// Carteira Lebrime: proposta e apólice são contratos equivalentes.
+const portfolioRows=()=>{
+  const unique=new Map();
+  for(const row of [...list('proposal'),...list('policy')]){
+    const status=fold(row.data.status||'');
+    if(['cotacao','orcamento','simulacao','recusada','recusado','cancelada','cancelado','perdida','perdido','convertida','convertido'].includes(status)||
+      row.data.isDuplicate===true||row.data.duplicateOf)continue;
+    const d=row.data;
+    const key=d.clientId&&d.insurer&&d.number&&d.start
+      ?[String(d.clientId),fold(d.insurer),searchKey(d.number),String(d.start),String(d.end||'')].join('|')
+      :row.id;
+    const previous=unique.get(key);
+    if(!previous||(row.kind==='policy'&&previous.kind!=='policy')||(!Number(previous.data.premium||0)&&Number(d.premium||0)))unique.set(key,row);
+  }
+  return [...unique.values()];
+};
+const insuranceRowsForClient=clientId=>portfolioRows()
   .filter(r=>String(r.data.clientId||'')===String(clientId||''));
+const effectiveCommissionRows=()=>{
+  const ids=new Set(portfolioRows().map(r=>r.id));
+  const result=new Map();
+  for(const row of list('commission')){
+    const id=row.data.policyId||row.data.proposalId||'';
+    if(!ids.has(id)||fold(row.data.status||'').includes('duplicada'))continue;
+    const prior=result.get(id);
+    if(!prior||Number(row.data.received||0)>Number(prior.data.received||0)||
+      (Number(row.data.received||0)===Number(prior.data.received||0)&&Number(row.data.expected||0)>Number(prior.data.expected||0)))result.set(id,row);
+  }
+  return [...result.values()];
+};
 
 // Histórico completo: a vigência encerrada não remove o contrato da ficha.
 // A situação da vigência é diferente da situação comercial (em análise, emitida etc.).
@@ -197,8 +225,7 @@ const relatedEndorsementsFor=insurance=>{
 
 const clientPortfolioState=clientId=>{
   const rows=insuranceRowsForClient(clientId);
-  if(rows.some(isPolicyInPeriod))return {key:'policy',label:'Apólice no prazo'};
-  if(rows.some(isProposalInPeriod))return {key:'proposal',label:'Somente proposta no período'};
+  if(rows.some(isContractInPeriod))return {key:'current',label:'Contrato no prazo'};
   if(rows.some(r=>insurancePeriodState(r).key==='future'))return {key:'future',label:'Vigência futura'};
   if(rows.some(r=>insurancePeriodState(r).key==='unknown'))return {key:'review',label:'Vigência a conferir'};
   if(rows.length)return {key:'history',label:'Somente histórico vencido'};
@@ -347,7 +374,7 @@ const importedInsuranceDate=insurance=>{
 const importedInsuranceSource=insurance=>
   insurance?.kind==='policy'?'Importação da apólice':'Importação da proposta';
 
-const producerInsurances=producerId=>[...list('proposal'),...list('policy')]
+const producerInsurances=producerId=>portfolioRows()
   .filter(r=>String(r.data.producerId||'')===String(producerId||''));
 
 const producerClients=producerId=>{
@@ -669,9 +696,8 @@ async function syncPortoNow(){
 
 
 function renderDashboard(){
-  const contracts=[...list('proposal'),...list('policy')];
-  const inPeriodPolicies=contracts.filter(isPolicyInPeriod);
-  const inPeriodProposals=contracts.filter(isProposalInPeriod);
+  const contracts=portfolioRows();
+  const inPeriodContracts=contracts.filter(isContractInPeriod);
   const expiredContracts=contracts.filter(r=>insurancePeriodState(r).key==='expired');
   const futureContracts=contracts.filter(r=>insurancePeriodState(r).key==='future');
   const undatedContracts=contracts.filter(r=>insurancePeriodState(r).key==='unknown');
@@ -679,7 +705,7 @@ function renderDashboard(){
   const forecasts=payments.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
   const open=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
   const overdue=open.filter(r=>r.data.due&&r.data.due<today());
-  const renew60=inPeriodPolicies.filter(r=>{
+  const renew60=inPeriodContracts.filter(r=>{
     if(!r.data.end)return false;
     const d=(new Date(r.data.end+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000;
     return d>=0&&d<=60;
@@ -687,17 +713,19 @@ function renderDashboard(){
   const claims=list('claim');
   const activeClaims=claims.filter(r=>!['Pago','Encerrado','Negado'].includes(String(r.data.status||'')));
   const claimActionsDue=activeClaims.filter(r=>r.data.nextActionDate&&r.data.nextActionDate<today());
-  const comm=list('commission');
+  const comm=effectiveCommissionRows();
   const received=comm.reduce((s,r)=>s+Number(r.data.received||0),0);
   const paid=comm.reduce((s,r)=>s+Number(r.data.transferPaid||0),0);
   const gross=comm.reduce((s,r)=>s+Number(r.data.expected||0),0);
   const ff=comm.reduce((s,r)=>s+Number(r.data.ffFee||0),0);
   const producerExpected=comm.reduce((s,r)=>s+Number(r.data.producerExpected||0),0);
   const lebrimeNet=comm.reduce((s,r)=>s+Number(r.data.lebrimeNet||0),0);
-  const activePremium=inPeriodPolicies.reduce((s,r)=>s+Number(r.data.premium||0),0);
+  const activePremium=inPeriodContracts.reduce((s,r)=>s+Number(r.data.premium||0),0);
+  const totalPortfolioPremium=contracts.reduce((s,r)=>s+Number(r.data.premium||0),0);
+  const missingPortfolioPremium=contracts.filter(r=>!Number(r.data.premium||0)).length;
   const forecastTotal=forecasts.reduce((s,r)=>s+Number(r.data.amount||0),0);
   const brokerRows=brokerages.map(name=>{
-    const items=inPeriodPolicies.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(name));
+    const items=inPeriodContracts.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(name));
     return {name,count:items.length,premium:items.reduce((sum,r)=>sum+Number(r.data.premium||0),0)};
   }).filter(r=>r.count>0);
 
@@ -717,17 +745,17 @@ function renderDashboard(){
       <div>
         <span class="section-kicker">Resumo executivo</span>
         <h2>Visão executiva da carteira</h2>
-        <p>Cadastro, apólices, propostas e histórico em indicadores separados.</p>
+        <p>Propostas e apólices formam uma única carteira; todo contrato válido contribui para o prêmio.</p>
       </div>
       <div class="as-of">Posição em ${date(today())}</div>
     </div>
 
     <div class="portfolio-explainer">
       <div><strong>Como interpretar os números</strong>
-        <p><b>Clientes</b> são cadastros únicos. <b>Apólices no prazo</b> são documentos de apólice com vigência corrente.
-        <b>Propostas no período</b> podem estar em análise; não comprovam contratação.
-        <b>Histórico</b> permanece na ficha após o vencimento.</p>
-        <small>Vigência não comprova quitação. A importação dos PDFs ainda está em andamento.</small>
+        <p><b>Clientes</b> são cadastros únicos. <b>Contratos</b> incluem propostas e apólices.
+        <b>Prêmio da carteira</b> soma os contratos válidos em todas as vigências, sem repetir contratos idênticos.
+        <b>Histórico</b> permanece disponível após o vencimento.</p>
+        <small>A importação de uma proposta com dados de comissão confirmados reconhece a comissão como recebida pela regra da Lebrime.</small>
       </div>
       <div class="portfolio-quick-links">
         <button type="button" class="btn ghost small" data-go="client">Consultar clientes</button>
@@ -736,12 +764,12 @@ function renderDashboard(){
     </div>
     <div class="cards executive-cards">
       ${metric('Clientes cadastrados',list('client').length,'Cadastro mestre · CPF/CNPJ único')}
-      ${metric('Apólices no prazo',inPeriodPolicies.length,'Apólices, não propostas')}
-      ${metric('Propostas no período',inPeriodProposals.length,'Em análise, transmitidas ou emitidas')}
+      ${metric('Contratos no prazo',inPeriodContracts.length,'Propostas e apólices contabilizadas igualmente')}
+      ${metric('Prêmio total da carteira',money(totalPortfolioPremium),`${contracts.length} contratos · ${missingPortfolioPremium} sem prêmio confirmado`)}
       ${metric('Histórico de contratos',contracts.length,`${expiredContracts.length} vencidos · ${futureContracts.length} futuros · ${undatedContracts.length} sem datas`)}
       ${metric('Confiabilidade da base',reliabilityPct?`${reliabilityPct.toFixed(2)}%`:'—',reliabilityLabel)}
       ${metric('Importação SegFlex',sourceTotal?`${cleanImportProgress.toFixed(2)}%`:'—',sourceTotal?`${sourceImported} importados · ${sourcePendingReview} revisão · ${sourceUnprocessed} pendentes`:'Aguardando leitura')}
-      ${metric('Prêmio das apólices no prazo',money(activePremium),'Total declarado; não é valor recebido')}
+      ${metric('Prêmio dos contratos no prazo',money(activePremium),'Propostas e apólices em vigência')}
       ${metric('Resultado realizado',money(received-paid),'Comissão recebida − paga ao produtor')}
     </div>
 
@@ -757,7 +785,7 @@ function renderDashboard(){
         <small>${money(overdue.reduce((s,r)=>s+Number(r.data.amount||0),0))}</small>
       </div>
       <div class="operational-item">
-        <span>Apólices vencendo em 60 dias</span>
+        <span>Contratos vencendo em 60 dias</span>
         <strong>${renew60.length}</strong>
         <small>Acompanhamento prioritário</small>
       </div>
@@ -808,15 +836,15 @@ function renderDashboard(){
 
       <div class="panel">
         <div class="panel-head corporate-panel-head">
-          <div><span class="section-kicker">Apólices no prazo</span><h2>Distribuição por corretora</h2></div>
+          <div><span class="section-kicker">Contratos no prazo</span><h2>Distribuição por corretora</h2></div>
           <button class="link-btn" data-go="insurance">Abrir carteira</button>
         </div>
         <div class="brokerage-summary">
           ${brokerRows.length?brokerRows.map(r=>`
             <div class="brokerage-summary-row">
-              <div><strong>${esc(r.name)}</strong><span>${r.count} apólice(s) dentro da vigência</span></div>
+              <div><strong>${esc(r.name)}</strong><span>${r.count} contrato(s) dentro da vigência</span></div>
               <strong>${money(r.premium)}</strong>
-            </div>`).join(''):'<div class="empty compact">Nenhuma apólice no período.</div>'}
+            </div>`).join(''):'<div class="empty compact">Nenhum contrato no período.</div>'}
         </div>
       </div>
 
@@ -889,8 +917,8 @@ const config={
       ['Cliente',r=>r.data.name],
       ['CPF/CNPJ',r=>r.data.document],
       ['Situação da ficha',r=>clientPortfolioState(r.id).label],
-      ['Apólices no prazo',r=>insuranceRowsForClient(r.id).filter(isPolicyInPeriod).length],
-      ['Propostas no período',r=>insuranceRowsForClient(r.id).filter(isProposalInPeriod).length],
+      ['Contratos no prazo',r=>insuranceRowsForClient(r.id).filter(isContractInPeriod).length],
+      ['Prêmio no prazo',r=>money(insuranceRowsForClient(r.id).filter(isContractInPeriod).reduce((s,i)=>s+Number(i.data.premium||0),0))],
       ['Histórico total',r=>insuranceRowsForClient(r.id).length],
       ['Último vencimento',r=>clientLastPeriod(r.id)]
     ],
@@ -944,7 +972,6 @@ const config={
   insurance:{
     title:'Seguro',
     columns:[
-      ['Tipo',r=>r.kind==='policy'?'Apólice':'Proposta'],
       ['Operação',r=>r.data.policyType||'—'],
       ['Cliente',r=>nameById(r.data.clientId)],
       ['Número',r=>r.data.number],
@@ -957,14 +984,13 @@ const config={
       ['Status comercial',r=>r.data.status||'Não informado']
     ],
     fields:[
-      ['_kind','Tipo de registro','select',['proposal','policy']],
       ['clientId','Cliente','ref','client'],
       ['producerId','Produtor','ref','producer'],
       ['brokerages','Corretoras','brokerages'],
       ['insurer','Seguradora','combo',insurers],
       ['branch','Ramo','combo',branches],
       ['subBranches','Ramos / seções internas','textarea'],
-      ['number','Nº proposta / apólice','text'],
+      ['number','Nº do contrato','text'],
       ['policyType','Operação','select',['Seguro novo','Renovação','Cancelamento']],
       ['netPremium','Prêmio líquido','money'],
       ['premium','Prêmio total','money'],
@@ -1124,7 +1150,7 @@ const config={
 function businessFields(kind){
   return [
     ['clientId','Cliente','ref','client'],['producerId','Produtor','ref','producer'],['brokerages','Corretoras','brokerages'],['insurer','Seguradora','combo',insurers],
-    ['branch','Ramo','combo',branches],['subBranches','Ramos / seções internas','textarea'],['number',kind==='policy'?'Nº apólice':'Nº proposta','text'],
+    ['branch','Ramo','combo',branches],['subBranches','Ramos / seções internas','textarea'],['number','Nº do contrato','text'],
     ['policyType','Tipo','select',['Seguro novo','Renovação','Cancelamento']],['netPremium','Prêmio líquido','money'],['premium','Prêmio total','money'],['start','Início vigência','date'],['end','Fim vigência','date'],
     ['installmentCount','Qtd. parcelas','number'],['paymentMethod','Forma de pagamento','select',['','Boleto','Débito em conta','Cartão de crédito','Cartão de débito','PIX','Transferência','Outro']],['firstInstallmentAmount','Valor da 1ª parcela','money'],['installmentAmount','Valor padrão das demais','money'],['firstDueDate','1º vencimento (se conhecido)','date'],['paymentDueText','Referência do vencimento','text'],
     ['status','Status','select',kind==='policy'?['Ativa','Cancelada','Renovada']:['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida']],
@@ -1256,7 +1282,7 @@ function renderList(){
   let rows;
   const allRenewals=current==='renewal'?renewalSourceRows():[];
 
-  if(current==='insurance')rows=[...list('proposal'),...list('policy')];
+  if(current==='insurance')rows=portfolioRows();
   else if(current==='renewal')rows=applyRenewalFilters(allRenewals);
   else if(current==='payment')rows=applyPaymentFilters([...list('payment')]);
   else if(current==='commission')rows=applyCommissionFilters([...list('commission')]);
@@ -1272,7 +1298,7 @@ function renderList(){
   if(current==='insurance'&&insurancePortfolioFilter!=='all')
     rows=rows.filter(r=>{
       const stage=insurancePeriodState(r).key;
-      if(insurancePortfolioFilter==='policy')return isPolicyInPeriod(r);
+      if(insurancePortfolioFilter==='current')return isContractInPeriod(r);
       if(insurancePortfolioFilter==='proposal')return isProposalInPeriod(r);
       if(insurancePortfolioFilter==='expired')return stage==='expired';
       if(insurancePortfolioFilter==='future')return stage==='future';
@@ -1298,7 +1324,7 @@ function renderList(){
     $('#filters').innerHTML=`
       <div class="portfolio-list-guide">
         <div><strong>Cadastro de clientes</strong><p>Cada pessoa ou empresa aparece uma vez. A ficha reúne todos os anos e documentos, mesmo vencidos.
-          Os números de propostas não são apólices confirmadas.</p></div>
+          Propostas e apólices são contratos equivalentes para a carteira da Lebrime.</p></div>
         <label>Mostrar
           <select id="clientPortfolioFilter">
             ${categories.map(([key,label])=>`<option value="${key}" ${clientPortfolioFilter===key?'selected':''}>${label}</option>`).join('')}
@@ -1321,9 +1347,8 @@ function renderList(){
     ];
     $('#filters').innerHTML=`
       <div class="portfolio-list-guide">
-        <div><strong>Propostas e apólices são registros diferentes</strong>
-          <p>A coluna de vigência indica datas. A coluna de status comercial indica análise, emissão, contratação ou cancelamento.
-          Uma proposta no prazo não equivale a uma apólice emitida.</p>
+        <div><strong>Carteira única de contratos</strong>
+          <p>Propostas importadas e apólices têm o mesmo peso na carteira e no prêmio. O status comercial permanece apenas para consulta operacional.</p>
           ${pendingProducer?`<span class="chip danger">Produtores pendentes: ${pendingProducer}</span>`:''}
         </div>
         <label>Mostrar
@@ -1833,7 +1858,7 @@ function validateBeforeSave(data){
     if(!String(data.brokerages||'').trim())return 'Selecione a corretora responsável por esta proposta/apólice.';
     if(Number(data.commissionPercent||0)>0&&!Number(data.netPremium||0))return 'Informe o prêmio líquido para calcular a comissão.';
     if(Number(data.installmentCount||0)>0&&!Number(data.premium||0))return 'Informe o prêmio total para gerar o plano de parcelas.';
-    const dup=list(recordKind).find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
+    const dup=[...list('proposal'),...list('policy')].find(r=>r.id!==editing?.id&&String(r.data.clientId)===String(data.clientId)&&norm(r.data.insurer)===norm(data.insurer)&&norm(r.data.number)===norm(data.number)&&norm(r.data.branch)===norm(data.branch)&&String(r.data.start||'')===String(data.start||'')&&String(r.data.end||'')===String(data.end||''));
     if(dup)return 'Já existe um registro com este cliente, seguradora, ramo, número e vigência.';
   }
   if(current==='claim'){
@@ -2040,7 +2065,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const visibleInsuranceIds=new Set(insurances.map(r=>r.id));
   const docs=clientRelatedDocuments(clientId);
   const storedDocs=docs.filter(documentAvailable);
-  const currentPeriodInsurances=insurances.filter(r=>insurancePeriodState(r).key==='current');
+  const currentPeriodInsurances=insurances.filter(isContractInPeriod);
   const expiredInsurances=insurances.filter(r=>insurancePeriodState(r).key==='expired');
   const futureInsurances=insurances.filter(r=>insurancePeriodState(r).key==='future');
   const undatedInsurances=insurances.filter(r=>insurancePeriodState(r).key==='unknown');
@@ -2083,7 +2108,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     return `${periodHeading}
       <article class="insurance-card">
         <div class="insurance-card-head">
-          <div><span class="record-type">${r.kind==='policy'?'APÓLICE':'PROPOSTA'}</span><h4>${esc(r.data.number||'Sem número')}</h4></div>
+          <div><span class="record-type">CONTRATO</span><h4>${esc(r.data.number||'Sem número')}</h4></div>
           <span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'Cadastrado')}</span>
         </div>
         <div class="insurance-card-grid">
@@ -2163,7 +2188,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
 
     <section class="detail-section">
       <div class="section-title-row client-contract-heading">
-        <div><h3>Propostas e apólices — histórico completo</h3><p>Todas as vigências, inclusive encerradas, futuras e em análise. O status da proposta não é confirmação de emissão. Histórico vinculado ao CPF/CNPJ e à corretora de cada contrato.</p></div>
+        <div><h3>Contratos — histórico completo</h3><p>Todas as vigências, inclusive encerradas, futuras e em análise. O status da proposta não é confirmação de emissão. Histórico vinculado ao CPF/CNPJ e à corretora de cada contrato.</p></div>
         <label class="inline-filter">Corretora
           <select id="clientBrokerageFilter">
             <option value="all">Todas</option>
