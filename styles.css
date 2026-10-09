@@ -2990,3 +2990,167 @@ html[data-theme="light"] dialog{
   .portfolio-list-guide label{width:100%}
   .portfolio-list-guide select{max-width:100%}
 }
+
+
+/* Dashboard v20.22 — hierarquia de indicadores por unidade de contagem */
+.dashboard-topic{
+  margin:0 0 18px;
+  padding:21px;
+  background:#fff;
+  border:1px solid #e6dfd2;
+  border-radius:14px;
+  box-shadow:0 5px 18px rgba(42,44,49,.035);
+}
+.dashboard-topic-heading{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  margin-bottom:16px;
+}
+.dashboard-topic-heading h3{
+  color:#1b303e;
+  font-size:18px;
+  line-height:1.25;
+  letter-spacing:-.01em;
+  margin:3px 0 4px;
+}
+.dashboard-topic-heading p{
+  margin:0;
+  font-size:12px;
+  line-height:1.5;
+  color:#65727d;
+}
+.dashboard-topic-actions{display:flex;gap:8px;flex-wrap:wrap}
+.dashboard-main-kpis,.dashboard-import-grid,.dashboard-finance-kpis{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+.dashboard-kpi,.dashboard-import-grid>div,.dashboard-finance-kpis>div{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  background:#f9f8f5;
+  border:1px solid #ece7dd;
+  border-radius:11px;
+  min-width:0;
+  padding:16px 17px;
+}
+.dashboard-kpi-current{
+  background:#f5f8f5;
+  border-color:#d9e6da;
+}
+.dashboard-kpi>span,.dashboard-import-grid span,.dashboard-finance-kpis span,
+.dashboard-premium-pair span{
+  color:#63727f;
+  font-size:11px;
+  font-weight:750;
+  line-height:1.4;
+}
+.dashboard-kpi strong,.dashboard-import-grid strong,.dashboard-finance-kpis strong{
+  margin:7px 0 4px;
+  color:#193548;
+  font-size:29px;
+  line-height:1.12;
+  letter-spacing:-.03em;
+  font-weight:800;
+}
+.dashboard-kpi strong em,.dashboard-import-grid strong em{
+  font-size:15px;
+  font-style:normal;
+  color:#7a8590;
+  font-weight:600;
+  letter-spacing:0;
+}
+.dashboard-kpi small,.dashboard-import-grid small,.dashboard-finance-kpis small,
+.dashboard-premium-pair small{
+  font-size:11px;
+  color:#788692;
+  line-height:1.45;
+}
+.dashboard-relationship{
+  margin-top:13px;
+  padding:14px 16px;
+  background:#fafaf9;
+  border:1px solid #ebe8e1;
+  border-radius:10px;
+}
+.dashboard-relationship-head{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:center;
+  color:#3e5361;
+  font-size:12px;
+}
+.dashboard-relationship-head span{font-weight:800;color:#46694f}
+.dashboard-ratio{
+  height:9px;
+  border-radius:20px;
+  overflow:hidden;
+  margin:11px 0 9px;
+  background:#e8ece8;
+}
+.dashboard-ratio i{
+  display:block;
+  height:100%;
+  border-radius:20px;
+  background:#66876d;
+}
+.dashboard-relationship p{
+  margin:0;
+  color:#596b78;
+  font-size:11px;
+  line-height:1.55;
+}
+.dashboard-relationship p small{
+  display:inline;
+  color:#86919c;
+}
+.dashboard-premium-pair{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin-top:12px;
+}
+.dashboard-premium-pair>div{
+  padding:13px 16px;
+  border:1px solid #e8e6df;
+  background:#fff;
+  border-radius:10px;
+}
+.dashboard-premium-pair strong{
+  display:block;
+  font-size:21px;
+  margin:5px 0 3px;
+  color:#1b3240;
+  letter-spacing:-.02em;
+}
+.dashboard-premium-pair small{display:block}
+.dashboard-caution{
+  margin:11px 1px 0;
+  font-size:11px;
+  color:#936d32;
+}
+.dashboard-import-grid{grid-template-columns:1.3fr repeat(3,minmax(0,1fr))}
+.dashboard-import-grid strong{font-size:24px}
+.dashboard-import-total strong{font-size:29px}
+.dashboard-import-grid .dashboard-import-total{
+  background:#f4f6f6;
+  border-color:#e4e9eb;
+}
+.dashboard-finance-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.dashboard-finance-kpis strong{font-size:20px;overflow-wrap:anywhere}
+.dashboard-operations-heading{margin:20px 0 12px;padding:0 4px}
+@media(max-width:1150px){
+  .dashboard-import-grid,.dashboard-finance-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .dashboard-topic{padding:14px}
+  .dashboard-topic-heading{flex-direction:column;gap:10px}
+  .dashboard-main-kpis,.dashboard-import-grid,.dashboard-finance-kpis,.dashboard-premium-pair{grid-template-columns:1fr}
+  .dashboard-kpi strong{font-size:26px}
+  .dashboard-premium-pair strong{font-size:20px}
+}
