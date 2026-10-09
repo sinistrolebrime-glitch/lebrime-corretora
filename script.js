@@ -1111,8 +1111,9 @@ const config={
       ['Corretora',r=>String(dataById(r.data.policyId||r.data.proposalId).brokerages||dataById(r.data.policyId||r.data.proposalId).brokerage||'—').replace(/\|/g,' · ')],
       ['Produtor',r=>nameById(r.data.producerId)],
       ['Prêmio líquido',r=>money(r.data.netPremium)],
-      ['%',r=>String(r.data.commissionPercent||0)+'%'],
+      ['Comissão cheia %',r=>String(r.data.commissionPercent||0)+'%'],
       ['Comissão bruta',r=>money(r.data.expected)],
+      ['Após taxa FF',r=>money(r.data.afterFf)],
       ['Taxa FF',r=>money(r.data.ffFee)],
       ['Taxa Lebrime %',r=>String(r.data.lebrimePercent||0)+'%'],
       ['Taxa Lebrime',r=>money(r.data.lebrimeNet)],
@@ -1698,6 +1699,16 @@ function commissionSummary(rows){
       <span class="chip">Recebida: ${money(received)}</span>
       <span class="chip">Paga a produtores: ${money(paid)}</span>
       <span class="chip">Lucro realizado: ${money(received-paid)}</span>
+    </div>
+    <div class="commission-rules-overview">
+      <strong>Regra automática de comissionamento — percentuais sobre a comissão bruta cheia</strong>
+      <div class="commission-rules-grid">
+        <div><b>FF Apolinário / Homeni / Eólica · Leandro</b><span>FF 30% · Produtor 70% · Lebrime 0%</span></div>
+        <div><b>FF Apolinário / Homeni / Eólica · Demais</b><span>FF 30% · Produtor 60% · Lebrime 10%</span></div>
+        <div><b>Lebrime · Leandro</b><span>FF 0% · Produtor 100% · Lebrime 0%</span></div>
+        <div><b>Lebrime · Demais</b><span>FF 0% · Produtor 60% · Lebrime 40%</span></div>
+      </div>
+      <small>Comissão recebida: valor após a taxa FF, quando houver. Lucro realizado: comissão recebida menos repasses pagos aos produtores.</small>
     </div>`;
 }
 
