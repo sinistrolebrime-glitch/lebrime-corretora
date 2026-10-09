@@ -886,10 +886,13 @@ const config={
   client:{
     title:'Cliente',
     columns:[
-      ['Nome',r=>r.data.name],
+      ['Cliente',r=>r.data.name],
       ['CPF/CNPJ',r=>r.data.document],
-      ['Telefone',r=>r.data.mobile||r.data.phone],
-      ['Cidade',r=>[r.data.city,r.data.state].filter(Boolean).join('/')]
+      ['Situação da ficha',r=>clientPortfolioState(r.id).label],
+      ['Apólices no prazo',r=>insuranceRowsForClient(r.id).filter(isPolicyInPeriod).length],
+      ['Propostas no período',r=>insuranceRowsForClient(r.id).filter(isProposalInPeriod).length],
+      ['Histórico total',r=>insuranceRowsForClient(r.id).length],
+      ['Último vencimento',r=>clientLastPeriod(r.id)]
     ],
     fields:[
       ['personType','Tipo','select',['Pessoa Jurídica','Pessoa Física']],
@@ -948,9 +951,10 @@ const config={
       ['Seguradora',r=>r.data.insurer],
       ['Ramo',r=>r.data.branch],
       ['Produtor',r=>producerLabelOf(r)],
-      ['Vigência',r=>date(r.data.end)],
+      ['Vigência',r=>date(r.data.start)+' a '+date(r.data.end)],
+      ['Situação da vigência',r=>insurancePeriodState(r).label],
       ['Prêmio',r=>money(r.data.premium)],
-      ['Status',r=>r.data.status]
+      ['Status comercial',r=>r.data.status||'Não informado']
     ],
     fields:[
       ['_kind','Tipo de registro','select',['proposal','policy']],
@@ -1263,6 +1267,18 @@ function renderList(){
 
   const q=searchKey($('#searchInput').value);
   if(q)rows=rows.filter(r=>current==='client'?clientSearchText(r).includes(q):genericSearchText(r).includes(q));
+  if(current==='client'&&clientPortfolioFilter!=='all')
+    rows=rows.filter(r=>clientPortfolioState(r.id).key===clientPortfolioFilter);
+  if(current==='insurance'&&insurancePortfolioFilter!=='all')
+    rows=rows.filter(r=>{
+      const stage=insurancePeriodState(r).key;
+      if(insurancePortfolioFilter==='policy')return isPolicyInPeriod(r);
+      if(insurancePortfolioFilter==='proposal')return isProposalInPeriod(r);
+      if(insurancePortfolioFilter==='expired')return stage==='expired';
+      if(insurancePortfolioFilter==='future')return stage==='future';
+      if(insurancePortfolioFilter==='review')return stage==='unknown';
+      return true;
+    });
 
   if(current==='payment')rows.sort((a,b)=>String(a.data.due||'').localeCompare(String(b.data.due||'')));
   if(current==='insurance')rows.sort((a,b)=>String(b.data.start||'').localeCompare(String(a.data.start||'')));
@@ -1273,7 +1289,24 @@ function renderList(){
   });
 
   $('#listMeta').textContent=`${rows.length} registro(s)`;
-  if(current==='payment')$('#filters').innerHTML=paymentFilterHtml(list('payment'))+paymentSummary(rows);
+  if(current==='client'){
+    const categories=[
+      ['all','Todos os clientes'],['policy','Apólice no prazo'],
+      ['proposal','Somente proposta no período'],['history','Somente histórico vencido'],
+      ['future','Vigência futura'],['review','Vigência a conferir'],['none','Sem contratos']
+    ];
+    $('#filters').innerHTML=`
+      <div class="portfolio-list-guide">
+        <div><strong>Cadastro de clientes</strong><p>Cada pessoa ou empresa aparece uma vez. A ficha reúne todos os anos e documentos, mesmo vencidos.
+          Os números de propostas não são apólices confirmadas.</p></div>
+        <label>Mostrar
+          <select id="clientPortfolioFilter">
+            ${categories.map(([key,label])=>`<option value="${key}" ${clientPortfolioFilter===key?'selected':''}>${label}</option>`).join('')}
+          </select>
+        </label>
+      </div>`;
+  }
+  else if(current==='payment')$('#filters').innerHTML=paymentFilterHtml(list('payment'))+paymentSummary(rows);
   else if(current==='commission')$('#filters').innerHTML=commissionFilterHtml(list('commission'))+commissionSummary(rows);
   else if(current==='renewal')$('#filters').innerHTML=renewalFilterHtml(allRenewals);
   else if(current==='task')$('#filters').innerHTML=taskFilterHtml(list('task'))+taskSummary(rows);
@@ -1281,9 +1314,24 @@ function renderList(){
   else if(current==='claim')$('#filters').innerHTML=claimFilterHtml(list('claim'))+claimSummary(rows);
   else if(current==='insurance'){
     const pendingProducer=rows.filter(r=>r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId).length;
-    $('#filters').innerHTML=pendingProducer
-      ?`<span class="chip danger">Produtor pendente: ${pendingProducer}</span><span class="chip">Propostas Porto importadas exigem definição manual do produtor</span>`
-      :'';
+    const categories=[
+      ['all','Todo o histórico'],['policy','Apólices no prazo'],
+      ['proposal','Propostas no período'],['expired','Vigências encerradas'],
+      ['future','Vigências futuras'],['review','Vigência sem data']
+    ];
+    $('#filters').innerHTML=`
+      <div class="portfolio-list-guide">
+        <div><strong>Propostas e apólices são registros diferentes</strong>
+          <p>A coluna de vigência indica datas. A coluna de status comercial indica análise, emissão, contratação ou cancelamento.
+          Uma proposta no prazo não equivale a uma apólice emitida.</p>
+          ${pendingProducer?`<span class="chip danger">Produtores pendentes: ${pendingProducer}</span>`:''}
+        </div>
+        <label>Mostrar
+          <select id="insurancePortfolioFilter">
+            ${categories.map(([key,label])=>`<option value="${key}" ${insurancePortfolioFilter===key?'selected':''}>${label}</option>`).join('')}
+          </select>
+        </label>
+      </div>`;
   }else $('#filters').innerHTML='';
 
   $('#tableHead').innerHTML='<tr>'+c.columns.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'<th></th></tr>';
@@ -1315,7 +1363,14 @@ function renderList(){
       if(current==='insurance'&&label==='Produtor'&&r.kind==='proposal'&&r.data.producerPending&&!r.data.producerId){
         return '<td><span class="status-pill corporate-status warning">Pendente — preencher</span></td>';
       }
-      if(['Status','Cobrança','Operação','Origem'].includes(label)){
+      if(current==='client'&&label==='Situação da ficha'){
+        const stage=clientPortfolioState(r.id).key;
+        return `<td><span class="portfolio-stage portfolio-stage-${stage}">${esc(value)}</span></td>`;
+      }
+      if(current==='insurance'&&label==='Situação da vigência'){
+        return `<td><span class="portfolio-stage portfolio-stage-${insurancePeriodState(r).key}">${esc(value)}</span></td>`;
+      }
+      if(['Status','Status comercial','Cobrança','Operação','Origem'].includes(label)){
         const tone=statusTone(value);
         return `<td><span class="status-pill corporate-status ${tone}">${esc(value)}</span></td>`;
       }
@@ -1341,6 +1396,10 @@ function renderList(){
     return '<tr>'+cells+`<td class="actions">${editAction}${openFile}${insuranceFile}</td></tr>`;
   }).join(''):'<tr><td colspan="'+(c.columns.length+1)+'"><div class="empty">Nenhum registro encontrado.</div></td></tr>';
 
+  const clientFilterControl=$('#clientPortfolioFilter');
+  if(clientFilterControl)clientFilterControl.onchange=()=>{clientPortfolioFilter=clientFilterControl.value;renderList();};
+  const insuranceFilterControl=$('#insurancePortfolioFilter');
+  if(insuranceFilterControl)insuranceFilterControl.onchange=()=>{insurancePortfolioFilter=insuranceFilterControl.value;renderList();};
   document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.edit)));
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.open)));
   document.querySelectorAll('[data-open-insurance-pdf]').forEach(b=>b.onclick=()=>openInsuranceDocument(rowById(b.dataset.openInsurancePdf)));
