@@ -10,9 +10,21 @@
       document.documentElement.dataset.theme='light';
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=20.20">
+  <link rel="stylesheet" href="styles.css?v=20.21">
 </head>
 <body>
+  <div id="loadingView" class="auth-shell" role="status" aria-live="polite">
+    <div class="auth-card">
+      <div class="brand-mini">LEBRIME</div>
+      <h1>Carregando carteira</h1>
+      <p>Consultando clientes, contratos, prêmios e comissões no banco de dados.</p>
+      <div id="loadingError" class="error-text"></div>
+      <div class="dialog-actions">
+        <button id="reloadPortfolioBtn" type="button" class="btn primary">Tentar novamente</button>
+        <button id="loadingLogoutBtn" type="button" class="btn ghost">Entrar novamente</button>
+      </div>
+    </div>
+  </div>
   <div id="loginView" class="auth-shell hidden">
     <form id="loginForm" class="auth-card">
       <div class="brand-mini">LEBRIME</div>
@@ -34,7 +46,7 @@
             <strong>Portal Lebrime</strong>
             <span>Corretora de Seguros</span>
           </div>
-          <small class="version-badge">v20.20</small>
+          <small class="version-badge">v20.21</small>
         </div>
 
         <div class="portal-search">
@@ -177,6 +189,6 @@
     </form>
   </dialog>
 
-  <script src="script.js?v=20.20"></script>
+  <script src="script.js?v=20.21"></script>
 </body>
 </html>
