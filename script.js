@@ -462,6 +462,7 @@ async function login(password){
 
 function logout(){
   localStorage.removeItem(TOKEN_KEY);
+  $('#loadingView')?.classList.add('hidden');
   $('#appView').classList.add('hidden');
   $('#loginView').classList.remove('hidden');
 }
@@ -532,28 +533,34 @@ function commissionReconcileOps(){
 }
 
 async function loadRecords(){
-  const read=async()=>{
-    const j=await api('select',{orderUpdatedDesc:true});
-    records=(j.rows||[]).map(r=>({...r,data:r.data||{},version:Number(r.version||1),createdAt:r.created_at,updatedAt:r.updated_at}));
-  };
-  await read();
-  const ops=commissionReconcileOps();
-  if(ops.length){
-    await api('write',{ops});
-    await read();
-  }
+  // Apenas leitura na abertura. As comissões são sincronizadas pelo banco,
+  // evitando gravar milhares de operações durante o carregamento da página.
+  const j=await api('select',{orderUpdatedDesc:true});
+  if(!Array.isArray(j.rows))throw new Error('A consulta não retornou a carteira.');
+  records=j.rows.map(r=>({...r,data:r.data||{},version:Number(r.version||1),createdAt:r.created_at,updatedAt:r.updated_at}));
 }
 
 async function boot(){
   if(!token()){logout();return;}
+  const loading=$('#loadingView');
+  const loadError=$('#loadingError');
+  if(loading)loading.classList.remove('hidden');
+  if(loadError)loadError.textContent='';
+  $('#loginView').classList.add('hidden');
+  $('#appView').classList.add('hidden');
   try{
     await loadRecords();
     $('#loginView').classList.add('hidden');
+    if(loading)loading.classList.add('hidden');
     $('#appView').classList.remove('hidden');
     renderNav();
     navigate('overview');
   }catch(e){
-    logout();
+    if(!token()){logout();return;}
+    // Conservar a sessão quando o banco ou a conexão falhar temporariamente.
+    if(loading)loading.classList.remove('hidden');
+    if(loadError)loadError.textContent='Não foi possível carregar os dados do sistema. '+String(e?.message||e);
+    console.error('Erro ao carregar a carteira Lebrime:',e);
   }
 }
 
@@ -2481,6 +2488,8 @@ async function openDocument(entry){
   alert('O registro deste documento foi localizado, mas o arquivo físico ainda não está disponível. Use “Regularizar arquivo” para anexar o PDF sem criar duplicidade.');
 }
 
+$('#reloadPortfolioBtn').onclick=()=>boot();
+$('#loadingLogoutBtn').onclick=logout;
 $('#loginForm').onsubmit=async e=>{
   e.preventDefault();$('#loginError').textContent='';
   try{await login($('#loginPassword').value)}catch(err){$('#loginError').textContent=err.message}
