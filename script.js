@@ -107,10 +107,26 @@ const searchKey=v=>fold(v).replace(/[^a-z0-9]/g,'');
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(v)||0)/100);
 const parseMoney=v=>Math.max(0,Math.round(Number(String(v||'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''))*100)||0);
 const date=v=>v?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(new Date(v+'T12:00:00Z')):'—';
-const rowById=id=>records.find(r=>r.id===id);
+// Rebuild read indexes only when a successful reload replaces the snapshot.
+let indexedRecords=null;
+let recordIds=new Map();
+let recordKinds=new Map();
+let cachedPortfolio=null;
+let clientContracts=new Map();
+function ensureRecordIndexes(){
+  if(indexedRecords===records)return;
+  recordIds=new Map();recordKinds=new Map();cachedPortfolio=null;clientContracts=new Map();
+  for(const row of records){
+    if(!recordIds.has(row.id))recordIds.set(row.id,row);
+    if(!recordKinds.has(row.kind))recordKinds.set(row.kind,[]);
+    recordKinds.get(row.kind).push(row);
+  }
+  indexedRecords=records;
+}
+const rowById=id=>{ensureRecordIndexes();return recordIds.get(id);};
 const dataById=id=>rowById(id)?.data||{};
 const nameById=id=>dataById(id).name||dataById(id).number||'—';
-const list=kind=>records.filter(r=>r.kind===kind);
+const list=kind=>{ensureRecordIndexes();return (recordKinds.get(kind)||[]).slice();};
 const insuranceDocuments=insurance=>list('document').filter(d=>
   String(d.data.policyId||'')===insurance.id||String(d.data.proposalId||'')===insurance.id
 );
@@ -162,6 +178,8 @@ const isProposalInPeriod=row=>row?.kind==='proposal'&&isContractInPeriod(row);
 
 // Carteira Lebrime: proposta e apólice são contratos equivalentes.
 const portfolioRows=()=>{
+  ensureRecordIndexes();
+  if(cachedPortfolio)return cachedPortfolio.slice();
   const unique=new Map();
   for(const row of [...list('proposal'),...list('policy')]){
     const status=fold(row.data.status||'');
@@ -174,10 +192,19 @@ const portfolioRows=()=>{
     const previous=unique.get(key);
     if(!previous||(row.kind==='policy'&&previous.kind!=='policy')||(!Number(previous.data.premium||0)&&Number(d.premium||0)))unique.set(key,row);
   }
-  return [...unique.values()];
+  cachedPortfolio=[...unique.values()];
+  for(const row of cachedPortfolio){
+    const key=String(row.data.clientId||'');
+    if(!clientContracts.has(key))clientContracts.set(key,[]);
+    clientContracts.get(key).push(row);
+  }
+  return cachedPortfolio.slice();
 };
-const insuranceRowsForClient=clientId=>portfolioRows()
-  .filter(r=>String(r.data.clientId||'')===String(clientId||''));
+const insuranceRowsForClient=clientId=>{
+  ensureRecordIndexes();
+  if(!cachedPortfolio)portfolioRows();
+  return (clientContracts.get(String(clientId||''))||[]).slice();
+};
 const effectiveCommissionRows=()=>{
   const ids=new Set(portfolioRows().map(r=>r.id));
   const result=new Map();
@@ -440,20 +467,32 @@ const brokerageMatches=(insurance,value)=>value==='all'||String(insurance?.data?
 const uniqueSorted=values=>[...new Set(values.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'));
 
 async function api(action,body={},opts={}){
+  const timedRead=['select','login'].includes(action);
+  const controller=new AbortController();
+  const timer=timedRead?setTimeout(()=>controller.abort(),30000):null;
+  const session=token();
   const headers={...(opts.headers||{})};
-  if(token())headers.authorization='Bearer '+token();
+  if(session)headers.authorization='Bearer '+session;
   if(!(opts.raw))headers['content-type']='application/json';
+  try{
   const r=await fetch(API+'?action='+encodeURIComponent(action)+(opts.key?'&key='+encodeURIComponent(opts.key):''),{
-    method:opts.method||'POST',headers,body:opts.raw?body:JSON.stringify(body)
+    method:opts.method||'POST',headers,body:opts.raw?body:JSON.stringify(body),signal:controller.signal
   });
   if(opts.blob){
     if(!r.ok)throw new Error('Não foi possível abrir o arquivo.');
     return await r.blob();
   }
   const j=await r.json().catch(()=>({}));
-  if(r.status===401&&action!=='login'){logout();throw new Error('Sua sessão expirou. Entre novamente.');}
+  if(r.status===401&&action!=='login'){
+    if(token()===session)logout();
+    throw new Error('Sua sessão expirou. Entre novamente.');
+  }
   if(!r.ok)throw new Error(j.error||'Falha na operação.');
   return j;
+  }catch(error){
+    if(controller.signal.aborted)throw new Error('A consulta demorou mais de 30 segundos. Verifique sua conexão e tente novamente.');
+    throw error;
+  }finally{if(timer)clearTimeout(timer);}
 }
 
 async function login(password){
@@ -463,6 +502,7 @@ async function login(password){
 }
 
 function logout(){
+  bootGeneration++;
   localStorage.removeItem(TOKEN_KEY);
   $('#loadingView')?.classList.add('hidden');
   $('#appView').classList.add('hidden');
@@ -536,35 +576,47 @@ function commissionReconcileOps(){
   return ops;
 }
 
-async function loadRecords(){
+async function loadRecords(isCurrent=()=>true){
   // Apenas leitura na abertura. As comissões são sincronizadas pelo banco,
   // evitando gravar milhares de operações durante o carregamento da página.
   const j=await api('select',{orderUpdatedDesc:true});
   if(!Array.isArray(j.rows))throw new Error('A consulta não retornou a carteira.');
+  if(!isCurrent())return;
   records=j.rows.map(r=>({...r,data:r.data||{},version:Number(r.version||1),createdAt:r.created_at,updatedAt:r.updated_at}));
 }
 
+let bootGeneration=0;
 async function boot(){
+  const generation=++bootGeneration;
   if(!token()){logout();return;}
+  const session=token();
+  const isCurrent=()=>generation===bootGeneration&&token()===session;
   const loading=$('#loadingView');
   const loadError=$('#loadingError');
+  const retry=$('#reloadPortfolioBtn');
+  retry.disabled=true;
+  retry.textContent='Carregando…';
   if(loading)loading.classList.remove('hidden');
   if(loadError)loadError.textContent='';
   $('#loginView').classList.add('hidden');
   $('#appView').classList.add('hidden');
   try{
-    await loadRecords();
+    await loadRecords(isCurrent);
+    if(!isCurrent())return;
     $('#loginView').classList.add('hidden');
     if(loading)loading.classList.add('hidden');
     $('#appView').classList.remove('hidden');
     renderNav();
     navigate('overview');
   }catch(e){
+    if(generation!==bootGeneration)return;
     if(!token()){logout();return;}
     // Conservar a sessão quando o banco ou a conexão falhar temporariamente.
     if(loading)loading.classList.remove('hidden');
     if(loadError)loadError.textContent='Não foi possível carregar os dados do sistema. '+String(e?.message||e);
     console.error('Erro ao carregar a carteira Lebrime:',e);
+  }finally{
+    if(generation===bootGeneration){retry.disabled=false;retry.textContent='Tentar novamente';}
   }
 }
 
@@ -2577,7 +2629,10 @@ $('#reloadPortfolioBtn').onclick=()=>boot();
 $('#loadingLogoutBtn').onclick=logout;
 $('#loginForm').onsubmit=async e=>{
   e.preventDefault();$('#loginError').textContent='';
+  const button=$('#loginForm button[type="submit"]');
+  button.disabled=true;
   try{await login($('#loginPassword').value)}catch(err){$('#loginError').textContent=err.message}
+  finally{button.disabled=false;}
 };
 $('#logoutBtn').onclick=logout;
 $('#themeToggle').onclick=toggleTheme;
