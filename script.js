@@ -217,6 +217,15 @@ const effectiveCommissionRows=()=>{
   }
   return [...result.values()];
 };
+// Regra da carteira Lebrime: o repasse ao produtor é considerado pago
+// quando a proposta/apólice está cadastrada com produtor e comissão confirmados.
+// Registros avulsos/antigos sem contrato mantêm o valor de pagamento manual.
+const paidToProducerOf=commission=>{
+  const calculated=Math.max(0,Number(commission?.data?.producerExpected||0));
+  const linked=rowById(commission?.data?.proposalId||commission?.data?.policyId);
+  if(linked&&['proposal','policy'].includes(linked.kind)&&calculated>0)return calculated;
+  return Math.max(0,Number(commission?.data?.transferPaid||0));
+};
 
 // Histórico completo: a vigência encerrada não remove o contrato da ficha.
 // A situação da vigência é diferente da situação comercial (em análise, emitida etc.).
@@ -783,7 +792,7 @@ function renderDashboard(){
   const claimActionsDue=activeClaims.filter(r=>r.data.nextActionDate&&r.data.nextActionDate<today());
   const comm=effectiveCommissionRows();
   const received=comm.reduce((s,r)=>s+Number(r.data.received||0),0);
-  const paid=comm.reduce((s,r)=>s+Number(r.data.transferPaid||0),0);
+  const paid=comm.reduce((s,r)=>s+paidToProducerOf(r),0);
   const gross=comm.reduce((s,r)=>s+Number(r.data.expected||0),0);
   const ff=comm.reduce((s,r)=>s+Number(r.data.ffFee||0),0);
   const producerExpected=comm.reduce((s,r)=>s+Number(r.data.producerExpected||0),0);
@@ -892,19 +901,22 @@ function renderDashboard(){
     </section>
 
     <section class="dashboard-topic" aria-labelledby="heading-financeiro">
-      <div class="dashboard-topic-heading">
-        <div><span class="section-kicker">03 / Financeiro</span>
-          <h3 id="heading-financeiro">Comissões e resultado</h3>
-          <p>Valores das comissões cadastradas, separados do prêmio da carteira.</p>
+      <div class="panel">
+        <div class="panel-head corporate-panel-head">
+          <div><span class="section-kicker">03 / Financeiro</span><h2 id="heading-financeiro">Comissões e repasses</h2></div>
+          <button class="link-btn" data-go="commission">Abrir comissões</button>
         </div>
-        <button type="button" class="btn ghost small" data-go="commission">Ver comissões</button>
+        <div class="finance-summary-grid">
+          <div><span>Comissão bruta</span><strong>${money(gross)}</strong></div>
+          <div><span>Recebida</span><strong>${money(received)}</strong></div>
+          <div><span>Taxa FF</span><strong>${money(ff)}</strong></div>
+          <div><span>Produtores</span><strong>${money(producerExpected)}</strong></div>
+          <div><span>Líquido Lebrime</span><strong>${money(lebrimeNet)}</strong></div>
+          <div><span>Pago a produtores</span><strong>${money(paid)}</strong></div>
+        </div>
+        <p class="muted" style="margin:12px 0 0;font-size:12px">Repasses aos produtores considerados pagos automaticamente nos contratos cadastrados com comissão definida.</p>
       </div>
-      <div class="dashboard-finance-kpis">
-        <div><span>Comissão bruta</span><strong>${money(gross)}</strong></div>
-        <div><span>Comissão recebida</span><strong>${money(received)}</strong></div>
-        <div><span>Repasses pagos aos produtores</span><strong>${money(paid)}</strong></div>
-        <div><span>Resultado realizado</span><strong>${money(received-paid)}</strong><small>Comissão recebida − repasses pagos</small></div>
-      </div>
+
     </section>
 
     <div class="dashboard-topic-heading dashboard-operations-heading">
@@ -984,21 +996,6 @@ function renderDashboard(){
               <div><strong>${esc(r.name)}</strong><span>${r.count} contrato(s) dentro da vigência</span></div>
               <strong>${money(r.premium)}</strong>
             </div>`).join(''):'<div class="empty compact">Nenhum contrato no período.</div>'}
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head corporate-panel-head">
-          <div><span class="section-kicker">Financeiro</span><h2>Comissões e repasses</h2></div>
-          <button class="link-btn" data-go="commission">Abrir comissões</button>
-        </div>
-        <div class="finance-summary-grid">
-          <div><span>Comissão bruta</span><strong>${money(gross)}</strong></div>
-          <div><span>Recebida</span><strong>${money(received)}</strong></div>
-          <div><span>Taxa FF</span><strong>${money(ff)}</strong></div>
-          <div><span>Produtores</span><strong>${money(producerExpected)}</strong></div>
-          <div><span>Líquido Lebrime</span><strong>${money(lebrimeNet)}</strong></div>
-          <div><span>Pago a produtores</span><strong>${money(paid)}</strong></div>
         </div>
       </div>
 
@@ -1174,8 +1171,8 @@ const config={
       ['Recebida pela Lebrime',r=>money(r.data.received)],
       ['Data recebimento',r=>date(r.data.receivedDate)],
       ['Status',r=>r.data.status||'Prevista'],
-      ['Paga ao produtor',r=>money(r.data.transferPaid)],
-      ['Lucro realizado',r=>money(Number(r.data.received||0)-Number(r.data.transferPaid||0))]
+      ['Paga ao produtor',r=>money(paidToProducerOf(r))],
+      ['Lucro realizado',r=>money(Number(r.data.received||0)-paidToProducerOf(r))]
     ],
     fields:[
       ['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['producerId','Produtor','ref','producer'],
@@ -1741,7 +1738,7 @@ function commissionSummary(rows){
   const lebrime=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeFee||0),0);
   const lebrimeNet=rows.reduce((sum,r)=>sum+Number(r.data.lebrimeNet||0),0);
   const received=rows.reduce((sum,r)=>sum+Number(r.data.received||0),0);
-  const paid=rows.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
+  const paid=rows.reduce((sum,r)=>sum+paidToProducerOf(r),0);
   return `
     <div class="summary-strip">
       <span class="chip">Comissão bruta: ${money(gross)}</span>
@@ -1760,7 +1757,7 @@ function commissionSummary(rows){
         <div><b>Lebrime · Leandro</b><span>FF 0% · Produtor 100% · Lebrime 0%</span></div>
         <div><b>Lebrime · Demais</b><span>FF 0% · Produtor 60% · Lebrime 40%</span></div>
       </div>
-      <small>Comissão recebida: valor após a taxa FF, quando houver. Lucro realizado: comissão recebida menos repasses pagos aos produtores.</small>
+      <small>Comissão recebida: valor após a taxa FF, quando houver. Propostas/apólices cadastradas com comissão apurada têm repasse considerado pago automaticamente. Lucro realizado: comissão recebida menos repasses pagos aos produtores.</small>
     </div>`;
 }
 
@@ -2101,7 +2098,7 @@ function openProducerDetail(producerId){
   const totalLebrimeNet=insurances.reduce((sum,r)=>sum+lebrimeNetOf(r),0);
   const producerCommissions=effectiveCommissionRows().filter(r=>String(r.data.producerId||'')===String(producerId));
   const received=producerCommissions.reduce((sum,r)=>sum+Number(r.data.received||0),0);
-  const transferPaid=producerCommissions.reduce((sum,r)=>sum+Number(r.data.transferPaid||0),0);
+  const transferPaid=producerCommissions.reduce((sum,r)=>sum+paidToProducerOf(r),0);
   const activeCount=insurances.filter(isInsuranceActive).length;
   const special=isLeandro(producerId);
   const rule=special
