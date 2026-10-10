@@ -285,7 +285,16 @@ const fipeHttpCache=new Map();
 const fipeSeenThisSession=new Set();
 const fipeUpper=value=>fold(String(value||'')).toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 const fipeTokens=value=>fipeUpper(value).split(' ').filter(x=>x.length>=2&&!/^(AUT|AUTO|MEC|MECANICO|FLEX|GAS|GASOLINA|DIESEL|DSL|TURBO|TB|4P|5P|2P|12V|16V|8V|CVT|AT|MT|ABS|4X2|4X4)$/.test(x));
-const fipeModelOf=item=>String(item.data.makeModel||item.data.vehicle||item.data.model||item.data.description||'').trim();
+const fipeModelOf=item=>{
+  const d=item.data||{};
+  if(d.makeModel||d.vehicle||d.model||d.description)return String(d.makeModel||d.vehicle||d.model||d.description).trim();
+  if(['proposal','policy'].includes(item.kind)){
+    const notes=String(d.notes||'');
+    const match=notes.match(/(?:^|\s)Ve[ií]culo\s+(.{5,140}?)(?=,\s*placa|\.\s|;|$)/i);
+    return match?match[1].trim():'';
+  }
+  return '';
+};
 const fipeBrandsAliases={
   VW:'VOLKSWAGEN',VOLKSWAGEN:'VOLKSWAGEN',GM:'CHEVROLET',
   CHEVROLET:'CHEVROLET',MB:'MERCEDES',MERCEDES:'MERCEDES',
@@ -334,7 +343,8 @@ async function fipeEstimateModelOnly(item){
   const available=years.map(y=>({...y,year:Number(String(y.code||'').split('-')[0])}))
     .filter(y=>y.year>=1980&&y.year<=2026).sort((a,b)=>a.year-b.year);
   if(!available.length)throw new Error('Nenhum ano utilizável');
-  const knownYear=vehicleYearOf(item);
+  const notesYear=(String(item.data.notes||'').match(/(?:19|20)\d{2}\s*\/\s*((?:19|20)\d{2})\b/)||[])[1];
+  const knownYear=vehicleYearOf(item)||Number(notesYear||0);
   const mid=available[Math.floor((available.length-1)/2)].year;
   const chosenYear=knownYear||mid;
   const closest=available.slice().sort((a,b)=>Math.abs(a.year-chosenYear)-Math.abs(b.year-chosenYear));
@@ -359,13 +369,25 @@ async function fipeEstimateModelOnly(item){
   return {amount:estimate,model:price.model,modelCode:price.codeFipe||'',year:chosen.year,
     score:Math.round(match.score*100),detail};
 }
-const fipeCandidates=()=>list('insuredItem').filter(item=>{
-  const insurance=rowById(item.data.policyId||item.data.proposalId);
-  return insurance&&['proposal','policy'].includes(insurance.kind)&&
-    !validatedInsuredCents(item.data.insuredValue)&&
-    !validatedInsuredCents(item.data.estimatedInsuredValue)&&
-    (!!(fipeCodeOf(item)&&vehicleYearOf(item)&&fipeAdjustmentOf(item))||!!fipeModelOf(item));
-});
+const fipeCandidates=()=>{
+  const items=list('insuredItem').filter(item=>{
+    const insurance=rowById(item.data.policyId||item.data.proposalId);
+    return insurance&&['proposal','policy'].includes(insurance.kind)&&
+      !validatedInsuredCents(item.data.insuredValue)&&
+      !validatedInsuredCents(item.data.estimatedInsuredValue)&&
+      (!!(fipeCodeOf(item)&&vehicleYearOf(item)&&fipeAdjustmentOf(item))||!!fipeModelOf(item));
+  });
+  const withItems=new Set(list('insuredItem').map(item=>String(item.data.policyId||item.data.proposalId||'')));
+  const contracts=portfolioRows().filter(insurance=>{
+    const branch=fold(insurance.data.branch||'');
+    return /automovel|motocicleta|frota|caminhao|moto/.test(branch)&&
+      !withItems.has(String(insurance.id))&&
+      !validatedInsuredCents(insurance.data.insuredValue)&&
+      !validatedInsuredCents(insurance.data.estimatedInsuredValue)&&
+      !!fipeModelOf(insurance);
+  });
+  return [...items,...contracts];
+};
 async function updateFipeInsuredValues(){
   const button=$('#fipeValueRefreshBtn'),status=$('#fipeValueRefreshStatus');
   if(!button)return;
@@ -420,7 +442,7 @@ async function updateFipeInsuredValues(){
           estimated++;
         }catch(e){missing++;console.warn('Sem correspondência FIPE estimável',item.id,e);}
       }
-      if(updated)prepared.push({type:'update',kind:'insuredItem',id:item.id,
+      if(updated)prepared.push({type:'update',kind:item.kind,id:item.id,
         version:item.version,strict:true,updated_at:now(),data:updated});
     }
     if(prepared.length)await api('write',{ops:prepared});
