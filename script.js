@@ -280,6 +280,85 @@ const fipeFuelSuffixOf=item=>{
   return '';
 };
 let fipeAttemptCursor=0;
+
+const fipeHttpCache=new Map();
+const fipeSeenThisSession=new Set();
+const fipeUpper=value=>fold(String(value||'')).toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+const fipeTokens=value=>fipeUpper(value).split(' ').filter(x=>x.length>=2&&!/^(AUT|AUTO|MEC|MECANICO|FLEX|GAS|GASOLINA|DIESEL|DSL|TURBO|TB|4P|5P|2P|12V|16V|8V|CVT|AT|MT|ABS|4X2|4X4)$/.test(x));
+const fipeModelOf=item=>String(item.data.makeModel||item.data.vehicle||item.data.model||item.data.description||'').trim();
+const fipeBrandsAliases={
+  VW:'VOLKSWAGEN',VOLKSWAGEN:'VOLKSWAGEN',GM:'CHEVROLET',
+  CHEVROLET:'CHEVROLET',MB:'MERCEDES',MERCEDES:'MERCEDES',
+  CITROEN:'CITROEN',RENAULT:'RENAULT',HYUNDAI:'HYUNDAI'
+};
+const fipeCategoryOf=item=>{
+  const text=fipeUpper(fipeModelOf(item));
+  if(fipeCodeOf(item).startsWith('8')||/^(HONDA|YAMAHA|SUZUKI) (CG|BIZ|POP|CB|XRE|NXR|PCX|SAHARA|FAZER|FACTOR|MT|NMAX|GSX)/.test(text))return 'motorcycles';
+  if(fipeCodeOf(item).startsWith('5')||/^(SCANIA|DAF|IVECO|VOLVO FH|VOLVO FM)/.test(text))return 'trucks';
+  return 'cars';
+};
+async function fipeLoad(path){
+  if(fipeHttpCache.has(path))return fipeHttpCache.get(path);
+  const response=await fetch('https://fipe.parallelum.com.br/api/v2'+path);
+  if(!response.ok)throw new Error('Consulta FIPE HTTP '+response.status);
+  const data=await response.json();
+  fipeHttpCache.set(path,data);
+  return data;
+}
+const fipeScore=(target,candidate)=>{
+  const a=fipeTokens(target),b=fipeTokens(candidate);
+  if(!a.length||!b.length||a[0]!==b[0])return 0;
+  const hits=a.filter(x=>b.some(y=>y===x||(x.length>=4&&y.length>=4&&(x.startsWith(y)||y.startsWith(x))))).length;
+  return .8*hits/a.length+.2*hits/Math.max(a.length,b.length);
+};
+async function fipeEstimateModelOnly(item){
+  const display=fipeModelOf(item),text=fipeUpper(display),parts=text.split(' ');
+  if(parts.length<2)throw new Error('Marca/modelo insuficiente');
+  const type=fipeCategoryOf(item);
+  const brands=await fipeLoad('/'+type+'/brands?reference='+fipeReference2026);
+  if(!Array.isArray(brands))throw new Error('Marcas indisponíveis');
+  const alias=fipeBrandsAliases[parts[0]]||parts[0];
+  const brand=brands.find(x=>fipeUpper(x.name)===alias)||brands.find(x=>fipeUpper(x.name).includes(alias));
+  if(!brand)throw new Error('Marca não identificada');
+  let family=text.slice(parts[0].length).trim();
+  if(parts[0]==='MERCEDES'&&family.startsWith('BENZ '))family=family.slice(5);
+  if(fipeTokens(family).length<1)throw new Error('Modelo não identificado');
+  const models=await fipeLoad('/'+type+'/brands/'+encodeURIComponent(brand.code)+'/models?reference='+fipeReference2026);
+  if(!Array.isArray(models))throw new Error('Modelos indisponíveis');
+  const candidates=models.map(x=>({model:x,score:fipeScore(family,x.name)}))
+    .filter(x=>x.score>=.5).sort((a,b)=>b.score-a.score);
+  if(!candidates.length)throw new Error('Sem modelo FIPE compatível');
+  const match=candidates[0];
+  const years=await fipeLoad('/'+type+'/brands/'+encodeURIComponent(brand.code)+'/models/'+encodeURIComponent(match.model.code)+'/years?reference='+fipeReference2026);
+  if(!Array.isArray(years)||!years.length)throw new Error('Sem ano FIPE');
+  const available=years.map(y=>({...y,year:Number(String(y.code||'').split('-')[0])}))
+    .filter(y=>y.year>=1980&&y.year<=2026).sort((a,b)=>a.year-b.year);
+  if(!available.length)throw new Error('Nenhum ano utilizável');
+  const knownYear=vehicleYearOf(item);
+  const mid=available[Math.floor((available.length-1)/2)].year;
+  const chosenYear=knownYear||mid;
+  const closest=available.slice().sort((a,b)=>Math.abs(a.year-chosenYear)-Math.abs(b.year-chosenYear));
+  let chosen=closest[0];
+  const suffix=fipeFuelSuffixOf(item);
+  if(suffix){
+    const options=closest.filter(x=>Math.abs(x.year-chosenYear)===Math.abs(chosen.year-chosenYear));
+    chosen=options.find(x=>String(x.code).endsWith(suffix))||chosen;
+  }
+  const price=await fipeLoad('/'+type+'/brands/'+encodeURIComponent(brand.code)+'/models/'+encodeURIComponent(match.model.code)+'/years/'+encodeURIComponent(chosen.code)+'?reference='+fipeReference2026);
+  if(!fipeUpper(price.referenceMonth).includes('OUTUBRO')||!String(price.referenceMonth).includes('2026')||Number(price.modelYear)!==chosen.year)throw new Error('Data de referência FIPE divergente');
+  const marketCents=parseMoney(price.price);
+  if(!marketCents)throw new Error('FIPE sem preço');
+  const explicitFactor=fipeAdjustmentOf(item);
+  const factor=explicitFactor||100;
+  const estimate=Math.round(marketCents*factor/100);
+  if(!Number.isSafeInteger(estimate)||estimate<=0)throw new Error('Preço estimado inválido');
+  const detail='VALOR APROXIMADO FIPE outubro/2026, nome '+display+' associado a '+price.model+
+    ', ano '+chosen.year+(knownYear?' informado':' REPRESENTATIVO (ano ausente)')+
+    ', '+price.price+', fator '+factor+'%'+(explicitFactor?' declarado':' de referência, não declarado')+
+    ', correspondência '+Math.round(match.score*100)+'%. NÃO É LIMITE SEGURADO CONFIRMADO.';
+  return {amount:estimate,model:price.model,modelCode:price.codeFipe||'',year:chosen.year,
+    score:Math.round(match.score*100),detail};
+}
 const fipeCandidates=()=>list('insuredItem').filter(item=>{
   const insurance=rowById(item.data.policyId||item.data.proposalId);
   return insurance&&['proposal','policy'].includes(insurance.kind)&&
