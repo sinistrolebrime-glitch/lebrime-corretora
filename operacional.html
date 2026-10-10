@@ -22,6 +22,16 @@ dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px
 <style>
 .detail-contracts{max-height:240px;overflow:auto;margin-top:18px}.detail-contracts h3{margin:15px 0 8px;font-size:13px}.contract-line{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #e9edf2;font-size:12px}.contract-line b{display:block}.contract-line small{color:#748191}.status-line{color:#98743f}.searchpanel input{text-transform:none}#plate{text-transform:uppercase}#detail .detail-grid{margin-bottom:12px}
 </style>
+<style>
+.is-hidden{display:none!important}.monitor-panel{margin-bottom:18px}.monitor-head{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:18px}.monitor-head h2{font-size:17px;margin:0}.monitor-head small{color:#718095}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.metric{border:1px solid #e6e9ee;border-radius:12px;background:#fff;text-align:left;padding:14px 15px;min-height:94px}
+.metric.active{border-color:#a98853;background:#fff9ef;box-shadow:0 0 0 2px #ead9bc}.metric:hover{border-color:#b49a76}
+.metric strong{display:block;font-size:23px;color:#1e2c3b;line-height:1.2}.metric span{color:#647386;font-size:12px}.metric:first-child strong{color:#b05241}
+.monitor-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}.monitor-tools select,.monitor-tools input{height:42px;border:1px solid #dce2e9;border-radius:8px;background:#fff;padding:0 12px;min-width:210px}.monitor-tools .right{display:flex;gap:8px;align-items:center}.monitor-tools button{padding:9px 12px}
+.priority-overdue{color:#af463c;font-weight:700}.priority-soon{color:#926d35;font-weight:700}.priority-ok{color:#427459;font-weight:650}
+.warning-text{margin-top:14px;font-size:12px;color:#835e2c}.monitor-status{color:#667585;font-size:12px;padding:12px 0 0}
+@media(max-width:900px){.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.monitor-tools input,.monitor-tools select{min-width:100%;width:100%}.monitor-tools .right{width:100%}.monitor-tools .right button{flex:1}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -30,6 +40,8 @@ dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px
  <div><div class="caption">Área operacional</div><nav class="nav" aria-label="Menu operacional">
  <button type="button" class="active" data-tab="consulta"><span class="ico">⌕</span>Consulta de segurados</button>
  <button type="button" data-tab="apolices"><span class="ico">▤</span>Apólices e propostas</button>
+ <button type="button" data-tab="renewals"><span class="ico">↻</span>Renovações</button>
+ <button type="button" data-tab="payments"><span class="ico">▦</span>Parcelas</button>
  
  </nav></div>
  <div class="sidebar-bottom"><b>Perfil operacional</b><span>Somente consulta, documentos e acompanhamento de contratos. Sem informações de comissões.</span></div>
@@ -46,6 +58,16 @@ dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px
       <div class="field"><label for="cnpj">CNPJ</label><input id="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00"></div>
       <div class="field"><label for="plate">Placa</label><input id="plate" placeholder="ABC1D23" maxlength="7"></div>
     </div><div class="actions"><button type="button" class="btn" id="clear">Limpar</button><button type="submit" class="btn primary">Consultar →</button></div></form>
+  </section>
+  
+  <section id="monitorPanel" class="panel searchpanel monitor-panel is-hidden" aria-label="Painel de acompanhamento">
+    <div class="monitor-head"><div><h2 id="monitorTitle">Acompanhamento operacional</h2><small id="monitorPeriod"></small></div><button id="monitorRefresh" class="btn" type="button">Atualizar</button></div>
+    <div class="metric-grid" id="monitorMetrics"></div>
+    <div class="monitor-tools">
+      <div class="field"><label for="monitorFilter">Filtrar situação</label><select id="monitorFilter"></select></div>
+      <div class="right"><input id="monitorText" type="search" placeholder="Filtrar cliente ou contrato" aria-label="Filtrar resultados"><button id="monitorClear" class="btn" type="button">Limpar</button></div>
+    </div>
+    <div class="monitor-status" id="monitorStatus" aria-live="polite"></div>
   </section>
   <div class="info" role="note">Consulta à carteira LEBRIME. Este acesso apresenta dados operacionais sem comissões ou informações financeiras restritas.</div>
   <div class="results-head"><h2>Resultados da consulta</h2><span id="count" class="count">Aguardando pesquisa</span></div>
@@ -133,13 +155,131 @@ $('#searchForm').onsubmit=e=>{e.preventDefault();search()};
 $('#clear').onclick=()=>{$('#searchForm').reset();$('#results').innerHTML='<div class="empty"><b>Comece uma consulta</b>Pesquise por nome, CPF, CNPJ ou placa.</div>';$('#count').textContent='Aguardando pesquisa';$('#name').focus();};
 $('#logout').onclick=exit;
 $('#closeDetail').onclick=()=>$('#detail').close();
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
- document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));
- const view=b.dataset.tab;
- $('#pageHeading').textContent=view==='consulta'?'Encontre um cliente rapidamente.':'Apólices e propostas no mesmo lugar.';
- $('#pageSubheading').textContent=view==='consulta'?'Pesquise por nome, CPF, CNPJ ou placa. A ficha reúne os contratos e vigências.':'Pesquise por segurado, placa ou número. A ficha apresenta o histórico de seguros.';
- $('#name').focus();
-});
+let currentTab='consulta';
+let monitoringCache={renewals:null,payments:null};
+const filterOptions={
+ renewals:[['month','Vencendo nos próximos 30 dias'],['week','Próximos 7 dias'],['expired','Vencidos nos últimos 30 dias'],['ninety','Próximos 90 dias'],['all','Todos no período']],
+ payments:[['late','Em atraso (para cobrar)'],['week','Próximos 7 dias'],['month','Próximos 30 dias'],['noCharge','Não cobrar / apenas acompanhar'],['all','Todas as parcelas do período']]
+};
+const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(v)||0)/100);
+function priority(v,payment){
+ if(payment){
+  if(v.paid)return ['Pago','priority-ok'];
+  if(v.doNotCharge)return ['Não cobrar','priority-ok'];
+ }
+ if(v.days<0)return ['Atrasado '+Math.abs(v.days)+' dia(s)','priority-overdue'];
+ if(v.days===0)return ['Vence hoje','priority-overdue'];
+ if(v.days<=7)return ['Em '+v.days+' dia(s)','priority-soon'];
+ return ['Em '+v.days+' dias','priority-ok'];
+}
+function rowAllowed(x,filter,mode){
+ if(mode==='renewals'){
+  if(filter==='expired')return x.days<0;
+  if(filter==='week')return x.days>=0&&x.days<=7;
+  if(filter==='month')return x.days>=0&&x.days<=30;
+  if(filter==='ninety')return x.days>=0&&x.days<=90;
+  return true;
+ }
+ if(filter==='late')return !x.paid&&!x.doNotCharge&&x.days<0;
+ if(filter==='week')return !x.paid&&!x.doNotCharge&&x.days>=0&&x.days<=7;
+ if(filter==='month')return !x.paid&&!x.doNotCharge&&x.days>=0&&x.days<=30;
+ if(filter==='noCharge')return !x.paid&&x.doNotCharge;
+ return true;
+}
+function renderMonitor(){
+ const mode=currentTab,data=monitoringCache[mode];
+ if(!data)return;
+ const isPay=mode==='payments',active=$('#monitorFilter').value;
+ const metrics=isPay?[
+   ['late','Em atraso',data.counts?.late||0],
+   ['week','Vencem em 7 dias',data.counts?.week||0],
+   ['month','Vencem em 30 dias',data.counts?.month||0],
+   ['noCharge','Não cobrar',data.counts?.noCharge||0]
+ ]:[
+   ['expired','Vencidas',data.counts?.expired||0],
+   ['week','Próximos 7 dias',data.counts?.week||0],
+   ['month','Próximos 30 dias',data.counts?.month||0],
+   ['ninety','Próximos 90 dias',data.counts?.ninety||0]
+ ];
+ $('#monitorMetrics').innerHTML=metrics.map(([filter,label,count])=>
+  '<button type="button" class="metric '+(filter===active?'active':'')+'" data-filter="'+esc(filter)+'"><strong>'+esc(count)+'</strong><span>'+esc(label)+'</span></button>').join('');
+ $('#monitorMetrics').querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
+  $('#monitorFilter').value=b.dataset.filter;renderMonitor();
+ });
+ const term=normalize($('#monitorText').value);
+ const rows=(data.rows||[]).filter(r=>rowAllowed(r,active,mode)).filter(r=>
+   !term||normalize([r.clientName,r.contractNumber,r.number,r.insurer,r.branch,r.installment,r.collectionStatus].join(' ')).includes(term));
+ $('#count').textContent=rows.length+' registro(s) exibidos';
+ const head=isPay?['Segurado','Parcela','Contrato / seguradora','Vencimento','Valor','Situação','Ação']:
+                  ['Segurado','Contrato / seguradora','Ramo','Fim da vigência','Prazo','Situação','Ação'];
+ const tableRows=rows.slice(0,120).map((r,i)=>{
+   const [prio,style]=priority(r,isPay);
+   const base='<td><strong>'+esc(r.clientName||'Segurado')+'</strong><small>'+esc(r.branch||'')+'</small></td>';
+   const action='<td><button type="button" class="link-btn" data-open="'+i+'">Ver ficha</button></td>';
+   if(isPay){
+     return '<tr>'+base+'<td>'+esc(r.installment||'—')+'</td><td><strong>'+esc(r.contractNumber||'Sem número')+'</strong><small>'+esc(r.insurer||'')+'</small></td><td>'+esc(normDate(r.due))+'</td><td>'+esc(money(r.amount))+'</td><td><span class="'+style+'">'+esc(r.paid?'Pago':prio)+'</span><small>'+esc(r.collectionStatus||r.status||'')+'</small></td>'+action+'</tr>';
+   }
+   return '<tr>'+base+'<td><strong>'+esc(r.number||'Sem número')+'</strong><small>'+esc(r.insurer||'')+'</small></td><td>'+esc(r.branch||'—')+'</td><td>'+esc(normDate(r.end))+'</td><td><span class="'+style+'">'+esc(prio)+'</span></td><td>'+esc(r.status||'—')+'</td>'+action+'</tr>';
+ }).join('');
+ if(rows.length===0){$('#results').innerHTML='<div class="empty"><b>Nenhum registro neste filtro</b>Experimente outro prazo ou situação.</div>';}
+ else{
+  $('#results').innerHTML='<table><thead><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+tableRows+'</tbody></table>';
+  $('#results').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{
+   const r=rows[Number(b.dataset.open)];openDetail({...r,number:r.number||r.contractNumber});
+  });
+ }
+ let note='Período: '+esc(normDate(data.window?.from))+' a '+esc(normDate(data.window?.to))+
+    ' · Última atualização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+ if(rows.length>120)note+=' · Exibindo os 120 primeiros do filtro; refine a pesquisa.';
+ if(data.limited)note+=' · Consulta ampla: refine a pesquisa para acompanhar todos.';
+ if(isPay)note+=' · Vencimentos sem data e parcelas fora do período não entram nesta lista. “Não cobrar” não é tratado como inadimplência.';
+ $('#monitorStatus').textContent=note;
+}
+async function loadMonitor(force=false){
+ const mode=currentTab;if(mode!=='renewals'&&mode!=='payments')return;
+ const status=$('#monitorStatus');
+ if(!force&&monitoringCache[mode]){renderMonitor();return;}
+ status.textContent='Consultando registros de '+(mode==='renewals'?'renovação':'parcelas')+'…';
+ $('#results').innerHTML='<div class="empty"><b>Carregando acompanhamento</b>Consultando a carteira e organizando os prazos.</div>';
+ try{
+  const data=await api('operational-monitor',{category:mode});
+  monitoringCache[mode]=data;
+  if(currentTab===mode)renderMonitor();
+ }catch(e){
+  status.textContent='Falha na atualização: '+(e.message||e);
+  $('#results').innerHTML='<div class="empty"><b>Não foi possível carregar</b>Use Atualizar para tentar novamente.</div>';
+ }
+}
+function selectTab(mode){
+ currentTab=mode;
+ document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===mode));
+ const isMonitor=mode==='renewals'||mode==='payments';
+ $('.searchpanel:not(#monitorPanel)').classList.toggle('is-hidden',isMonitor);
+ $('#monitorPanel').classList.toggle('is-hidden',!isMonitor);
+ if(mode==='consulta'||mode==='apolices'){
+  $('#pageHeading').textContent=mode==='consulta'?'Encontre um cliente rapidamente.':'Apólices e propostas no mesmo lugar.';
+  $('#pageSubheading').textContent=mode==='consulta'?'Pesquise por nome, CPF, CNPJ ou placa. A ficha reúne os contratos e vigências.':'Pesquise por segurado, placa ou número. A ficha apresenta o histórico de seguros.';
+  $('#count').textContent='Aguardando pesquisa';
+  $('#results').innerHTML='<div class="empty"><b>Comece uma consulta</b>Pesquise por nome, CPF, CNPJ ou placa.</div>';
+  $('#name').focus();
+  return;
+ }
+ const isPay=mode==='payments';
+ $('#pageHeading').textContent=isPay?'Acompanhe as parcelas.':'Renovações próximas e vencidas.';
+ $('#pageSubheading').textContent=isPay?'Atrasos, vencimentos e situações de cobrança organizados por prioridade.':'Veja quais contratos precisam de atenção para renovar no prazo.';
+ $('#monitorTitle').textContent=isPay?'Central de parcelas':'Agenda de renovações';
+ $('#monitorPeriod').textContent=isPay?'Visão de vencimentos e cobrança':'Contratos vencidos há até 30 dias e a vencer em até 90 dias';
+ $('#monitorFilter').innerHTML=filterOptions[mode].map(([v,t])=>'<option value="'+v+'">'+esc(t)+'</option>').join('');
+ $('#monitorText').value='';
+ $('#monitorFilter').value=isPay?'late':'month';
+ $('#count').textContent='Consultando…';
+ loadMonitor();
+}
+$('#monitorRefresh').onclick=()=>loadMonitor(true);
+$('#monitorFilter').onchange=renderMonitor;
+$('#monitorText').oninput=renderMonitor;
+$('#monitorClear').onclick=()=>{$('#monitorText').value='';$('#monitorFilter').value=currentTab==='payments'?'late':'month';renderMonitor();};
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab));
 (async()=>{try{const status=await api('session');if(status.role!=='operacional'){location.replace('index.html');}}catch(e){$('#results').textContent='Acesso não validado. '+String(e.message||'');}})();
 </script>
 </body></html>
