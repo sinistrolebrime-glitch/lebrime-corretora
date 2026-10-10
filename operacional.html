@@ -23,7 +23,7 @@ dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px
 .detail-contracts{max-height:240px;overflow:auto;margin-top:18px}.detail-contracts h3{margin:15px 0 8px;font-size:13px}.contract-line{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #e9edf2;font-size:12px}.contract-line b{display:block}.contract-line small{color:#748191}.status-line{color:#98743f}.searchpanel input{text-transform:none}#plate{text-transform:uppercase}#detail .detail-grid{margin-bottom:12px}
 </style>
 <style>
-.is-hidden{display:none!important}.monitor-panel{margin-bottom:18px}.monitor-head{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:18px}.monitor-head h2{font-size:17px;margin:0}.monitor-head small{color:#718095}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.is-hidden{display:none!important}.monitor-panel{margin-bottom:18px}.monitor-head{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:18px}.monitor-head h2{font-size:17px;margin:0}.monitor-head small{color:#718095}.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:18px}
 .metric{border:1px solid #e6e9ee;border-radius:12px;background:#fff;text-align:left;padding:14px 15px;min-height:94px}
 .metric.active{border-color:#a98853;background:#fff9ef;box-shadow:0 0 0 2px #ead9bc}.metric:hover{border-color:#b49a76}
 .metric strong{display:block;font-size:23px;color:#1e2c3b;line-height:1.2}.metric span{color:#647386;font-size:12px}.metric:first-child strong{color:#b05241}
@@ -159,12 +159,13 @@ let currentTab='consulta';
 let monitoringCache={renewals:null,payments:null};
 const filterOptions={
  renewals:[['month','Vencendo nos próximos 30 dias'],['week','Próximos 7 dias'],['expired','Vencidos nos últimos 30 dias'],['ninety','Próximos 90 dias'],['all','Todos no período']],
- payments:[['late','Em atraso (para cobrar)'],['week','Próximos 7 dias'],['month','Próximos 30 dias'],['noCharge','Não cobrar / apenas acompanhar'],['all','Todas as parcelas do período']]
+ payments:[['late','Em atraso (para cobrar)'],['week','Próximos 7 dias'],['month','Próximos 30 dias'],['noCharge','Não cobrar / apenas acompanhar'],['missingDue','Sem data de vencimento'],['all','Todas as parcelas do período']]
 };
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(v)||0)/100);
 function priority(v,payment){
  if(payment){
   if(v.paid)return ['Pago','priority-ok'];
+  if(v.missingDue)return ['Sem vencimento','priority-overdue'];
   if(v.doNotCharge)return ['Não cobrar','priority-ok'];
  }
  if(v.days<0)return ['Atrasado '+Math.abs(v.days)+' dia(s)','priority-overdue'];
@@ -184,6 +185,7 @@ function rowAllowed(x,filter,mode){
  if(filter==='week')return !x.paid&&!x.doNotCharge&&x.days>=0&&x.days<=7;
  if(filter==='month')return !x.paid&&!x.doNotCharge&&x.days>=0&&x.days<=30;
  if(filter==='noCharge')return !x.paid&&x.doNotCharge;
+ if(filter==='missingDue')return !x.paid&&x.missingDue;
  return true;
 }
 function renderMonitor(){
@@ -194,7 +196,8 @@ function renderMonitor(){
    ['late','Em atraso',data.counts?.late||0],
    ['week','Vencem em 7 dias',data.counts?.week||0],
    ['month','Vencem em 30 dias',data.counts?.month||0],
-   ['noCharge','Não cobrar',data.counts?.noCharge||0]
+   ['noCharge','Não cobrar',data.counts?.noCharge||0],
+   ['missingDue','Sem vencimento',data.counts?.missingDue||0]
  ]:[
    ['expired','Vencidas',data.counts?.expired||0],
    ['week','Próximos 7 dias',data.counts?.week||0],
@@ -232,7 +235,7 @@ function renderMonitor(){
     ' · Última atualização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
  if(rows.length>120)note+=' · Exibindo os 120 primeiros do filtro; refine a pesquisa.';
  if(data.limited)note+=' · Consulta ampla: refine a pesquisa para acompanhar todos.';
- if(isPay)note+=' · Vencimentos sem data e parcelas fora do período não entram nesta lista. “Não cobrar” não é tratado como inadimplência.';
+ if(isPay)note+=' · Sem vencimento: parcelas em aberto que precisam de data. “Não cobrar” não é tratado como inadimplência. Outros vencimentos fora do período não são exibidos.';
  $('#monitorStatus').textContent=note;
 }
 async function loadMonitor(force=false){
