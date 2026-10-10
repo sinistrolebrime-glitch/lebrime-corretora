@@ -362,62 +362,80 @@ async function fipeEstimateModelOnly(item){
 const fipeCandidates=()=>list('insuredItem').filter(item=>{
   const insurance=rowById(item.data.policyId||item.data.proposalId);
   return insurance&&['proposal','policy'].includes(insurance.kind)&&
-    !validatedInsuredCents(item.data.insuredValue)&&fipeCodeOf(item)&&
-    vehicleYearOf(item)&&fipeAdjustmentOf(item);
+    !validatedInsuredCents(item.data.insuredValue)&&
+    !validatedInsuredCents(item.data.estimatedInsuredValue)&&
+    (!!(fipeCodeOf(item)&&vehicleYearOf(item)&&fipeAdjustmentOf(item))||!!fipeModelOf(item));
 });
 async function updateFipeInsuredValues(){
   const button=$('#fipeValueRefreshBtn'),status=$('#fipeValueRefreshStatus');
   if(!button)return;
-  button.disabled=true;
-  button.textContent='Conferindo valores…';
-  let prepared=[],review=0,errors=0;
-  const candidates=fipeCandidates();
-  if(fipeAttemptCursor>=candidates.length)fipeAttemptCursor=0;
-  const group=candidates.slice(fipeAttemptCursor,fipeAttemptCursor+5);
-  fipeAttemptCursor+=group.length;
-  if(!group.length){if(status)status.textContent='Nenhum veículo com código, ano e fator FIPE completos disponível neste lote.';button.disabled=false;button.textContent='Conferir FIPE';return;}
+  button.disabled=true;button.textContent='Consultando FIPE…';
+  let prepared=[],confirmed=0,estimated=0,missing=0;
+  let candidates=fipeCandidates().filter(item=>!fipeSeenThisSession.has(item.id));
+  if(!candidates.length){fipeSeenThisSession.clear();candidates=fipeCandidates();}
+  const group=candidates.slice(0,5);
+  if(!group.length){status.textContent='Nenhum item aguardando avaliação FIPE neste cadastro.';button.disabled=false;button.textContent='Buscar valores FIPE';return;}
   try{
     for(const item of group){
-      const code=fipeCodeOf(item),year=vehicleYearOf(item),adjustment=fipeAdjustmentOf(item);
-      const vehicleType=code.startsWith('8')?'motorcycles':'cars';
-      try{
-        const base='https://fipe.parallelum.com.br/api/v2/'+vehicleType+'/'+encodeURIComponent(code)+'/years';
-        const yearsResponse=await fetch(base+'?reference='+fipeReference2026);
-        if(!yearsResponse.ok)throw new Error('Consulta FIPE indisponível');
-        const choices=await yearsResponse.json();
-        if(!Array.isArray(choices))throw new Error('Anos FIPE inválidos');
-        let years=choices.filter(x=>String(x.code||'').startsWith(String(year)+'-'));
-        if(years.length!==1){
-          const fuel=fipeFuelSuffixOf(item);
-          years=fuel?years.filter(x=>String(x.code||'').endsWith(fuel)):[];
-        }
-        if(years.length!==1){review++;continue;}
-        const detailResponse=await fetch(base+'/'+encodeURIComponent(years[0].code)+'?reference='+fipeReference2026);
-        if(!detailResponse.ok)throw new Error('Cotação FIPE não obtida');
-        const detail=await detailResponse.json();
-        if(String(detail.codeFipe||'').replace(/\D/g,'')!==code.replace(/\D/g,'')
-          ||Number(detail.modelYear)!==year
-          ||!fold(detail.referenceMonth||'').includes('outubro')
-          ||!String(detail.referenceMonth||'').includes('2026')){review++;continue;}
-        const baseCents=parseMoney(detail.price);
-        const insuredCents=Math.round(baseCents*adjustment/100);
-        if(!insuredCents||insuredCents>Number.MAX_SAFE_INTEGER){review++;continue;}
-        const reference='FIPE outubro/2026, código '+code+', ano-modelo '+year+
-          ', '+detail.model+', '+detail.price+' × '+adjustment+'% VMR. Fonte: fipe.parallelum.com.br (API independente).';
-        prepared.push({type:'update',id:item.id,kind:'insuredItem',version:item.version,strict:true,updated_at:now(),
-          data:{...item.data,insuredValue:insuredCents,insuredValueBasis:'FIPE 10/2026',
-            fipeCode:code,fipeModelYear:year,fipeAdjustmentPercent:adjustment,fipeReference:'outubro/2026',
-            insuredValueReference:reference,insuredValueVerifiedAt:today()}});
-      }catch(e){errors++;console.warn('FIPE pendente para item',item.id,e);}
+      fipeSeenThisSession.add(item.id);
+      const code=fipeCodeOf(item),year=vehicleYearOf(item),adjust=fipeAdjustmentOf(item);
+      let updated=null;
+      if(code&&year&&adjust){
+        try{
+          const type=fipeCategoryOf(item);
+          const endpoint='/'+type+'/'+encodeURIComponent(code)+'/years';
+          const options=await fipeLoad(endpoint+'?reference='+fipeReference2026);
+          if(!Array.isArray(options))throw new Error('Anos FIPE ausentes');
+          let matching=options.filter(o=>String(o.code||'').startsWith(String(year)+'-'));
+          if(matching.length!==1){
+            const fuel=fipeFuelSuffixOf(item);
+            matching=fuel?matching.filter(o=>String(o.code).endsWith(fuel)):[];
+          }
+          if(matching.length!==1)throw new Error('Versão FIPE indefinida');
+          const detail=await fipeLoad(endpoint+'/'+encodeURIComponent(matching[0].code)+'?reference='+fipeReference2026);
+          if(String(detail.codeFipe||'').replace(/\D/g,'')!==code.replace(/\D/g,'')||
+             Number(detail.modelYear)!==year||
+             !fipeUpper(detail.referenceMonth).includes('OUTUBRO')||
+             !String(detail.referenceMonth).includes('2026'))throw new Error('Tabela FIPE divergente');
+          const confirmedCents=Math.round(parseMoney(detail.price)*adjust/100);
+          if(!confirmedCents||!Number.isSafeInteger(confirmedCents))throw new Error('Preço inválido');
+          updated={...item.data,insuredValue:confirmedCents,insuredValueBasis:'FIPE 10/2026',
+            fipeCode:code,fipeModelYear:year,fipeAdjustmentPercent:adjust,
+            fipeReference:'outubro/2026',
+            insuredValueReference:'FIPE outubro/2026, código '+code+', '+detail.model+', ano '+year+
+              ', preço '+detail.price+', percentual contratado '+adjust+'%.',
+            insuredValueVerifiedAt:today()};
+          confirmed++;
+        }catch(e){console.info('FIPE confirmada não disponível; utilizando tentativa de estimativa',item.id,e);}
+      }
+      if(!updated){
+        try{
+          const guess=await fipeEstimateModelOnly(item);
+          updated={...item.data,estimatedInsuredValue:guess.amount,
+            estimatedValueBasis:'FIPE APROXIMADA 10/2026 por nome',
+            estimatedInsuredValueReference:guess.detail,
+            estimatedModelCode:guess.modelCode,estimatedModelYear:guess.year,
+            estimatedConfidence:guess.score,estimatedReference:'outubro/2026',
+            estimatedAt:today()};
+          estimated++;
+        }catch(e){missing++;console.warn('Sem correspondência FIPE estimável',item.id,e);}
+      }
+      if(updated)prepared.push({type:'update',kind:'insuredItem',id:item.id,
+        version:item.version,strict:true,updated_at:now(),data:updated});
     }
     if(prepared.length)await api('write',{ops:prepared});
     await loadRecords();
     renderDashboard();
     const newStatus=$('#fipeValueRefreshStatus');
-    if(newStatus)newStatus.textContent=prepared.length+' veículo(s) avaliados; '+review+' aguardam confirmação e '+errors+' consultas indisponíveis. Execute novamente para próximo lote.';
+    if(newStatus)newStatus.textContent=confirmed+' confirmados; '+estimated+
+      ' aproximados; '+missing+' não encontrados. Consulte o próximo lote.';
   }catch(e){
-    if(status)status.textContent='Valores não gravados: '+String(e.message||e);
-    button.disabled=false;button.textContent='Conferir FIPE';
+    for(const item of group)fipeSeenThisSession.delete(item.id);
+    const display=$('#fipeValueRefreshStatus');
+    if(display)display.textContent='Não foi possível gravar o lote: '+String(e.message||e);
+  }finally{
+    const next=$('#fipeValueRefreshBtn');
+    if(next){next.disabled=false;next.textContent='Buscar valores FIPE (5 veículos)';}
   }
 }
 const effectiveCommissionRows=()=>{
