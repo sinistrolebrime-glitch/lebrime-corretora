@@ -281,185 +281,6 @@ const fipeFuelSuffixOf=item=>{
 };
 let fipeAttemptCursor=0;
 
-const fipeHttpCache=new Map();
-const fipeSeenThisSession=new Set();
-const fipeUpper=value=>fold(String(value||'')).toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
-const fipeTokens=value=>fipeUpper(value).split(' ').filter(x=>x.length>=2&&!/^(AUT|AUTO|MEC|MECANICO|FLEX|GAS|GASOLINA|DIESEL|DSL|TURBO|TB|4P|5P|2P|12V|16V|8V|CVT|AT|MT|ABS|4X2|4X4)$/.test(x));
-const fipeModelOf=item=>{
-  const d=item.data||{};
-  if(d.makeModel||d.vehicle||d.model||d.description)return String(d.makeModel||d.vehicle||d.model||d.description).trim();
-  if(['proposal','policy'].includes(item.kind)){
-    const notes=String(d.notes||'');
-    const match=notes.match(/(?:^|\s)Ve[ií]culo\s+(.{5,140}?)(?=,\s*placa|\.\s|;|$)/i);
-    return match?match[1].trim():'';
-  }
-  return '';
-};
-const fipeBrandsAliases={
-  VW:'VOLKSWAGEN',VOLKSWAGEN:'VOLKSWAGEN',GM:'CHEVROLET',
-  CHEVROLET:'CHEVROLET',MB:'MERCEDES',MERCEDES:'MERCEDES',
-  CITROEN:'CITROEN',RENAULT:'RENAULT',HYUNDAI:'HYUNDAI'
-};
-const fipeCategoryOf=item=>{
-  const text=fipeUpper(fipeModelOf(item));
-  if(fipeCodeOf(item).startsWith('8')||/^(HONDA|YAMAHA|SUZUKI) (CG|BIZ|POP|CB|XRE|NXR|PCX|SAHARA|FAZER|FACTOR|MT|NMAX|GSX)/.test(text))return 'motorcycles';
-  if(fipeCodeOf(item).startsWith('5')||/^(SCANIA|DAF|IVECO|VOLVO FH|VOLVO FM)/.test(text))return 'trucks';
-  return 'cars';
-};
-async function fipeLoad(path){
-  if(fipeHttpCache.has(path))return fipeHttpCache.get(path);
-  const response=await fetch('https://fipe.parallelum.com.br/api/v2'+path);
-  if(!response.ok)throw new Error('Consulta FIPE HTTP '+response.status);
-  const data=await response.json();
-  fipeHttpCache.set(path,data);
-  return data;
-}
-const fipeScore=(target,candidate)=>{
-  const a=fipeTokens(target),b=fipeTokens(candidate);
-  if(!a.length||!b.length||a[0]!==b[0])return 0;
-  const hits=a.filter(x=>b.some(y=>y===x||(x.length>=4&&y.length>=4&&(x.startsWith(y)||y.startsWith(x))))).length;
-  return .8*hits/a.length+.2*hits/Math.max(a.length,b.length);
-};
-async function fipeEstimateModelOnly(item){
-  const display=fipeModelOf(item),text=fipeUpper(display),parts=text.split(' ');
-  if(parts.length<2)throw new Error('Marca/modelo insuficiente');
-  const type=fipeCategoryOf(item);
-  const brands=await fipeLoad('/'+type+'/brands?reference='+fipeReference2026);
-  if(!Array.isArray(brands))throw new Error('Marcas indisponíveis');
-  const alias=fipeBrandsAliases[parts[0]]||parts[0];
-  const brand=brands.find(x=>fipeUpper(x.name)===alias)||brands.find(x=>fipeUpper(x.name).includes(alias));
-  if(!brand)throw new Error('Marca não identificada');
-  let family=text.slice(parts[0].length).trim();
-  if(parts[0]==='MERCEDES'&&family.startsWith('BENZ '))family=family.slice(5);
-  if(fipeTokens(family).length<1)throw new Error('Modelo não identificado');
-  const models=await fipeLoad('/'+type+'/brands/'+encodeURIComponent(brand.code)+'/models?reference='+fipeReference2026);
-  if(!Array.isArray(models))throw new Error('Modelos indisponíveis');
-  const candidates=models.map(x=>({model:x,score:fipeScore(family,x.name)}))
-    .filter(x=>x.score>=.5).sort((a,b)=>b.score-a.score);
-  if(!candidates.length)throw new Error('Sem modelo FIPE compatível');
-  const match=candidates[0];
-  const years=await fipeLoad('/'+type+'/brands/'+encodeURIComponent(brand.code)+'/models/'+encodeURIComponent(match.model.code)+'/years?reference='+fipeReference2026);
-  if(!Array.isArray(years)||!years.length)throw new Error('Sem ano FIPE');
-  const available=years.map(y=>({...y,year:Number(String(y.code||'').split('-')[0])}))
-    .filter(y=>y.year>=1980&&y.year<=2026).sort((a,b)=>a.year-b.year);
-  if(!available.length)throw new Error('Nenhum ano utilizável');
-  const notesYear=(String(item.data.notes||'').match(/(?:19|20)\d{2}\s*\/\s*((?:19|20)\d{2})\b/)||[])[1];
-  const knownYear=vehicleYearOf(item)||Number(notesYear||0);
-  const mid=available[Math.floor((available.length-1)/2)].year;
-  const chosenYear=knownYear||mid;
-  const closest=available.slice().sort((a,b)=>Math.abs(a.year-chosenYear)-Math.abs(b.year-chosenYear));
-  let chosen=closest[0];
-  const suffix=fipeFuelSuffixOf(item);
-  if(suffix){
-    const options=closest.filter(x=>Math.abs(x.year-chosenYear)===Math.abs(chosen.year-chosenYear));
-    chosen=options.find(x=>String(x.code).endsWith(suffix))||chosen;
-  }
-  const price=await fipeLoad('/'+type+'/brands/'+encodeURIComponent(brand.code)+'/models/'+encodeURIComponent(match.model.code)+'/years/'+encodeURIComponent(chosen.code)+'?reference='+fipeReference2026);
-  if(!fipeUpper(price.referenceMonth).includes('OUTUBRO')||!String(price.referenceMonth).includes('2026')||Number(price.modelYear)!==chosen.year)throw new Error('Data de referência FIPE divergente');
-  const marketCents=parseMoney(price.price);
-  if(!marketCents)throw new Error('FIPE sem preço');
-  const explicitFactor=fipeAdjustmentOf(item);
-  const factor=explicitFactor||100;
-  const estimate=Math.round(marketCents*factor/100);
-  if(!Number.isSafeInteger(estimate)||estimate<=0)throw new Error('Preço estimado inválido');
-  const detail='VALOR APROXIMADO FIPE outubro/2026, nome '+display+' associado a '+price.model+
-    ', ano '+chosen.year+(knownYear?' informado':' REPRESENTATIVO (ano ausente)')+
-    ', '+price.price+', fator '+factor+'%'+(explicitFactor?' declarado':' de referência, não declarado')+
-    ', correspondência '+Math.round(match.score*100)+'%. NÃO É LIMITE SEGURADO CONFIRMADO.';
-  return {amount:estimate,model:price.model,modelCode:price.codeFipe||'',year:chosen.year,
-    score:Math.round(match.score*100),detail};
-}
-const fipeCandidates=()=>{
-  const items=list('insuredItem').filter(item=>{
-    const insurance=rowById(item.data.policyId||item.data.proposalId);
-    return insurance&&['proposal','policy'].includes(insurance.kind)&&
-      !validatedInsuredCents(item.data.insuredValue)&&
-      !validatedInsuredCents(item.data.estimatedInsuredValue)&&
-      (!!(fipeCodeOf(item)&&vehicleYearOf(item)&&fipeAdjustmentOf(item))||!!fipeModelOf(item));
-  });
-  const withItems=new Set(list('insuredItem').map(item=>String(item.data.policyId||item.data.proposalId||'')));
-  const contracts=portfolioRows().filter(insurance=>{
-    const branch=fold(insurance.data.branch||'');
-    return /automovel|motocicleta|frota|caminhao|moto/.test(branch)&&
-      !withItems.has(String(insurance.id))&&
-      !validatedInsuredCents(insurance.data.insuredValue)&&
-      !validatedInsuredCents(insurance.data.estimatedInsuredValue)&&
-      !!fipeModelOf(insurance);
-  });
-  return [...items,...contracts];
-};
-async function updateFipeInsuredValues(){
-  const button=$('#fipeValueRefreshBtn'),status=$('#fipeValueRefreshStatus');
-  if(!button)return;
-  button.disabled=true;button.textContent='Consultando FIPE…';
-  let prepared=[],confirmed=0,estimated=0,missing=0;
-  let candidates=fipeCandidates().filter(item=>!fipeSeenThisSession.has(item.id));
-  if(!candidates.length){fipeSeenThisSession.clear();candidates=fipeCandidates();}
-  const group=candidates.slice(0,5);
-  if(!group.length){status.textContent='Nenhum item aguardando avaliação FIPE neste cadastro.';button.disabled=false;button.textContent='Buscar valores FIPE';return;}
-  try{
-    for(const item of group){
-      fipeSeenThisSession.add(item.id);
-      const code=fipeCodeOf(item),year=vehicleYearOf(item),adjust=fipeAdjustmentOf(item);
-      let updated=null;
-      if(code&&year&&adjust){
-        try{
-          const type=fipeCategoryOf(item);
-          const endpoint='/'+type+'/'+encodeURIComponent(code)+'/years';
-          const options=await fipeLoad(endpoint+'?reference='+fipeReference2026);
-          if(!Array.isArray(options))throw new Error('Anos FIPE ausentes');
-          let matching=options.filter(o=>String(o.code||'').startsWith(String(year)+'-'));
-          if(matching.length!==1){
-            const fuel=fipeFuelSuffixOf(item);
-            matching=fuel?matching.filter(o=>String(o.code).endsWith(fuel)):[];
-          }
-          if(matching.length!==1)throw new Error('Versão FIPE indefinida');
-          const detail=await fipeLoad(endpoint+'/'+encodeURIComponent(matching[0].code)+'?reference='+fipeReference2026);
-          if(String(detail.codeFipe||'').replace(/\D/g,'')!==code.replace(/\D/g,'')||
-             Number(detail.modelYear)!==year||
-             !fipeUpper(detail.referenceMonth).includes('OUTUBRO')||
-             !String(detail.referenceMonth).includes('2026'))throw new Error('Tabela FIPE divergente');
-          const confirmedCents=Math.round(parseMoney(detail.price)*adjust/100);
-          if(!confirmedCents||!Number.isSafeInteger(confirmedCents))throw new Error('Preço inválido');
-          updated={...item.data,insuredValue:confirmedCents,insuredValueBasis:'FIPE 10/2026',
-            fipeCode:code,fipeModelYear:year,fipeAdjustmentPercent:adjust,
-            fipeReference:'outubro/2026',
-            insuredValueReference:'FIPE outubro/2026, código '+code+', '+detail.model+', ano '+year+
-              ', preço '+detail.price+', percentual contratado '+adjust+'%.',
-            insuredValueVerifiedAt:today()};
-          confirmed++;
-        }catch(e){console.info('FIPE confirmada não disponível; utilizando tentativa de estimativa',item.id,e);}
-      }
-      if(!updated){
-        try{
-          const guess=await fipeEstimateModelOnly(item);
-          updated={...item.data,estimatedInsuredValue:guess.amount,
-            estimatedValueBasis:'FIPE APROXIMADA 10/2026 por nome',
-            estimatedInsuredValueReference:guess.detail,
-            estimatedModelCode:guess.modelCode,estimatedModelYear:guess.year,
-            estimatedConfidence:guess.score,estimatedReference:'outubro/2026',
-            estimatedAt:today()};
-          estimated++;
-        }catch(e){missing++;console.warn('Sem correspondência FIPE estimável',item.id,e);}
-      }
-      if(updated)prepared.push({type:'update',kind:item.kind,id:item.id,
-        version:item.version,strict:true,updated_at:now(),data:updated});
-    }
-    if(prepared.length)await api('write',{ops:prepared});
-    await loadRecords();
-    renderDashboard();
-    const newStatus=$('#fipeValueRefreshStatus');
-    if(newStatus)newStatus.textContent=confirmed+' confirmados; '+estimated+
-      ' aproximados; '+missing+' não encontrados. Consulte o próximo lote.';
-  }catch(e){
-    for(const item of group)fipeSeenThisSession.delete(item.id);
-    const display=$('#fipeValueRefreshStatus');
-    if(display)display.textContent='Não foi possível gravar o lote: '+String(e.message||e);
-  }finally{
-    const next=$('#fipeValueRefreshBtn');
-    if(next){next.disabled=false;next.textContent='Buscar valores FIPE (5 veículos)';}
-  }
-}
 const effectiveCommissionRows=()=>{
   const ids=new Set(portfolioRows().map(r=>r.id));
   const result=new Map();
@@ -1141,31 +962,15 @@ function renderDashboard(){
       </div>
       ${missingPortfolioPremium?'<p class="dashboard-caution">'+missingPortfolioPremium+' contrato(s) sem prêmio total confirmado ainda não contribuem para esses valores.</p>':''}
       <div class="dashboard-insured-title">
-        <span>Valor total assegurado <small>Patrimônio coberto, não é prêmio</small></span>
-        <div class="dashboard-fipe-actions">
-          <button type="button" id="fipeValueRefreshBtn" class="btn ghost small">Buscar FIPE confirmada ou aproximada (5 veículos)</button>
-          <small id="fipeValueRefreshStatus">Modelo conhecido = estimativa FIPE; código, ano e fator = valor referenciado</small>
-        </div>
+        <span>Valor Total Assegurado <small>FIPE 2026 e valores segurados dos contratos</small></span>
       </div>
       <div class="dashboard-premium-pair dashboard-insured-pair">
-        <div><span>Valor aproximado de mercado — veículos em vigência</span><strong>${currentEstimatedAmount?money(currentEstimatedAmount):"A apurar"}</strong>
-          <small>${currentTotalValued} de ${currentValuations.length} contratos com valor confirmado ou estimado</small></div>
-        <div><span>Patrimônio estimado + documentado em vigência</span><strong>${currentInsuredAmount+currentEstimatedAmount?money(currentInsuredAmount+currentEstimatedAmount):"A apurar"}</strong>
-          <small>Total parcial indicativo; não equivale à importância segurada contratual</small></div>
+        <div><span>Carteira em vigência — valor total assegurado</span><strong>${currentInsuredAmount+currentEstimatedAmount?money(currentInsuredAmount+currentEstimatedAmount):'A apurar'}</strong>
+          <small>${currentTotalValued} de ${currentValuations.length} contratos avaliados; inclui valores FIPE aproximados quando necessário</small></div>
+        <div><span>Histórico de vigências — valor total registrado</span><strong>${historicalValuedTotal?money(historicalValuedTotal):'A apurar'}</strong>
+          <small>${valuedContracts.filter(x=>x.priced).length} contratos avaliados; o histórico pode incluir renovações do mesmo bem</small></div>
       </div>
-      <div class="dashboard-premium-pair dashboard-insured-pair">
-        <div><span>Valor assegurado em vigência — confirmado</span><strong>${currentInsuredAmount?money(currentInsuredAmount):'A apurar'}</strong>
-          <small>${currentInsuredComplete} de ${currentValuations.length} contratos com valor completo confirmado</small></div>
-        <div><span>Valor assegurado do histórico — documentado</span><strong>${historicalInsuredAmount?money(historicalInsuredAmount):'A apurar'}</strong>
-          <small>${totalInsuredComplete} de ${valuedContracts.length} contratos com valor completo; inclui vigências passadas</small></div>
-      </div>
-      <div class="dashboard-premium-pair dashboard-insured-pair">
-        <div><span>FIPE aproximada — histórico</span><strong>${historicalEstimatedAmount?money(historicalEstimatedAmount):"A apurar"}</strong>
-          <small>Valores de mercado por nome, de todas as vigências cadastradas</small></div>
-        <div><span>Valor patrimonial histórico parcial</span><strong>${historicalValuedTotal?money(historicalValuedTotal):"A apurar"}</strong>
-          <small>Documentado + estimado; não representa bens únicos entre renovações</small></div>
-      </div>
-      ${currentInsuredMissing?'<p class="dashboard-caution">'+currentInsuredMissing+' contrato(s) em vigência com valor segurado pendente ou parcial. Valores acima são parciais e não representam ainda o total real da carteira; veículos aguardam confirmação FIPE por código, modelo, ano e percentual contratado.</p>':''}
+      ${currentValuations.filter(x=>!x.priced).length?'<p class="dashboard-caution">'+currentValuations.filter(x=>!x.priced).length+' contrato(s) no prazo ainda sem valor de referência. O total da carteira continuará crescendo à medida que as propostas forem avaliadas.</p>':''}
     </section>
 
     <section class="dashboard-topic" aria-labelledby="heading-importacao">
@@ -1320,8 +1125,6 @@ function renderDashboard(){
       </div>
     </div>`;
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navigate(b.dataset.go));
-  const fipeUpdateButton=$('#fipeValueRefreshBtn');
-  if(fipeUpdateButton)fipeUpdateButton.onclick=updateFipeInsuredValues;
 }
 function statusTone(value){
   const v=fold(value);
@@ -1409,7 +1212,7 @@ const config={
       ['Vigência',r=>date(r.data.start)+' a '+date(r.data.end)],
       ['Situação da vigência',r=>insurancePeriodState(r).label],
       ['Prêmio',r=>money(r.data.premium)],
-      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount&&v.estimated?money(v.amount)+' + ~ '+money(v.estimated):v.amount?money(v.amount)+(v.complete?'':' (parcial)'):v.estimated?'~ '+money(v.estimated)+' (estimativa)':'Pendente';}],
+      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount+v.estimated?money(v.amount+v.estimated):'Pendente';}],
       ['Status comercial',r=>r.data.status||'Não informado']
     ],
     fields:[
@@ -2687,9 +2490,7 @@ function openInsuranceDetail(insuranceId){
   const broker=String(insurance.data.brokerages||insurance.data.brokerage||'—').replace(/\|/g,' · ');
 
   const insuredValuation=insuranceInsuredValuation(insurance,insuredValuationIndex());
-  const insuredValuationHtml=`<div class="entity-card"><div><span>Valor segurado confirmado</span><strong>${insuredValuation.amount?money(insuredValuation.amount):"Pendente"}</strong></div>
-  <div><span>Valor de mercado FIPE aproximado</span><strong>${insuredValuation.estimated?"~ "+money(insuredValuation.estimated):"Pendente"}</strong></div>
-  <small>Estimativas por modelo não são limites contratuais; confira ano, versão e percentual FIPE.</small></div>`;
+  const insuredValuationHtml=`<div class="entity-card"><div><span>Valor Total Assegurado</span><strong>${insuredValuation.amount+insuredValuation.estimated?money(insuredValuation.amount+insuredValuation.estimated):'Pendente'}</strong></div><small>${insuredValuation.estimated?'Inclui avaliação FIPE aproximada, identificada na origem dos dados. ':'Valor identificado no documento ou cadastro. '}${insurance.data.insuredValueReference?esc(insurance.data.insuredValueReference):''}${insurance.data.estimatedInsuredValueReference?esc(insurance.data.estimatedInsuredValueReference):''}</small></div>`;
   const itemsHtml=items.length?items.map(r=>`
     <div class="entity-card"><div><span>${esc(r.data.itemType||'Item segurado')}</span><strong>${esc(r.data.makeModel||r.data.description||'—')}</strong></div>
     <div class="entity-grid"><span>Placa <strong>${esc(r.data.plate||'—')}</strong></span><span>Chassi <strong>${esc(r.data.chassis||'—')}</strong></span><span>Ano <strong>${esc(r.data.year||'—')}</strong></span><span>Valor <strong>${money(r.data.insuredValue)}</strong></span></div></div>
