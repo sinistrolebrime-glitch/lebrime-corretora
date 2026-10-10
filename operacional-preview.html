@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>LEBRIME · Consulta Operacional — Prévia</title>
+<style>
+:root{--gold:#b78b51;--gold-dark:#8e672f;--ink:#1d2633;--muted:#647083;--line:#e9edf2;--bg:#f6f7f9;--white:#fff;--blue:#102c50}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #d4b386;outline-offset:2px}
+.app{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)}
+.sidebar{background:#fff;border-right:1px solid var(--line);padding:26px 15px;display:flex;flex-direction:column;gap:32px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 11px}.monogram{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#1d2633;color:#c9a56e;font:bold 23px Georgia,serif}.brand strong{font-size:15px;letter-spacing:.075em}.brand small{display:block;font-size:10px;color:var(--gold-dark);text-transform:uppercase;letter-spacing:.1em}
+.caption{padding:0 13px;font-size:10px;font-weight:700;letter-spacing:.14em;color:#919baa;text-transform:uppercase;margin-bottom:10px}
+.nav{display:flex;flex-direction:column;gap:5px}.nav button{display:flex;gap:12px;align-items:center;text-align:left;padding:12px 13px;border:0;background:transparent;border-radius:9px;color:#546174;font-weight:600}.nav button.active{background:#f7f0e6;color:#805b2a}.nav button:hover{background:#f7f8fa}.nav button.active:hover{background:#f7f0e6}.ico{font-size:18px;line-height:1;width:20px;text-align:center}
+.sidebar-bottom{margin-top:auto;padding:16px 12px;border:1px solid var(--line);border-radius:12px;background:#fafbfc}.sidebar-bottom b{display:block;font-size:12px}.sidebar-bottom span{color:var(--muted);font-size:11px}
+main{min-width:0}.topbar{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#fff;padding:0 clamp(20px,4vw,54px)}.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-dark);font-weight:800}.topright{display:flex;align-items:center;gap:16px}.tag{background:#fbf4e9;color:#845d29;border:1px solid #eedec5;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700}.avatar{width:36px;height:36px;display:grid;place-items:center;background:#e9eef3;color:var(--blue);font-weight:800;border-radius:50%}
+.content{max-width:1150px;margin:auto;padding:39px clamp(20px,4vw,54px) 70px}.intro h1{font-size:clamp(24px,3vw,33px);letter-spacing:-.045em;margin:3px 0 6px}.intro p{color:var(--muted);margin:0 0 28px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 18px #1f2e4406}.searchpanel{padding:25px 26px 23px}.panel-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:23px}.panel-title h2{font-size:16px;margin:0}.hint{color:var(--muted);font-size:12px}.searchgrid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:14px;align-items:end}.field label{font-size:12px;font-weight:700;color:#465368;display:block;margin-bottom:8px}.field input{width:100%;height:45px;border:1px solid #dbe1e9;border-radius:9px;background:#fff;padding:0 12px;transition:.2s}.field input:focus{border-color:var(--gold);outline:3px solid #c9a66a33}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}.btn{border:1px solid #dce3ec;border-radius:9px;padding:10px 18px;font-weight:700;color:#506074;background:white}.btn.primary{background:#9a733c;color:#fff;border-color:#9a733c}.btn:hover{filter:brightness(.97)}
+.info{font-size:12px;color:#7b6747;background:#fffbf3;border:1px solid #f2e5cd;border-radius:9px;padding:11px 14px;margin:19px 0 25px}
+.results{margin-top:24px}.results-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.results-head h2{font-size:16px;margin:0}.count{color:var(--muted);font-size:12px}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;text-align:left}th{background:#fafbfd;color:#67748a;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:800;padding:14px 17px;border-bottom:1px solid var(--line)}td{padding:16px 17px;border-bottom:1px solid #eef0f3;color:#465266;white-space:nowrap}td strong{display:block;color:#1f2e40}td small{display:block;color:#7c8999}.pill{display:inline-block;background:#eaf5ef;color:#23734c;padding:5px 9px;border-radius:25px;font-size:11px;font-weight:700}.pill.expired{background:#fff1ef;color:#a44940}.link-btn{border:0;background:none;color:#8f672d;text-decoration:underline;font-weight:800}.empty{padding:58px 20px;color:#788495;text-align:center}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:6px}
+dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px,calc(100% - 28px));box-shadow:0 30px 80px #14223330}dialog::backdrop{background:#0c1b2a73}.modal-inner{padding:26px}.modal-top{display:flex;justify-content:space-between;gap:20px}.modal-top h2{margin:5px 0 17px}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.detail-grid span{display:block;color:#7a8796;font-size:12px}.detail-grid b{display:block}.close{background:none;border:0;font-size:24px;align-self:flex-start}.note{border-top:1px solid var(--line);color:var(--muted);font-size:12px;margin-top:24px;padding-top:15px}
+@media(max-width:1050px){.searchgrid{grid-template-columns:1fr 1fr}}@media(max-width:730px){.app{display:block}.sidebar{position:static;border-right:0;border-bottom:1px solid var(--line);padding:13px 17px;gap:10px}.sidebar .caption,.sidebar-bottom{display:none}.nav{flex-direction:row;overflow:auto}.nav button{font-size:12px;white-space:nowrap}.topbar{height:60px;padding:0 20px}.searchgrid{grid-template-columns:1fr}.searchpanel{padding:19px}.content{padding:26px 16px 60px}.results-head{align-items:flex-start}.tag{font-size:10px}.eyebrow{font-size:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+ <div class="brand"><span class="monogram">L</span><div><strong>LEBRIME</strong><small>Corretora de seguros</small></div></div>
+ <div><div class="caption">Área operacional</div><nav class="nav" aria-label="Menu operacional">
+ <button type="button" class="active" data-tab="consulta"><span class="ico">⌕</span>Consulta de segurados</button>
+ <button type="button" data-tab="apolices"><span class="ico">▤</span>Apólices e propostas</button>
+ <button type="button" data-tab="renovacoes"><span class="ico">↻</span>Renovações</button>
+ <button type="button" data-tab="pendencias"><span class="ico">☷</span>Pendências</button></nav></div>
+ <div class="sidebar-bottom"><b>Perfil operacional</b><span>Somente consulta, documentos e acompanhamento de contratos. Sem informações de comissões.</span></div>
+</aside>
+<main>
+ <header class="topbar"><span class="eyebrow">LEBRIME / Portal interno</span><div class="topright"><span class="tag">Prévia de interface · dados fictícios</span><span class="avatar">OP</span></div></header>
+ <div class="content">
+  <div class="intro"><span class="eyebrow">CONSULTA DE SEGURADOS</span><h1 id="pageHeading">Encontre um cliente rapidamente.</h1><p id="pageSubheading">Pesquise por nome, CPF, CNPJ ou placa. A ficha reúne as apólices, propostas e vigências em um só lugar.</p></div>
+  <section class="panel searchpanel" aria-labelledby="searchTitle">
+    <div class="panel-title"><h2 id="searchTitle">Pesquisa rápida</h2><span class="hint">Preencha apenas o campo que precisar.</span></div>
+    <form id="searchForm"><div class="searchgrid">
+      <div class="field"><label for="name">Nome / razão social</label><input id="name" placeholder="Digite o nome do segurado" autocomplete="off"></div>
+      <div class="field"><label for="cpf">CPF</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00"></div>
+      <div class="field"><label for="cnpj">CNPJ</label><input id="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00"></div>
+      <div class="field"><label for="plate">Placa</label><input id="plate" placeholder="ABC1D23" maxlength="7"></div>
+    </div><div class="actions"><button type="button" class="btn" id="clear">Limpar</button><button type="submit" class="btn primary">Consultar →</button></div></form>
+  </section>
+  <div class="info" role="note">Esta é uma prévia visual. Os exemplos são fictícios e não consultam a carteira real. O acesso operacional só será ativado após a configuração das quatro contas individuais e das permissões no servidor.</div>
+  <div class="results-head"><h2>Resultados da consulta</h2><span id="count" class="count">Aguardando pesquisa</span></div>
+  <section class="panel table-wrap" aria-live="polite"><div id="results"><div class="empty"><b>Comece uma consulta</b>Pesquise por nome, documento ou placa para visualizar o resultado.</div></div></section>
+ </div>
+</main>
+</div>
+<dialog id="detail"><div class="modal-inner"><div class="modal-top"><div><span class="eyebrow">Ficha de segurado · demonstração</span><h2 id="detailName"></h2></div><button class="close" type="button" id="closeDetail" aria-label="Fechar">×</button></div><div class="detail-grid" id="detailInfo"></div><p class="note">Na versão conectada, esta ficha exibirá todos os contratos e documentos reais do cliente, incluindo vigências históricas, sem comissões nem dados financeiros restritos.</p></div></dialog>
+<script>
+const demo=[
+ {name:"Cliente Exemplo Alfa Ltda.",doc:"12.345.678/0001-90",plate:"ABC1D23",insurer:"Allianz",branch:"Automóvel",number:"AP-EXEMPLO-001",end:"17/10/2027",status:"Em vigência"},
+ {name:"Cliente Exemplo Beta",doc:"123.456.789-00",plate:"DEF4G56",insurer:"Porto",branch:"Residencial",number:"AP-EXEMPLO-002",end:"04/05/2027",status:"Em vigência"},
+ {name:"Cliente Exemplo Gama Ltda.",doc:"98.765.432/0001-10",plate:"GHI7J89",insurer:"Tokio Marine",branch:"Frota",number:"AP-EXEMPLO-003",end:"12/06/2026",status:"Vencido"}
+];
+const $=s=>document.querySelector(s),clean=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/gi,"").toLowerCase();
+let matches=[];
+function renderRows(rows){
+ const node=$("#results");$("#count").textContent=rows.length+" resultado(s) fictício(s)";
+ if(!rows.length){node.innerHTML='<div class="empty"><b>Nenhum exemplo encontrado</b>Os dados desta prévia são fictícios. A pesquisa real será conectada depois.</div>';return;}
+ const tbody=rows.map((r,i)=>'<tr><td><strong>'+r.name+'</strong><small>'+r.doc+'</small></td><td>'+r.plate+'</td><td>'+r.branch+'</td><td><strong>'+r.insurer+'</strong><small>'+r.number+'</small></td><td>'+r.end+'</td><td><span class="pill '+(r.status==="Vencido"?"expired":"")+'">'+r.status+'</span></td><td><button type="button" class="link-btn" data-result="'+i+'">Ver ficha</button></td></tr>').join("");
+ node.innerHTML='<table><thead><tr><th>Segurado</th><th>Placa</th><th>Ramo</th><th>Seguradora / contrato</th><th>Fim vigência</th><th>Status</th><th></th></tr></thead><tbody>'+tbody+'</tbody></table>';
+ node.querySelectorAll("button[data-result]").forEach(b=>b.addEventListener("click",()=>openDetail(rows[Number(b.dataset.result)])));
+}
+function openDetail(r){$("#detailName").textContent=r.name;$("#detailInfo").innerHTML=[["Documento",r.doc],["Placa",r.plate],["Ramo",r.branch],["Seguradora",r.insurer],["Contrato",r.number],["Vigência até",r.end]].map(x=>'<div><span>'+x[0]+'</span><b>'+x[1]+'</b></div>').join("");$("#detail").showModal()}
+$("#closeDetail").onclick=()=>$("#detail").close();
+$("#searchForm").onsubmit=e=>{e.preventDefault();const q=["#name","#cpf","#cnpj","#plate"].map(x=>clean($(x).value)).filter(Boolean);if(!q.length){renderRows([]);$("#count").textContent="Informe um dado para consultar";return;}matches=demo.filter(r=>q.every(term=>clean(r.name+" "+r.doc+" "+r.plate+" "+r.number).includes(term)));renderRows(matches)};
+$("#clear").onclick=()=>{$("#searchForm").reset();$("#results").innerHTML='<div class="empty"><b>Comece uma consulta</b>Pesquise por nome, documento ou placa para visualizar o resultado.</div>';$("#count").textContent="Aguardando pesquisa";$("#name").focus()};
+document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-tab]").forEach(n=>n.classList.toggle("active",n===b));const name=b.dataset.tab;$("#pageHeading").textContent=({consulta:"Encontre um cliente rapidamente.",apolices:"Apólices e propostas no mesmo lugar.",renovacoes:"Renovações organizadas por vigência.",pendencias:"Pendências da operação, sem ruído."})[name];$("#pageSubheading").textContent=({consulta:"Pesquise por nome, CPF, CNPJ ou placa. A ficha reúne as apólices, propostas e vigências em um só lugar.",apolices:"Na versão conectada, aqui estarão todas as propostas e apólices, com acesso ao documento original.",renovacoes:"A versão conectada mostrará contratos próximos do vencimento, com filtros por período.",pendencias:"A equipe acompanhará tarefas e documentos necessários, sem acessar comissões."})[name];$("#name").focus()});
+</script>
+</body></html>
