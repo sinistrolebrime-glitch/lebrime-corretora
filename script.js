@@ -278,6 +278,7 @@ const fipeFuelSuffixOf=item=>{
   if(/gasolina/.test(t))return '-1';
   return '';
 };
+let fipeAttemptCursor=0;
 const fipeCandidates=()=>list('insuredItem').filter(item=>{
   const insurance=rowById(item.data.policyId||item.data.proposalId);
   return insurance&&['proposal','policy'].includes(insurance.kind)&&
@@ -290,7 +291,10 @@ async function updateFipeInsuredValues(){
   button.disabled=true;
   button.textContent='Conferindo valores…';
   let prepared=[],review=0,errors=0;
-  const group=fipeCandidates().slice(0,5);
+  const candidates=fipeCandidates();
+  if(fipeAttemptCursor>=candidates.length)fipeAttemptCursor=0;
+  const group=candidates.slice(fipeAttemptCursor,fipeAttemptCursor+5);
+  fipeAttemptCursor+=group.length;
   if(!group.length){if(status)status.textContent='Nenhum veículo com código, ano e fator FIPE completos disponível neste lote.';button.disabled=false;button.textContent='Conferir FIPE';return;}
   try{
     for(const item of group){
