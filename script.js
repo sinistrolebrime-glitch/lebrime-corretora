@@ -205,6 +205,45 @@ const insuranceRowsForClient=clientId=>{
   if(!cachedPortfolio)portfolioRows();
   return (clientContracts.get(String(clientId||''))||[]).slice();
 };
+// Valor segurado não se confunde com prêmio e nunca pode ser deduzido do prêmio.
+// O valor em centavos deve ser comprovado em FIPE (mês/modelo) ou PDF de seguro.
+const validatedInsuredCents=value=>{
+  if(typeof value!=='number'&&!(typeof value==='string'&&/^\d+(?:\.\d+)?$/.test(value.trim())))return 0;
+  const n=Number(value);
+  return Number.isSafeInteger(n)&&n>0?n:0;
+};
+// Não somar coberturas paralelas (RC, danos elétricos, incêndio) à LMGA:
+// elas podem sobrepor o mesmo risco. Para frota, somar um único valor por veículo.
+const insuranceInsuredValuation=(insurance,itemsByInsurance)=>{
+  const d=insurance?.data||{};
+  const total=validatedInsuredCents(d.insuredValue);
+  if(total)return {amount:total,complete:true,kind:'contrato'};
+  const items=itemsByInsurance?.get(String(insurance?.id||''))||[];
+  if(!items.length)return {amount:0,complete:false,kind:'pendente'};
+  const unique=new Map();
+  for(const r of items){
+    const x=r.data||{};
+    const key=searchKey(x.chassis||x.plate||x.identifier||r.id);
+    if(!unique.has(key)||(!validatedInsuredCents(unique.get(key).data.insuredValue)&&validatedInsuredCents(x.insuredValue)))
+      unique.set(key,r);
+  }
+  const individual=[...unique.values()];
+  return {
+    amount:individual.reduce((n,r)=>n+validatedInsuredCents(r.data.insuredValue),0),
+    complete:individual.length>0&&individual.every(r=>validatedInsuredCents(r.data.insuredValue)>0),
+    kind:'itens'
+  };
+};
+const insuredValuationIndex=()=>{
+  const byInsurance=new Map();
+  for(const r of list('insuredItem')){
+    const id=String(r.data.policyId||r.data.proposalId||'');
+    if(!id)continue;
+    if(!byInsurance.has(id))byInsurance.set(id,[]);
+    byInsurance.get(id).push(r);
+  }
+  return byInsurance;
+};
 const effectiveCommissionRows=()=>{
   const ids=new Set(portfolioRows().map(r=>r.id));
   const result=new Map();
@@ -800,6 +839,14 @@ function renderDashboard(){
   const activePremium=inPeriodContracts.reduce((s,r)=>s+Number(r.data.premium||0),0);
   const totalPortfolioPremium=contracts.reduce((s,r)=>s+Number(r.data.premium||0),0);
   const missingPortfolioPremium=contracts.filter(r=>!Number(r.data.premium||0)).length;
+  const itemValueIndex=insuredValuationIndex();
+  const valuedContracts=contracts.map(r=>({insurance:r,...insuranceInsuredValuation(r,itemValueIndex)}));
+  const currentValuations=valuedContracts.filter(x=>isContractInPeriod(x.insurance));
+  const currentInsuredAmount=currentValuations.reduce((sum,x)=>sum+x.amount,0);
+  const historicalInsuredAmount=valuedContracts.reduce((sum,x)=>sum+x.amount,0);
+  const currentInsuredComplete=currentValuations.filter(x=>x.complete).length;
+  const currentInsuredMissing=currentValuations.length-currentInsuredComplete;
+  const totalInsuredComplete=valuedContracts.filter(x=>x.complete).length;
   const forecastTotal=forecasts.reduce((s,r)=>s+Number(r.data.amount||0),0);
   const brokerRows=brokerages.map(name=>{
     const items=inPeriodContracts.filter(r=>String(r.data.brokerages||r.data.brokerage||'').split('|').includes(name));
@@ -873,6 +920,17 @@ function renderDashboard(){
           <small>Parte do prêmio histórico referente aos contratos vigentes</small></div>
       </div>
       ${missingPortfolioPremium?'<p class="dashboard-caution">'+missingPortfolioPremium+' contrato(s) sem prêmio total confirmado ainda não contribuem para esses valores.</p>':''}
+      <div class="dashboard-insured-title">
+        <span>Valor total assegurado <small>Patrimônio coberto, não é prêmio</small></span>
+        <small>FIPE de outubro/2026 para veículos · LMGA/valor segurado do PDF para empresas e residências</small>
+      </div>
+      <div class="dashboard-premium-pair dashboard-insured-pair">
+        <div><span>Valor assegurado em vigência — confirmado</span><strong>${currentInsuredAmount?money(currentInsuredAmount):'A apurar'}</strong>
+          <small>${currentInsuredComplete} de ${currentValuations.length} contratos com valor completo confirmado</small></div>
+        <div><span>Valor assegurado do histórico — documentado</span><strong>${historicalInsuredAmount?money(historicalInsuredAmount):'A apurar'}</strong>
+          <small>${totalInsuredComplete} de ${valuedContracts.length} contratos com valor completo; inclui vigências passadas</small></div>
+      </div>
+      ${currentInsuredMissing?'<p class="dashboard-caution">'+currentInsuredMissing+' contrato(s) em vigência com valor segurado pendente ou parcial. Valores acima são parciais e não representam ainda o total real da carteira; veículos aguardam confirmação FIPE por código, modelo, ano e percentual contratado.</p>':''}
     </section>
 
     <section class="dashboard-topic" aria-labelledby="heading-importacao">
@@ -1114,6 +1172,7 @@ const config={
       ['Vigência',r=>date(r.data.start)+' a '+date(r.data.end)],
       ['Situação da vigência',r=>insurancePeriodState(r).label],
       ['Prêmio',r=>money(r.data.premium)],
+      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount?money(v.amount)+(v.complete?'':' (parcial)'):'Pendente';}],
       ['Status comercial',r=>r.data.status||'Não informado']
     ],
     fields:[
@@ -1127,6 +1186,9 @@ const config={
       ['policyType','Operação','select',['Seguro novo','Renovação','Cancelamento']],
       ['netPremium','Prêmio líquido','money'],
       ['premium','Prêmio total','money'],
+      ['insuredValue','Valor total assegurado (R$)','money'],
+      ['insuredValueBasis','Base do valor segurado','select',['','FIPE 10/2026','LMGA da proposta / apólice','Importância segurada contratada','Valor em risco declarado']],
+      ['insuredValueReference','Fonte / referência da avaliação','text'],
       ['start','Início vigência','date'],
       ['end','Fim vigência','date'],
       ['status','Status','select',['Em elaboração','Enviada','Em análise','Aprovada','Recusada','Convertida','Ativa','Cancelada','Renovada']],
@@ -1236,7 +1298,7 @@ const config={
   },
   insuredItem:{
     title:'Item / risco',columns:[['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Tipo',r=>r.data.itemType],['Descrição',r=>r.data.description],['Identificador',r=>r.data.plate||r.data.identifier],['Valor segurado',r=>money(r.data.insuredValue)]],
-    fields:[['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['itemType','Tipo','select',['Veículo','Imóvel','Local de risco / filial','Equipamento','Contrato / objeto da garantia','Pessoa','Outro']],['description','Descrição','text'],['identifier','Identificador','text'],['plate','Placa','text'],['chassis','Chassi','text'],['makeModel','Marca / modelo','text'],['year','Ano','text'],['insuredValue','Valor segurado','money'],['address','Endereço','text'],['city','Cidade','text'],['state','UF','text'],['notes','Observações','textarea']]
+    fields:[['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['itemType','Tipo','select',['Veículo','Imóvel','Local de risco / filial','Equipamento','Contrato / objeto da garantia','Pessoa','Outro']],['description','Descrição','text'],['identifier','Identificador','text'],['plate','Placa','text'],['chassis','Chassi','text'],['makeModel','Marca / modelo','text'],['year','Ano do modelo','text'],['insuredValue','Valor segurado','money'],['fipeCode','Código FIPE','text'],['fipeReference','Mês/ano FIPE','text'],['fipeAdjustmentPercent','Percentual FIPE contratado','number'],['insuredValueReference','Fonte do valor','text'],['address','Endereço','text'],['city','Cidade','text'],['state','UF','text'],['notes','Observações','textarea']]
   },
   coverage:{
     title:'Cobertura',columns:[['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Cobertura',r=>r.data.name],['Limite',r=>money(r.data.limit)],['Franquia',r=>r.data.deductible],['Status',r=>r.data.status]],
@@ -2386,6 +2448,8 @@ function openInsuranceDetail(insuranceId){
   const embeddedDrivers=Array.isArray(insurance.data.drivers)?insurance.data.drivers:[];
   const broker=String(insurance.data.brokerages||insurance.data.brokerage||'—').replace(/\|/g,' · ');
 
+  const insuredValuation=insuranceInsuredValuation(insurance,insuredValuationIndex());
+  const insuredValuationHtml=`<div class="entity-card"><div><span>Valor assegurado total do contrato</span><strong>${insuredValuation.amount?money(insuredValuation.amount):'Pendente'}</strong></div><small>${insuredValuation.complete?'Valor apurado no cadastro do contrato/itens com fonte registrada':'Valor parcial ou não apurado; consultar PDF e FIPE outubro/2026 por modelo/ano, sem estimar'}${insurance.data.insuredValueReference?' · '+esc(insurance.data.insuredValueReference):''}</small></div>`;
   const itemsHtml=items.length?items.map(r=>`
     <div class="entity-card"><div><span>${esc(r.data.itemType||'Item segurado')}</span><strong>${esc(r.data.makeModel||r.data.description||'—')}</strong></div>
     <div class="entity-grid"><span>Placa <strong>${esc(r.data.plate||'—')}</strong></span><span>Chassi <strong>${esc(r.data.chassis||'—')}</strong></span><span>Ano <strong>${esc(r.data.year||'—')}</strong></span><span>Valor <strong>${money(r.data.insuredValue)}</strong></span></div></div>
@@ -2447,7 +2511,8 @@ function openInsuranceDetail(insuranceId){
     </div>
 
     <div class="contract-sections">
-      <section class="detail-section"><div class="section-title-row"><div><h3>Itens segurados / veículos</h3><p>Riscos vinculados exclusivamente a este contrato.</p></div></div>${itemsHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Itens segurados / veículos</h3><p>Riscos vinculados exclusivamente a este contrato.</p></div></div>${insuredValuationHtml}
+        ${itemsHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Condutores</h3><p>Condutores associados ao seguro, quando cadastrados.</p></div></div>${driverHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Coberturas</h3><p>Limites e franquias cadastrados.</p></div></div>${coverageHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Perfil e observações</h3><p>Informações complementares do risco.</p></div></div><div class="profile-note">${esc(insurance.data.profile||insurance.data.notes||'Nenhuma informação complementar cadastrada.')}</div></section>
