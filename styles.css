@@ -3181,3 +3181,7 @@ html[data-theme="light"] dialog{
 .dashboard-insured-pair>div{border-color:rgba(116,130,91,.27)}
 .dashboard-insured-pair strong{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 @media(max-width:680px){.dashboard-insured-title{flex-direction:column;align-items:flex-start}}
+
+.dashboard-fipe-actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
+.dashboard-fipe-actions small{font-size:11px;line-height:1.4}
+@media(max-width:680px){.dashboard-fipe-actions{align-items:flex-start;text-align:left}}
