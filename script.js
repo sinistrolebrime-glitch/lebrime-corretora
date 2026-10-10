@@ -1063,6 +1063,7 @@ function renderDashboard(){
   const currentTotalValued=currentValuations.filter(x=>x.priced).length;
   const historicalInsuredAmount=valuedContracts.reduce((sum,x)=>sum+x.amount,0);
   const historicalEstimatedAmount=valuedContracts.reduce((sum,x)=>sum+x.estimated,0);
+  const historicalValuedTotal=historicalInsuredAmount+historicalEstimatedAmount;
   const currentInsuredComplete=currentValuations.filter(x=>x.complete).length;
   const currentInsuredMissing=currentValuations.length-currentInsuredComplete;
   const totalInsuredComplete=valuedContracts.filter(x=>x.complete).length;
@@ -1157,6 +1158,12 @@ function renderDashboard(){
           <small>${currentInsuredComplete} de ${currentValuations.length} contratos com valor completo confirmado</small></div>
         <div><span>Valor assegurado do histórico — documentado</span><strong>${historicalInsuredAmount?money(historicalInsuredAmount):'A apurar'}</strong>
           <small>${totalInsuredComplete} de ${valuedContracts.length} contratos com valor completo; inclui vigências passadas</small></div>
+      </div>
+      <div class="dashboard-premium-pair dashboard-insured-pair">
+        <div><span>FIPE aproximada — histórico</span><strong>${historicalEstimatedAmount?money(historicalEstimatedAmount):"A apurar"}</strong>
+          <small>Valores de mercado por nome, de todas as vigências cadastradas</small></div>
+        <div><span>Valor patrimonial histórico parcial</span><strong>${historicalValuedTotal?money(historicalValuedTotal):"A apurar"}</strong>
+          <small>Documentado + estimado; não representa bens únicos entre renovações</small></div>
       </div>
       ${currentInsuredMissing?'<p class="dashboard-caution">'+currentInsuredMissing+' contrato(s) em vigência com valor segurado pendente ou parcial. Valores acima são parciais e não representam ainda o total real da carteira; veículos aguardam confirmação FIPE por código, modelo, ano e percentual contratado.</p>':''}
     </section>
@@ -1402,7 +1409,7 @@ const config={
       ['Vigência',r=>date(r.data.start)+' a '+date(r.data.end)],
       ['Situação da vigência',r=>insurancePeriodState(r).label],
       ['Prêmio',r=>money(r.data.premium)],
-      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount?money(v.amount)+(v.complete?'':' (parcial)'):(v.estimated?'~ '+money(v.estimated)+' (estimativa)':'Pendente');}],
+      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount&&v.estimated?money(v.amount)+' + ~ '+money(v.estimated):v.amount?money(v.amount)+(v.complete?'':' (parcial)'):v.estimated?'~ '+money(v.estimated)+' (estimativa)':'Pendente';}],
       ['Status comercial',r=>r.data.status||'Não informado']
     ],
     fields:[
@@ -1417,6 +1424,7 @@ const config={
       ['netPremium','Prêmio líquido','money'],
       ['premium','Prêmio total','money'],
       ['insuredValue','Valor total assegurado (R$)','money'],
+      ['estimatedInsuredValue','Valor FIPE estimado (não contratado)','money'],
       ['insuredValueBasis','Base do valor segurado','select',['','FIPE 10/2026','LMGA da proposta / apólice','Importância segurada contratada','Valor em risco declarado']],
       ['insuredValueReference','Fonte / referência da avaliação','text'],
       ['start','Início vigência','date'],
@@ -1527,7 +1535,7 @@ const config={
     ]
   },
   insuredItem:{
-    title:'Item / risco',columns:[['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Tipo',r=>r.data.itemType],['Descrição',r=>r.data.description],['Identificador',r=>r.data.plate||r.data.identifier],['Valor segurado',r=>money(r.data.insuredValue)]],
+    title:'Item / risco',columns:[['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Tipo',r=>r.data.itemType],['Descrição',r=>r.data.description],['Identificador',r=>r.data.plate||r.data.identifier],['Valor segurado',r=>money(r.data.insuredValue)],['FIPE estimada',r=>money(r.data.estimatedInsuredValue)]],
     fields:[['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['itemType','Tipo','select',['Veículo','Imóvel','Local de risco / filial','Equipamento','Contrato / objeto da garantia','Pessoa','Outro']],['description','Descrição','text'],['identifier','Identificador','text'],['plate','Placa','text'],['chassis','Chassi','text'],['makeModel','Marca / modelo','text'],['year','Ano do modelo','text'],['insuredValue','Valor segurado','money'],['estimatedInsuredValue','Estimativa FIPE por modelo (R$)','money'],['fipeCode','Código FIPE','text'],['fipeReference','Mês/ano FIPE','text'],['fipeAdjustmentPercent','Percentual FIPE contratado','number'],['insuredValueReference','Fonte do valor','text'],['address','Endereço','text'],['city','Cidade','text'],['state','UF','text'],['notes','Observações','textarea']]
   },
   coverage:{
