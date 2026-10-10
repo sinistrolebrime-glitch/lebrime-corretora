@@ -217,22 +217,23 @@ const validatedInsuredCents=value=>{
 const insuranceInsuredValuation=(insurance,itemsByInsurance)=>{
   const d=insurance?.data||{};
   const total=validatedInsuredCents(d.insuredValue);
-  if(total)return {amount:total,complete:true,kind:'contrato'};
+  if(total)return {amount:total,estimated:0,complete:true,priced:true,kind:'contrato'};
+  const contractEstimated=validatedInsuredCents(d.estimatedInsuredValue);
   const items=itemsByInsurance?.get(String(insurance?.id||''))||[];
-  if(!items.length)return {amount:0,complete:false,kind:'pendente'};
+  if(!items.length)return {amount:0,estimated:contractEstimated,complete:false,priced:!!contractEstimated,kind:'pendente'};
   const unique=new Map();
   for(const r of items){
     const x=r.data||{};
     const key=searchKey(x.chassis||x.plate||x.identifier||r.id);
-    if(!unique.has(key)||(!validatedInsuredCents(unique.get(key).data.insuredValue)&&validatedInsuredCents(x.insuredValue)))
-      unique.set(key,r);
+    const quality=v=>validatedInsuredCents(v.data.insuredValue)?2:validatedInsuredCents(v.data.estimatedInsuredValue)?1:0;
+    if(!unique.has(key)||quality(r)>quality(unique.get(key)))unique.set(key,r);
   }
   const individual=[...unique.values()];
-  return {
-    amount:individual.reduce((n,r)=>n+validatedInsuredCents(r.data.insuredValue),0),
-    complete:individual.length>0&&individual.every(r=>validatedInsuredCents(r.data.insuredValue)>0),
-    kind:'itens'
-  };
+  const amount=individual.reduce((n,r)=>n+validatedInsuredCents(r.data.insuredValue),0);
+  const estimated=individual.reduce((n,r)=>n+(validatedInsuredCents(r.data.insuredValue)?0:validatedInsuredCents(r.data.estimatedInsuredValue)),0);
+  const complete=individual.length>0&&individual.every(r=>validatedInsuredCents(r.data.insuredValue)>0);
+  const priced=individual.length>0&&individual.every(r=>validatedInsuredCents(r.data.insuredValue)||validatedInsuredCents(r.data.estimatedInsuredValue));
+  return {amount,estimated:estimated||(!amount?contractEstimated:0),complete,priced,kind:'itens'};
 };
 const insuredValuationIndex=()=>{
   const byInsurance=new Map();
@@ -939,7 +940,10 @@ function renderDashboard(){
   const valuedContracts=contracts.map(r=>({insurance:r,...insuranceInsuredValuation(r,itemValueIndex)}));
   const currentValuations=valuedContracts.filter(x=>isContractInPeriod(x.insurance));
   const currentInsuredAmount=currentValuations.reduce((sum,x)=>sum+x.amount,0);
+  const currentEstimatedAmount=currentValuations.reduce((sum,x)=>sum+x.estimated,0);
+  const currentTotalValued=currentValuations.filter(x=>x.priced).length;
   const historicalInsuredAmount=valuedContracts.reduce((sum,x)=>sum+x.amount,0);
+  const historicalEstimatedAmount=valuedContracts.reduce((sum,x)=>sum+x.estimated,0);
   const currentInsuredComplete=currentValuations.filter(x=>x.complete).length;
   const currentInsuredMissing=currentValuations.length-currentInsuredComplete;
   const totalInsuredComplete=valuedContracts.filter(x=>x.complete).length;
@@ -1019,9 +1023,15 @@ function renderDashboard(){
       <div class="dashboard-insured-title">
         <span>Valor total assegurado <small>Patrimônio coberto, não é prêmio</small></span>
         <div class="dashboard-fipe-actions">
-          <button type="button" id="fipeValueRefreshBtn" class="btn ghost small">Conferir FIPE (até 5 veículos)</button>
-          <small id="fipeValueRefreshStatus">Referência outubro/2026 · apenas códigos e anos confirmados</small>
+          <button type="button" id="fipeValueRefreshBtn" class="btn ghost small">Buscar FIPE confirmada ou aproximada (5 veículos)</button>
+          <small id="fipeValueRefreshStatus">Modelo conhecido = estimativa FIPE; código, ano e fator = valor referenciado</small>
         </div>
+      </div>
+      <div class="dashboard-premium-pair dashboard-insured-pair">
+        <div><span>Valor aproximado de mercado — veículos em vigência</span><strong>${currentEstimatedAmount?money(currentEstimatedAmount):"A apurar"}</strong>
+          <small>${currentTotalValued} de ${currentValuations.length} contratos com valor confirmado ou estimado</small></div>
+        <div><span>Patrimônio estimado + documentado em vigência</span><strong>${currentInsuredAmount+currentEstimatedAmount?money(currentInsuredAmount+currentEstimatedAmount):"A apurar"}</strong>
+          <small>Total parcial indicativo; não equivale à importância segurada contratual</small></div>
       </div>
       <div class="dashboard-premium-pair dashboard-insured-pair">
         <div><span>Valor assegurado em vigência — confirmado</span><strong>${currentInsuredAmount?money(currentInsuredAmount):'A apurar'}</strong>
@@ -1273,7 +1283,7 @@ const config={
       ['Vigência',r=>date(r.data.start)+' a '+date(r.data.end)],
       ['Situação da vigência',r=>insurancePeriodState(r).label],
       ['Prêmio',r=>money(r.data.premium)],
-      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount?money(v.amount)+(v.complete?'':' (parcial)'):'Pendente';}],
+      ['Valor assegurado',r=>{const v=insuranceInsuredValuation(r,insuredValuationIndex());return v.amount?money(v.amount)+(v.complete?'':' (parcial)'):(v.estimated?'~ '+money(v.estimated)+' (estimativa)':'Pendente');}],
       ['Status comercial',r=>r.data.status||'Não informado']
     ],
     fields:[
@@ -1399,7 +1409,7 @@ const config={
   },
   insuredItem:{
     title:'Item / risco',columns:[['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Tipo',r=>r.data.itemType],['Descrição',r=>r.data.description],['Identificador',r=>r.data.plate||r.data.identifier],['Valor segurado',r=>money(r.data.insuredValue)]],
-    fields:[['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['itemType','Tipo','select',['Veículo','Imóvel','Local de risco / filial','Equipamento','Contrato / objeto da garantia','Pessoa','Outro']],['description','Descrição','text'],['identifier','Identificador','text'],['plate','Placa','text'],['chassis','Chassi','text'],['makeModel','Marca / modelo','text'],['year','Ano do modelo','text'],['insuredValue','Valor segurado','money'],['fipeCode','Código FIPE','text'],['fipeReference','Mês/ano FIPE','text'],['fipeAdjustmentPercent','Percentual FIPE contratado','number'],['insuredValueReference','Fonte do valor','text'],['address','Endereço','text'],['city','Cidade','text'],['state','UF','text'],['notes','Observações','textarea']]
+    fields:[['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['itemType','Tipo','select',['Veículo','Imóvel','Local de risco / filial','Equipamento','Contrato / objeto da garantia','Pessoa','Outro']],['description','Descrição','text'],['identifier','Identificador','text'],['plate','Placa','text'],['chassis','Chassi','text'],['makeModel','Marca / modelo','text'],['year','Ano do modelo','text'],['insuredValue','Valor segurado','money'],['estimatedInsuredValue','Estimativa FIPE por modelo (R$)','money'],['fipeCode','Código FIPE','text'],['fipeReference','Mês/ano FIPE','text'],['fipeAdjustmentPercent','Percentual FIPE contratado','number'],['insuredValueReference','Fonte do valor','text'],['address','Endereço','text'],['city','Cidade','text'],['state','UF','text'],['notes','Observações','textarea']]
   },
   coverage:{
     title:'Cobertura',columns:[['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Cobertura',r=>r.data.name],['Limite',r=>money(r.data.limit)],['Franquia',r=>r.data.deductible],['Status',r=>r.data.status]],
@@ -2550,7 +2560,9 @@ function openInsuranceDetail(insuranceId){
   const broker=String(insurance.data.brokerages||insurance.data.brokerage||'—').replace(/\|/g,' · ');
 
   const insuredValuation=insuranceInsuredValuation(insurance,insuredValuationIndex());
-  const insuredValuationHtml=`<div class="entity-card"><div><span>Valor assegurado total do contrato</span><strong>${insuredValuation.amount?money(insuredValuation.amount):'Pendente'}</strong></div><small>${insuredValuation.complete?'Valor apurado no cadastro do contrato/itens com fonte registrada':'Valor parcial ou não apurado; consultar PDF e FIPE outubro/2026 por modelo/ano, sem estimar'}${insurance.data.insuredValueReference?' · '+esc(insurance.data.insuredValueReference):''}</small></div>`;
+  const insuredValuationHtml=`<div class="entity-card"><div><span>Valor segurado confirmado</span><strong>${insuredValuation.amount?money(insuredValuation.amount):"Pendente"}</strong></div>
+  <div><span>Valor de mercado FIPE aproximado</span><strong>${insuredValuation.estimated?"~ "+money(insuredValuation.estimated):"Pendente"}</strong></div>
+  <small>Estimativas por modelo não são limites contratuais; confira ano, versão e percentual FIPE.</small></div>`;
   const itemsHtml=items.length?items.map(r=>`
     <div class="entity-card"><div><span>${esc(r.data.itemType||'Item segurado')}</span><strong>${esc(r.data.makeModel||r.data.description||'—')}</strong></div>
     <div class="entity-grid"><span>Placa <strong>${esc(r.data.plate||'—')}</strong></span><span>Chassi <strong>${esc(r.data.chassis||'—')}</strong></span><span>Ano <strong>${esc(r.data.year||'—')}</strong></span><span>Valor <strong>${money(r.data.insuredValue)}</strong></span></div></div>
