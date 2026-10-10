@@ -244,6 +244,98 @@ const insuredValuationIndex=()=>{
   }
   return byInsurance;
 };
+// Consulta pública via provedor independente da FIPE. Não há API oficial da Fundação.
+// Somente atribui preço quando código FIPE, ano-modelo, combustível, mês e
+// percentual VMR forem comprovados sem ambiguidade.
+const fipeReference2026='338'; // outubro de 2026
+const fipeCodeOf=item=>{
+  const source=String(item.data.fipeCode||item.data.notes||'');
+  const match=source.match(/(?:c[oó]digo\s+fipe[^\d]{0,8}|^)(\d{6}-?\d)\b/i);
+  if(!match)return '';
+  const digitsOnly=match[1].replace(/\D/g,'');
+  return digitsOnly.length===7?digitsOnly.slice(0,6)+'-'+digitsOnly.slice(6):'';
+};
+const vehicleYearOf=item=>{
+  const found=String(item.data.year||'').match(/(?:19|20)\d{2}/g)||[];
+  return found.length?Number(found[found.length-1]):0;
+};
+const fipeAdjustmentOf=item=>{
+  const d=item.data||{};
+  if(Number(d.fipeAdjustmentPercent)>0&&Number(d.fipeAdjustmentPercent)<=200)return Number(d.fipeAdjustmentPercent);
+  const txt=String(d.notes||'');
+  const m=txt.match(/FIPE\s*[x×]\s*(\d{2,3})\s*%?/i)
+    ||txt.match(/(\d{2,3})\s*%\s*(?:VMR\s*)?FIPE/i)
+    ||txt.match(/VMR\s*(\d{2,3})\s*%/i)
+    ||txt.match(/(?:fator de ajuste|fator)\s*[:=]?\s*(\d{2,3})\s*%/i);
+  return m&&Number(m[1])>0&&Number(m[1])<=200?Number(m[1]):0;
+};
+const fipeFuelSuffixOf=item=>{
+  const t=fold(String(item.data.makeModel||item.data.description||'')+' '+String(item.data.notes||''));
+  if(/diesel|dsl|tdi/.test(t))return '-3';
+  if(/hibrid/.test(t))return '-6';
+  if(/eletric/.test(t))return '-4';
+  if(/flex|bifuel|bi-combustivel|gasolina\/alcool|gasolina\/etanol/.test(t))return '-5';
+  if(/gasolina/.test(t))return '-1';
+  return '';
+};
+const fipeCandidates=()=>list('insuredItem').filter(item=>{
+  const insurance=rowById(item.data.policyId||item.data.proposalId);
+  return insurance&&['proposal','policy'].includes(insurance.kind)&&
+    !validatedInsuredCents(item.data.insuredValue)&&fipeCodeOf(item)&&
+    vehicleYearOf(item)&&fipeAdjustmentOf(item);
+});
+async function updateFipeInsuredValues(){
+  const button=$('#fipeValueRefreshBtn'),status=$('#fipeValueRefreshStatus');
+  if(!button)return;
+  button.disabled=true;
+  button.textContent='Conferindo valores…';
+  let prepared=[],review=0,errors=0;
+  const group=fipeCandidates().slice(0,5);
+  if(!group.length){if(status)status.textContent='Nenhum veículo com código, ano e fator FIPE completos disponível neste lote.';button.disabled=false;button.textContent='Conferir FIPE';return;}
+  try{
+    for(const item of group){
+      const code=fipeCodeOf(item),year=vehicleYearOf(item),adjustment=fipeAdjustmentOf(item);
+      const vehicleType=code.startsWith('8')?'motorcycles':'cars';
+      try{
+        const base='https://fipe.parallelum.com.br/api/v2/'+vehicleType+'/'+encodeURIComponent(code)+'/years';
+        const yearsResponse=await fetch(base+'?reference='+fipeReference2026);
+        if(!yearsResponse.ok)throw new Error('Consulta FIPE indisponível');
+        const choices=await yearsResponse.json();
+        if(!Array.isArray(choices))throw new Error('Anos FIPE inválidos');
+        let years=choices.filter(x=>String(x.code||'').startsWith(String(year)+'-'));
+        if(years.length!==1){
+          const fuel=fipeFuelSuffixOf(item);
+          years=fuel?years.filter(x=>String(x.code||'').endsWith(fuel)):[];
+        }
+        if(years.length!==1){review++;continue;}
+        const detailResponse=await fetch(base+'/'+encodeURIComponent(years[0].code)+'?reference='+fipeReference2026);
+        if(!detailResponse.ok)throw new Error('Cotação FIPE não obtida');
+        const detail=await detailResponse.json();
+        if(String(detail.codeFipe||'').replace(/\D/g,'')!==code.replace(/\D/g,'')
+          ||Number(detail.modelYear)!==year
+          ||!fold(detail.referenceMonth||'').includes('outubro')
+          ||!String(detail.referenceMonth||'').includes('2026')){review++;continue;}
+        const baseCents=parseMoney(detail.price);
+        const insuredCents=Math.round(baseCents*adjustment/100);
+        if(!insuredCents||insuredCents>Number.MAX_SAFE_INTEGER){review++;continue;}
+        const reference='FIPE outubro/2026, código '+code+', ano-modelo '+year+
+          ', '+detail.model+', '+detail.price+' × '+adjustment+'% VMR. Fonte: fipe.parallelum.com.br (API independente).';
+        prepared.push({type:'update',id:item.id,kind:'insuredItem',version:item.version,strict:true,updated_at:now(),
+          data:{...item.data,insuredValue:insuredCents,insuredValueBasis:'FIPE 10/2026',
+            fipeCode:code,fipeModelYear:year,fipeAdjustmentPercent:adjustment,fipeReference:'outubro/2026',
+            insuredValueReference:reference,insuredValueVerifiedAt:today()}});
+      }catch(e){errors++;console.warn('FIPE pendente para item',item.id,e);}
+    }
+    if(prepared.length)await api('write',{ops:prepared});
+    await loadRecords();
+    renderDashboard();
+    const newStatus=$('#fipeValueRefreshStatus');
+    if(newStatus)newStatus.textContent=prepared.length+' veículo(s) avaliados; '+review+' aguardam confirmação e '+errors+' consultas indisponíveis. Execute novamente para próximo lote.';
+  }catch(e){
+    if(status)status.textContent='Valores não gravados: '+String(e.message||e);
+    button.disabled=false;button.textContent='Conferir FIPE';
+  }
+}
 const effectiveCommissionRows=()=>{
   const ids=new Set(portfolioRows().map(r=>r.id));
   const result=new Map();
@@ -922,7 +1014,10 @@ function renderDashboard(){
       ${missingPortfolioPremium?'<p class="dashboard-caution">'+missingPortfolioPremium+' contrato(s) sem prêmio total confirmado ainda não contribuem para esses valores.</p>':''}
       <div class="dashboard-insured-title">
         <span>Valor total assegurado <small>Patrimônio coberto, não é prêmio</small></span>
-        <small>FIPE de outubro/2026 para veículos · LMGA/valor segurado do PDF para empresas e residências</small>
+        <div class="dashboard-fipe-actions">
+          <button type="button" id="fipeValueRefreshBtn" class="btn ghost small">Conferir FIPE (até 5 veículos)</button>
+          <small id="fipeValueRefreshStatus">Referência outubro/2026 · apenas códigos e anos confirmados</small>
+        </div>
       </div>
       <div class="dashboard-premium-pair dashboard-insured-pair">
         <div><span>Valor assegurado em vigência — confirmado</span><strong>${currentInsuredAmount?money(currentInsuredAmount):'A apurar'}</strong>
@@ -1085,6 +1180,8 @@ function renderDashboard(){
       </div>
     </div>`;
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>navigate(b.dataset.go));
+  const fipeUpdateButton=$('#fipeValueRefreshBtn');
+  if(fipeUpdateButton)fipeUpdateButton.onclick=updateFipeInsuredValues;
 }
 function statusTone(value){
   const v=fold(value);
