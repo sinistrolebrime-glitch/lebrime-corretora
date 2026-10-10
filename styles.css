@@ -3171,3 +3171,13 @@ html[data-theme="light"] dialog{
 .commission-rules-grid span{font-size:12px;font-weight:750;color:#536f54}
 .commission-rules-overview>small{font-size:11px;display:block;color:#687582;margin-top:11px;line-height:1.5}
 @media(max-width:760px){.commission-rules-grid{grid-template-columns:1fr}}
+
+/* Valor total assegurado: não confundir importância segurada e prêmio da carteira. */
+.dashboard-insured-title{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin:18px 0 9px;flex-wrap:wrap}
+.dashboard-insured-title>span{font-weight:800;font-size:15px;letter-spacing:-.015em}
+.dashboard-insured-title small{color:var(--muted);font-size:11px;font-weight:500}
+.dashboard-insured-title>span small{display:block;margin-top:3px}
+.dashboard-insured-pair{margin-top:0}
+.dashboard-insured-pair>div{border-color:rgba(116,130,91,.27)}
+.dashboard-insured-pair strong{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(max-width:680px){.dashboard-insured-title{flex-direction:column;align-items:flex-start}}
