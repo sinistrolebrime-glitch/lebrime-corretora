@@ -37,7 +37,7 @@
      ['week','Próximos 7 dias',c.week||0],
      ['attention','Prioridades',(c.late||0)+(c.week||0)],
      ['blocked','Não cobrar / previsão',(c.blocked||0)+(c.forecast||0)],
-     ['paid','Pagas (inclui migração)',(c.paid||0)+(c.paidMigration||0)]
+     ['paid','Pagas registradas (inclui sem evidência)',(c.paid||0)+(c.paidUnverified||0)+(c.paidMigration||0)]
    ];
  }
  function renderQueue(){
@@ -56,6 +56,7 @@
        html+='<button type="button" class="link-btn" data-fcopy="'+id+'">Copiar mensagem</button>';
        html+='<button type="button" class="link-btn" data-faction="contact" data-fid="'+id+'">Registrar contato</button>';
      }
+     if(row.stage==='review_paid_evidence')html+='<button type="button" class="link-btn" data-faction="attach-evidence" data-fid="'+id+'">Anexar evidência</button>';
      if(row.canAnnotate)html+='<button type="button" class="link-btn" data-faction="review-note" data-fid="'+id+'">Registrar conferência</button>';
      if(row.status!=='Pago'&&row.status!=='Cancelado')
        html+='<button type="button" class="link-btn" data-faction="confirm-payment" data-fid="'+id+'">Confirmar pagamento</button>';
@@ -146,12 +147,12 @@
    pending={row,operation};
    const d=dialog();
    d.querySelector('#financeActionTitle').textContent=operation==='contact'?'Registrar contato':
-     operation==='review-note'?'Registrar conferência':'Confirmar pagamento';
+     operation==='review-note'?'Registrar conferência':operation==='attach-evidence'?'Anexar evidência':'Confirmar pagamento';
    d.querySelector('#financeActionContext').textContent=row.clientName+' · '+row.contractNumber+' · parcela '+row.installment+' · '+row.label;
    d.querySelector('#financeResponsible').value=savedOperator||row.responsible||'';
    d.querySelector('#financeNote').value='';
    d.querySelector('#financeEvidence').value='';
-   d.querySelector('#financeEvidenceBox').classList.toggle('is-hidden',operation!=='confirm-payment');
+   d.querySelector('#financeEvidenceBox').classList.toggle('is-hidden',!['confirm-payment','attach-evidence'].includes(operation));
    d.querySelector('#financeNextBox').classList.toggle('is-hidden',operation!=='contact');
    d.querySelector('#financePaidBox').classList.toggle('is-hidden',operation!=='confirm-payment');
    d.querySelector('#financePaidDate').value=new Date(Date.now()-3*3600000).toISOString().slice(0,10);
