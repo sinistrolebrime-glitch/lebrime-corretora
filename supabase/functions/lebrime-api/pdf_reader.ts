@@ -1,5 +1,6 @@
 import * as pdfjsLib from "npm:pdfjs-dist@4.10.38/legacy/build/pdf.mjs";
 import { parseInstallmentSchedule } from "./parse_installments.mjs";
+import { previewProposalFromPages } from "./proposal_preview.mjs";
 const LIMIT=15*1024*1024;
 
 async function readLimited(res:Response){
@@ -77,4 +78,38 @@ export async function extractPaymentPlan(db:any,document:any,bucket:string,premi
   }finally{
     try{await pdf.destroy()}catch{}
   }
+}
+
+/**
+ * Prévia sem gravação: devolve somente campos rotulados e origem (página/trecho).
+ * Parcelamento será exibido somente como sugestão, nunca lançado pelo endpoint.
+ */
+export async function readProposalPreview(input:Uint8Array) {
+ if(input.byteLength<5||input.byteLength>LIMIT||
+    String.fromCharCode(...input.subarray(0,5))!=="%PDF-")
+   throw new Error("Arquivo PDF inválido ou acima de 15 MB.");
+ const pdf=await pdfjsLib.getDocument({data:input,disableWorker:true,isEvalSupported:false}).promise;
+ try {
+  if(pdf.numPages>100)throw new Error("PDF com mais de 100 páginas; encaminhe para conferência.");
+  const pages:string[]=[];
+  for(let n=1;n<=Math.min(pdf.numPages,20);n++){
+   const pg=await pdf.getPage(n);
+   const content=await pg.getTextContent();
+   pages.push(pageLines(content.items as any[]));
+  }
+  const preview=previewProposalFromPages(pages);
+  const premium=Number(preview.fields?.premium?.value||0);
+  const schedule=premium>0?parseInstallmentSchedule(pages,{premium,paymentMethod:""}):
+    {status:"review",reason:"Prêmio não identificado; parcelamento precisa de conferência.",plan:[],matchedPremium:false};
+  const installments=Array.isArray(schedule.plan)?schedule.plan.slice(0,72).map((item:any)=>({
+   installment:Number(item.installmentNo||0),
+   amount:Number(item.amount||0),
+   due:String(item.due||""),
+   sourcePage:Number(item.sourcePage||0)
+  })):[];
+  return {...preview,pdfPages:pdf.numPages,
+   installments:{status:String(schedule.status||"review"),
+    reason:String(schedule.reason||""),matchedPremium:Boolean(schedule.matchedPremium),
+    count:installments.length,plan:installments}};
+ }finally{try{await pdf.destroy()}catch{}}
 }
