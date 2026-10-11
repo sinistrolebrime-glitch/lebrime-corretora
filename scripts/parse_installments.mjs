@@ -5,14 +5,14 @@
  * conciliação exata com o prêmio contratual. Linhas ambíguas vão para revisão.
  */
 export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={}) {
-  const heading=/^parcelas?$|parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|presta[cç][oõ]es?\s+vencimento/i;
+  const heading=/^parcelas?$|parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|parc\.\s+vencimento\s+valor|presta[cç][oõ]es?\s+vencimento/i;
   const explicit=/\b(?:parcela|prestação|prestacao)\s*(?:n[ºo°.]?\s*)?0?(\d{1,2})(?:\s*(?:\/|de)\s*0?(\d{1,2}))?/i;
   const numbered=/^\s*0?(\d{1,2})\s*(?:\/\s*0?(\d{1,2}))?(?=\s|[-|;:])/;
   const dates=/\b([0-3]?\d)\/([01]?\d)\/(20\d{2})\b/g;
   const currency=/(?:R\$\s*)?(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}\b/g;
   // Quadros em duas colunas: "1 14/09/2026 8.149,60 4 20/12/2026 8.149,60".
   // Só analisar como tabela após encontrar o cabeçalho explícito de parcelas.
-  const tableHeader=/PARCELAS?\s+VENCIMENTO\s+VALOR|PARCELAS?\s+VALOR\s+VENCIMENTO/i;
+  const tableHeader=/PARCELAS?\s+VENCIMENTO\s+VALOR|PARCELAS?\s+VALOR\s+VENCIMENTO|PARC\.\s+VENCIMENTO\s+VALOR/i;
   const tableRow=/(?:^|\s)(0?[1-9]|[1-6]\d|7[0-2])\s+([0-3]?\d\/[01]?\d\/20\d{2})\s+(?:R\$\s*)?((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})(?=\s|$|P[aá]gina)/gi;
   const amountPair=/(?:^|\s)(0?[1-9]|[1-6]\d|7[0-2])\s+R\$\s*((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})(?=\s|$)/gi;
   const parseMoney=raw=>{
