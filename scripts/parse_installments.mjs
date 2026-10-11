@@ -5,7 +5,7 @@
  * conciliação exata com o prêmio contratual. Linhas ambíguas vão para revisão.
  */
 export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={}) {
-  const heading=/parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|presta[cç][oõ]es?\s+vencimento/i;
+  const heading=/parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|presta[cç][oõ]es?\s+vencimento/i;
   const explicit=/\b(?:parcela|prestação|prestacao)\s*(?:n[ºo°.]?\s*)?0?(\d{1,2})(?:\s*(?:\/|de)\s*0?(\d{1,2}))?/i;
   const numbered=/^\s*0?(\d{1,2})\s*(?:\/\s*0?(\d{1,2}))?(?=\s|[-|;:])/;
   const dates=/\b([0-3]?\d)\/([01]?\d)\/(20\d{2})\b/g;
@@ -24,8 +24,13 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   for(let pageIndex=0;pageIndex<Math.min(source.length,20);pageIndex++){
     const lines=String(source[pageIndex]||'').split(/\r?\n/).map(line=>line.replace(/\s+/g,' ').trim()).filter(Boolean);
     let context=0;
+    let dueReference='';
+
     for(let i=0;i<lines.length;i++){
       const line=lines[i];
+      const partialReference=line.match(/\bVencimento\s*:\s*(?:0?[1-9]|[12]\d|3[01])\b/i);
+      if(partialReference)dueReference=partialReference[0];
+      if(/fatura\s+d[oa]\s+cart[aã]o/i.test(line))dueReference='Fatura do cartão';
       if(heading.test(line)){context=25;headings++;}
       else context=Math.max(0,context-1);
       const explicitMatch=explicit.exec(line);
@@ -37,11 +42,15 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
       // ainda é ambígua; não atribuímos valores de outro item silenciosamente.
       const foundDates=Array.from(line.matchAll(dates));
       const foundMoney=Array.from(line.matchAll(currency));
-      if(foundDates.length!==1||foundMoney.length!==1)continue;
-      const d=foundDates[0],iso=validISO(d[1],d[2],d[3]);
+      if(foundDates.length>1||foundMoney.length!==1)continue;
+      const d=foundDates[0];
+      const iso=d?validISO(d[1],d[2],d[3]):'';
+      if(d&&!iso)continue;
+      if(!d&&!context)continue;
       const amount=parseMoney(foundMoney[0][0]);
-      if(!iso||amount<=0||amount>100_000_000_000)continue;
+      if(amount<=0||amount>100_000_000_000)continue;
       candidates.push({number:n,totalHint:hintedTotal,amount,due:iso,
+        dueText:iso?'':dueReference,
         paymentMethod:String(paymentMethod||''),sourcePage:pageIndex+1,sourceLine:i+1,
         explicit:!!explicitMatch,context:context>0});
     }
@@ -65,15 +74,19 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   const strongContext=headings>0||plan.every(r=>r.explicit);
   const sourceValid=source.length>0&&plan.length>0;
   const premiumMatch=Number.isSafeInteger(expectedPremium)&&expectedPremium>0&&total===expectedPremium;
-  const high=sourceValid&&sequential&&consistentCount&&strongContext&&premiumMatch;
+  const reconciled=sourceValid&&sequential&&consistentCount&&strongContext&&premiumMatch;
+  const hasAllDates=plan.every(p=>p.due);
+  const high=reconciled&&hasAllDates;
+  const partial=reconciled&&!hasAllDates;
   let reason='Conciliação pendente';
   if(!plan.length)reason='Quadro de parcelas com valores e vencimentos não identificado';
   else if(!sequential)reason='Numeração das parcelas incompleta ou fora de sequência';
   else if(!consistentCount)reason='Quantidade de parcelas divergente';
   else if(!strongContext)reason='Quadro de parcelamento não identificado com segurança';
   else if(!premiumMatch)reason='Soma das parcelas diferente do prêmio total cadastrado';
+  else if(!hasAllDates)reason='Valores conciliados; falta confirmar os vencimentos no PDF';
   else reason='Valores, vencimentos e prêmio conciliados';
-  return {status:high?'verified':'review',reason,plan:plan.map(({number,totalHint,explicit,context,...rest})=>({installmentNo:number,...rest})),
+  return {status:high?'verified':partial?'partial':'review',reason,plan:plan.map(({number,totalHint,explicit,context,...rest})=>({installmentNo:number,...rest})),
     pages:source.length,found:candidates.length,amountTotal:total,premium:expectedPremium,
     variance:expectedPremium?total-expectedPremium:null,matchedPremium:premiumMatch};
 }
