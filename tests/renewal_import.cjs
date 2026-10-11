@@ -93,6 +93,14 @@ async function submit(){
  assert.equal(writes.length,1,'cadastro duplicado bloqueado');
  assert.equal(calls.filter(c=>c.action==='storage-put').length,1);
  assert.match(message,/Já existe/);
+ // CPF/CNPJ extraído de PDF não pode ser trocado por outro cliente no salvar.
+ sourceObject.LebrimeProposalPreview={documentFor:()=> '99999999999'};
+ E('newRenewalNumber').value='NOVO-DIFERENTE';
+ E('newRenewalPdf').files=[pdf('novo.pdf')];
+ message=await submit();
+ assert.match(message,/CPF\/CNPJ da proposta diverge/i);
+ assert.equal(writes.length,1);
+ delete sourceObject.LebrimeProposalPreview;
  // Falso PDF rejeitado antes do upload e antes da escrita.
  E('newRenewalNumber').value='NOVO-DIF';
  E('newRenewalPdf').files=[pdf('falso.pdf','HELLO')];
