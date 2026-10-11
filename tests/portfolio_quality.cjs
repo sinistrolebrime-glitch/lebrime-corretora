@@ -19,13 +19,13 @@ const context={document,renderDashboard:()=>{},list:type=>type==='client'?client
  portfolioRows:()=>contracts,esc:s=>s,globalThis:{},Date,String,Number,Set};
 vm.createContext(context);
 vm.runInContext(code,context);
-const result=context.LebrimePortfolioQuality.coverage(clients,contracts,docs,payments);
+const result=context.globalThis.LebrimePortfolioQuality.coverage(clients,contracts,docs,payments);
 assert.equal(result.missingClient,1);
 assert.deepEqual(result.stats.map(x=>[x.value,x.total]),[[1,2],[2,3],[1,3],[2,3],[1,2]]);
-assert.equal(context.LebrimePortfolioQuality.percentage(1,2),50);
-assert.equal(context.LebrimePortfolioQuality.percentage(0,0),0);
-assert.equal(context.LebrimePortfolioQuality.isoDate('2026-02-30'),false);
-assert.equal(context.LebrimePortfolioQuality.isoDate('2028-02-29'),true);
+assert.equal(context.globalThis.LebrimePortfolioQuality.percentage(1,2),50);
+assert.equal(context.globalThis.LebrimePortfolioQuality.percentage(0,0),0);
+assert.equal(context.globalThis.LebrimePortfolioQuality.isoDate('2026-02-30'),false);
+assert.equal(context.globalThis.LebrimePortfolioQuality.isoDate('2028-02-29'),true);
 context.renderDashboard();
 assert.match(dashboard.innerHTML,/Conferência de dados da carteira/);
 assert.match(dashboard.innerHTML,/Parcelas com vencimento documentado/);
