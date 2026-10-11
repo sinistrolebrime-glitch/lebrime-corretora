@@ -2319,6 +2319,7 @@ function clientBrokerageOptions(insurances){
     .sort((a,b)=>a.localeCompare(b,'pt-BR'));
 }
 
+if(typeof document.createElement==='function'&&document.head?.appendChild){
 const endorsementStyleLebrime=document.createElement('style');
 endorsementStyleLebrime.textContent='.lebrime-endorsement-event{margin:0 0 18px 14px;padding:14px;border-left:3px solid #b48a4f;background:rgba(180,138,79,.065);border-radius:0 10px 10px 0;display:grid;gap:8px}'+
 '.lebrime-endorsement-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}'+
@@ -2326,6 +2327,7 @@ endorsementStyleLebrime.textContent='.lebrime-endorsement-event{margin:0 0 18px 
 '.lebrime-endorsement-summary{display:flex;flex-wrap:wrap;gap:12px 18px;font-size:12px}'+
 '.lebrime-endorsement-event small{color:var(--muted,#667586)}';
 document.head.appendChild(endorsementStyleLebrime);
+}
 function renderClientDetail(clientId,brokerageFilter='all'){
   const client=rowById(clientId);if(!client)return;
   const d=client.data;
