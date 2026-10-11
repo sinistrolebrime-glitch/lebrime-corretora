@@ -35,7 +35,7 @@
      ['review','Conferência',c.review||0],
      ['late','Vencidas sem confirmação',c.late||0],
      ['week','Próximos 7 dias',c.week||0],
-     ['attention','Prioridades',(c.late||0)+(c.today||0)+(c.week||0)],
+     ['attention','Prioridades',(c.late||0)+(c.week||0)],
      ['blocked','Não cobrar / previsão',(c.blocked||0)+(c.forecast||0)],
      ['paid','Pagas (inclui migração)',(c.paid||0)+(c.paidMigration||0)]
    ];
