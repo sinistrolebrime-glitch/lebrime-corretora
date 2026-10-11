@@ -24,13 +24,29 @@ const FINANCE=(()=>{
   );
   const blocked=row=>['cancelado','cancelada','pago','paga'].includes(String(row?.data?.status||'').toLowerCase())||
     /n[aã]o cobrar|em tratativa|em verifica[cç][aã]o/i.test(String(row?.data?.collectionStatus||''));
+  const planDifference=contract=>{
+    const d=contract?.data||{},plan=d.installmentPlan;
+    if(!Array.isArray(plan)||!plan.length)return null;
+    const premium=Number(d.premium);
+    if(!Number.isSafeInteger(premium)||premium<=0)return null;
+    let sum=0;
+    for(const entry of plan){
+      const v=Number(entry?.amount);
+      if(!Number.isSafeInteger(v)||v<0)return null;
+      sum+=v;
+    }
+    return Number.isSafeInteger(sum)?sum-premium:null;
+  };
   const stage=(row,contract,imported,cutoff='2026-10',asOf=todayISO())=>{
     if(row?.virtual)return 'Conferir parcelamento';
     const d=row?.data||{};
     if(d.status==='Cancelado')return 'Cancelada';
-    if(d.status==='Pago')return /migra/i.test(String(d.migrationStatus||''))?'Pago por migração':'Pagamento registrado';
+    if(d.status==='Pago')return /migra/i.test(String(d.migrationStatus||''))?'Pago por migração':
+      String(d.paymentEvidence||'').trim()?'Pagamento registrado':'Conferir pagamento sem comprovante';
     if(!contract)return 'Conferir vínculo';
     if(!effective(row,contract,imported))return 'Previsão — não cobrar';
+    const difference=planDifference(contract);
+    if(difference!==null&&difference!==0)return 'Conferir diferença no parcelamento';
     if(!Number(d.amount||0))return 'Conferir valor';
     if(!validDate(d.due))return 'Conferir vencimento';
     if(d.due.slice(0,7)<cutoff)return 'Migração a conferir';
@@ -65,7 +81,7 @@ const FINANCE=(()=>{
     return 7;
   };
   const summary=(rows,findContract,imported,cutoff,asOf)=>{
-    const result={overdue:0,today:0,soon:0,review:0,suspended:0,forecast:0,paid:0,paidMigration:0,openValue:0};
+    const result={overdue:0,today:0,soon:0,review:0,suspended:0,forecast:0,paid:0,paidUnverified:0,paidMigration:0,openValue:0};
     for(const row of rows){
       const st=stage(row,findContract(row),imported,cutoff,asOf);
       if(st==='Vencida — não confirmada')result.overdue++;
@@ -75,6 +91,7 @@ const FINANCE=(()=>{
       if(st==='Cobrança suspensa'||row.data?.collectionStatus==='Não cobrar')result.suspended++;
       if(st==='Previsão — não cobrar')result.forecast++;
       if(st==='Pagamento registrado')result.paid++;
+      if(st==='Conferir pagamento sem comprovante')result.paidUnverified++;
       if(st==='Pago por migração')result.paidMigration++;
       if(['Vencida — não confirmada','Vence hoje','A vencer'].includes(st))result.openValue+=Number(row.data.amount||0);
     }
@@ -93,5 +110,5 @@ const FINANCE=(()=>{
       :' Passando para lembrar, com antecedência, do vencimento da sua parcela.'+info+
         ' Caso já tenha efetuado o pagamento, por gentileza desconsidere. Permanecemos à disposição!');
   };
-  return {validDate,importedIds,effective,stage,actionable,queueRows,daysBetween,priority,summary,message};
+  return {validDate,importedIds,effective,planDifference,stage,actionable,queueRows,daysBetween,priority,summary,message};
 })();
