@@ -27,7 +27,7 @@
       if(state.view==='attention'&&!(['Vencida — não confirmada','Vence hoje'].includes(st)||st==='A vencer'&&days!==null&&days<=7))return false;
       if(state.view==='overdue'&&st!=='Vencida — não confirmada')return false;
       if(state.view==='next7'&&!(st==='Vence hoje'||st==='A vencer'&&days!==null&&days<=7))return false;
-      if(state.view==='review'&&!(/^Conferir|^Migração/.test(st)))return false;
+      if(state.view==='review'&&!(/^Conferir|^Migração/.test(st)||st==='Cobrança suspensa'))return false;
       if(state.view==='forecast'&&st!=='Previsão — não cobrar')return false;
       if(state.view==='paid'&&!['Pagamento registrado','Pago por migração'].includes(st))return false;
       if(state.brokerage!=='all'&&!String(c?.data?.brokerages||c?.data?.brokerage||'').split('|').includes(state.brokerage))return false;
@@ -95,7 +95,7 @@
         <div class="finance-filter-grid">
           <label>Fila de trabalho<select id="billingView">
             ${choice('attention','Prioridade · vencidas + próximos 7 dias')}
-            ${choice('review','Conferir PDF / dados')}
+            ${choice('review','Conferir PDF / bloqueadas')}
             ${choice('next7','A vencer nos próximos 7 dias')}
             ${choice('overdue','Vencidas sem confirmação')}
             ${choice('all','Todas as parcelas')}
