@@ -161,10 +161,12 @@ function buildDocumentList(docs){
    '<small>'+clean(doc.name||'Arquivo do contrato')+'</small></span><span class="doc-action">Visualizar</span></button>'
  ).join('');
 }
+if(typeof document.createElement==='function'&&document.head?.appendChild){
 const endossoStyle=document.createElement('style');
 endossoStyle.textContent='.op-endorsement-event{border-left:3px solid #b78b51;padding:10px 12px;margin:0 0 12px 16px;background:#fcf7f0;border-radius:0 8px 8px 0;display:grid;gap:4px}'+
 '.op-endorsement-event small{display:block;font-size:11px;color:#526274;line-height:1.6}';
 document.head.appendChild(endossoStyle);
+}
 const tabs=document.getElementById('clientDetailTabs');
 function showClientTab(name){
  if(!['history','data','payments','documents'].includes(name))name='history';
