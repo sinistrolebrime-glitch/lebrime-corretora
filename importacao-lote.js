@@ -111,6 +111,8 @@ function selectItem(index){
  const transfer=new DataTransfer();
  transfer.items.add(entry.file);
  fileInput.files=transfer.files;
+ fileInput.dispatchEvent(new Event('change',{bubbles:true}));
+ // Descarta a prévia anterior ao trocar o PDF na fila.
  // Sugerir cliente apenas quando nome/documento está inequívoco. Usuário confirma.
  if(entry.match){
   $q('newRenewalClient').value=entry.match.id;
