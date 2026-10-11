@@ -285,5 +285,5 @@ $('#monitorClear').onclick=()=>{$('#monitorText').value='';$('#monitorFilter').v
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab));
 (async()=>{try{const status=await api('session');if(status.role!=='operacional'){location.replace('index.html');}}catch(e){$('#results').textContent='Acesso não validado. '+String(e.message||'');}})();
 </script>
-<script src="operacional-financeiro.js?v=20.34"></script>
+<script src="operacional-financeiro.js?v=20.35"></script>
 </body></html>
