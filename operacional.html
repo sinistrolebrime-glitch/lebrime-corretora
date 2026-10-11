@@ -44,10 +44,10 @@ dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px
  <button type="button" data-tab="payments"><span class="ico">▦</span>Parcelas</button>
  
  </nav></div>
- <div class="sidebar-bottom"><b>Perfil operacional</b><span>Somente consulta, documentos e acompanhamento de contratos. Sem informações de comissões.</span></div>
+ <div class="sidebar-bottom"><b>Perfil operacional</b><span>Consulta de seguros, acompanhamento financeiro e registro de cobranças. Sem acesso a comissões.</span></div>
 </aside>
 <main>
- <header class="topbar"><span class="eyebrow">LEBRIME / Portal interno</span><div class="topright"><span class="tag">Consulta operacional</span><button type="button" id="logout" class="btn" aria-label="Sair do sistema">Sair</button></div></header>
+ <header class="topbar"><span class="eyebrow">LEBRIME / Portal interno</span><div class="topright"><span class="tag">Operacional e financeiro</span><button type="button" id="logout" class="btn" aria-label="Sair do sistema">Sair</button></div></header>
  <div class="content">
   <div class="intro"><span class="eyebrow">CONSULTA DE SEGURADOS</span><h1 id="pageHeading">Encontre um cliente rapidamente.</h1><p id="pageSubheading">Pesquise por nome, CPF, CNPJ ou placa. A ficha reúne as apólices, propostas e vigências em um só lugar.</p></div>
   <section class="panel searchpanel" aria-labelledby="searchTitle">
@@ -285,4 +285,5 @@ $('#monitorClear').onclick=()=>{$('#monitorText').value='';$('#monitorFilter').v
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab));
 (async()=>{try{const status=await api('session');if(status.role!=='operacional'){location.replace('index.html');}}catch(e){$('#results').textContent='Acesso não validado. '+String(e.message||'');}})();
 </script>
+<script src="operacional-financeiro.js?v=20.34"></script>
 </body></html>
