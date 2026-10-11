@@ -8,7 +8,7 @@ async function request(url,options={}){
 }
 (async()=>{
  for(const [url,markers] of [
-  [base+'/?smoke=finance',['financeiro.js','financeiro-ui.js','operacional.html']],
+  [base+'/?smoke=finance',['financeiro.js','financeiro-ui.js','role-bridge.js']],
   [base+'/operacional.html?smoke=finance',['operacional-financeiro.js','lebrime_token_v1']],
   [base+'/operacional-financeiro.js?smoke=finance',['attach-evidence','financeApi']]
  ]){
