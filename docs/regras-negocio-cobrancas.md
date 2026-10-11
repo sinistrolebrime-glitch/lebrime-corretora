@@ -76,3 +76,26 @@ Versão inicial: 2026-10-10. Estas regras são obrigatórias para novas importa�
 - Nenhum WhatsApp é enviado sem revisão e ação humana; pagamentos e cobranças não são presumidos. Gestão e operacional devem partilhar os estados, ainda que tenham interfaces diferentes.
 
 **Validação de implantação:** testes automatizados do extrator, central e regressões; o backend e a atualização da função SQL foram implantados. O teste end-to-end com sessão real e documentos históricos ainda é necessário; os 951 arquivos vinculados ao Drive não foram todos reprocessados neste lote.
+
+
+## Módulo 4 — Operacional, conciliação de carteira e recuperação documental (10/10/2026, v20.34)
+
+**Arquitetura:** serviço independente \`lebrime-finance-operational\` no Supabase, acessado por \`operacional-financeiro.js\` a partir de \`operacional.html\`. O serviço exige e valida o token HMAC da sessão do portal, restringindo-se aos perfis gestor e operacional. Comissões, percentuais dos produtores e informações comerciais estratégicas não são retornados por esse endpoint.
+
+**Fila única de trabalho (mesmo banco da gestão):**
+- Consulta todas as parcelas com paginação no servidor de 60 registros por página, inclusive sem vencimento e com bloqueio \`Não cobrar\`. A consulta anterior descartava parcelas sem data e limitava o retorno a 300.
+- Situações: vencida sem confirmação, vence hoje, próximas, conferir vencimento/valor/vínculo/migração, cobrança suspensa, previsão não cobrável, paga confirmada, paga por migração e cancelada.
+- Filtrar por prioridade, conferência, últimos vencimentos, próximos 7/30 dias, suspensas, pagas ou todas; pesquisar cliente, documento e contrato. Telefones do cliente e dados do contrato são apresentados ao operacional; dados de comissões nunca.
+- Somente datas completas e quantias válidas de parcela efetiva são elegíveis a mensagens. Vencida sem confirmação **não significa inadimplência comprovada**.
+- Lembrete de parcela ou consulta de cobrança são textos copiáveis, nunca enviados automaticamente. Alerta quando o registro já teve contato nas últimas 24 horas.
+- Equipe operacional pode registrar um contato com responsável, observação e próximo acompanhamento, registrar motivo de conferência ou dar baixa como \`Pago\` com evidência obrigatória. Ações usam validação do servidor, controle de versão e histórico append-only limitado, para detectar mudanças concorrentes.
+- A equipe operacional não pode liberar \`Não cobrar\`, alterar valores/vencimentos nem excluir contratos pela nova tela. As liberações de bloqueios e ajustes documentais permanecem para o gestor. A gestão passa a visualizar último contato e responsável na Central de Parcelas.
+
+**Recuperação segura da carteira histórica — primeiro lote auditado:**
+- As propostas antigas permanecem vinculadas ao cliente; nenhuma duplicata foi criada.
+- A proposta 140675343, com duas cópias idênticas do quadro documental, teve dez parcelas conciliadas com os PDFs: de 14/09/2026 a 20/06/2027, valor total R$ 81.496,12. As dez parcelas preexistentes foram sincronizadas sem aumento do total de registros.
+- A primeira parcela ficou \`Paga — Migração\` pelo corte da implantação. A informação é técnica, **não confirmação bancária**. Os dez bloqueios de contato \`Não cobrar\` foram preservados.
+- Outras duas propostas do lote inicial foram consideradas incompletas em vencimentos e não receberam datas inferidas.
+- Leitor de PDF passou a reconhecer tabelas com **duas colunas de parcelas na mesma linha**; foram criados testes para esse formato e executadas as regressões no repositório. O serviço original \`lebrime-api\` foi atualizado para v25 com o parser novo.
+
+**Próximas verificações operacionais:** login e funcionamento real da fila com sessão operacional; desempenho da paginação com o volume total; conferência pontual de 10 PDFs por lote, preservando dados e gerando relatório de resultados e exceções. Até essas verificações, não afirmar que 100% das importações históricas foram reconciliadas.
