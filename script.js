@@ -287,9 +287,11 @@ const effectiveCommissionRows=()=>{
   for(const row of list('commission')){
     const id=row.data.policyId||row.data.proposalId||'';
     if(!ids.has(id)||fold(row.data.status||'').includes('duplicada'))continue;
-    const prior=result.get(id);
+    // Endosso tem comissão própria; não substituir a comissão principal.
+    const key=row.data.endorsementId?'endosso:'+row.data.endorsementId:id;
+    const prior=result.get(key);
     if(!prior||Number(row.data.received||0)>Number(prior.data.received||0)||
-      (Number(row.data.received||0)===Number(prior.data.received||0)&&Number(row.data.expected||0)>Number(prior.data.expected||0)))result.set(id,row);
+      (Number(row.data.received||0)===Number(prior.data.received||0)&&Number(row.data.expected||0)>Number(prior.data.expected||0)))result.set(key,row);
   }
   return [...result.values()];
 };
@@ -2298,6 +2300,13 @@ function clientBrokerageOptions(insurances){
     .sort((a,b)=>a.localeCompare(b,'pt-BR'));
 }
 
+const endorsementStyleLebrime=document.createElement('style');
+endorsementStyleLebrime.textContent='.lebrime-endorsement-event{margin:0 0 18px 14px;padding:14px;border-left:3px solid #b48a4f;background:rgba(180,138,79,.065);border-radius:0 10px 10px 0;display:grid;gap:8px}'+
+'.lebrime-endorsement-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}'+
+'.lebrime-endorsement-vehicles{display:grid;gap:5px;font-size:13px}'+
+'.lebrime-endorsement-summary{display:flex;flex-wrap:wrap;gap:12px 18px;font-size:12px}'+
+'.lebrime-endorsement-event small{color:var(--muted,#667586)}';
+document.head.appendChild(endorsementStyleLebrime);
 function renderClientDetail(clientId,brokerageFilter='all'){
   const client=rowById(clientId);if(!client)return;
   const d=client.data;
@@ -2340,8 +2349,25 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const insuranceHtml=insurances.length?insurances.map((r,index)=>{
     const doc=primaryInsuranceDocument(r);
     const hasPdf=insuranceDocumentAvailable(r);
-    const endorsementCount=relatedEndorsementsFor(r).length+
-      insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso').length;
+    const relatedEndorsements=relatedEndorsementsFor(r);
+    const endorsementDocs=insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso');
+    const endorsementCount=Math.max(relatedEndorsements.length,endorsementDocs.length);
+    const endorsementHistoryHtml=relatedEndorsements.slice().sort((a,b)=>
+      String(a.data.start||'').localeCompare(String(b.data.start||''))).map(e=>{
+      const v=e.data||{};
+      return `<div class="lebrime-endorsement-event">
+        <div class="lebrime-endorsement-heading"><strong>Endosso ${esc(v.number||'')} · ${date(v.start)}</strong>
+          <span class="status-pill corporate-status">Substituição de veículo</span></div>
+        <div class="lebrime-endorsement-vehicles">
+          <span>Anterior: ${esc(v.priorVehicle||'Veículo anterior não identificado')} ${v.priorPlate?' · '+esc(v.priorPlate):''}</span>
+          <span>Substituto: ${esc(v.newVehicle||'Veículo substituto pendente')}</span></div>
+        <div class="lebrime-endorsement-summary"><span>Prêmio adicional: <strong>${money(v.premium)}</strong></span>
+          <span>Produtor: <strong>${esc(v.producerName||producerLabelOf(e))}</strong></span>
+          <span>Comissão: <strong>${Number(v.commissionPercent||0)?String(v.commissionPercent).replace('.',',')+'%':'Pendente'}</strong></span>
+          <span>Vigência do endosso: <strong>${date(v.start)} a ${date(v.end)}</strong></span></div>
+        <small>Mesma apólice ${esc(v.parentPolicyNumber||v.policyNumber||'—')}; não gera nova vigência.</small>
+      </div>`;
+    }).join('');
     const periodState=insurancePeriodState(r);
     const periodTitle=insuranceHistoryPeriod(r);
     const previousPeriod=index>0?insuranceHistoryPeriod(insurances[index-1]):'';
@@ -2371,7 +2397,8 @@ function renderClientDetail(clientId,brokerageFilter='all'){
           ${hasPdf?`<button class="btn ghost small" data-client-open-insurance-pdf="${r.id}">Abrir PDF</button>`:''}
           <button class="btn primary small" data-client-open-insurance="${r.id}">Abrir ficha</button>
         </div>
-      </article>`;
+      </article>
+      ${endorsementHistoryHtml}`;
   }).join(''):'<div class="empty compact">Nenhuma proposta ou apólice encontrada para o filtro selecionado.</div>';
 
   const paymentHtml=payments.length?payments.slice().sort((a,b)=>
