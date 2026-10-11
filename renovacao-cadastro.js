@@ -82,6 +82,17 @@ el('renewalNewForm').onsubmit=async e=>{
  const duplicate=portfolioRows().some(r=>r.data.clientId===clientId&&norm(r.data.insurer)===norm(insurer)&&
   norm(r.data.number)===norm(number)&&r.data.start===start&&r.data.end===end);
  if(duplicate)return setMessage('Já existe proposta/apólice com o mesmo número e vigência nesse cliente. Não foi duplicada.');
+ const hashHex=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',value)))
+  .map(x=>x.toString(16).padStart(2,'0')).join('');
+ let fileHash='',importFingerprint='';
+ try{
+  fileHash=await hashHex(await file.arrayBuffer());
+  const fingerprintData=[clientId,norm(insurer),norm(branch),norm(number),start,end].join('|');
+  importFingerprint=await hashHex(new TextEncoder().encode('lebrime-renewal-v1|'+fingerprintData));
+ }catch{return setMessage('Não foi possível conferir a integridade do PDF.');}
+ if(list('document').some(r=>r.data?.fileSha256===fileHash&&String(r.data?.clientId||'')===clientId)){
+  return setMessage('Este PDF já está cadastrado no cliente. Abra o documento existente em vez de importar novamente.');
+ }
  const proposalId=uuid(),documentId=uuid(),stamp=now(),docType='Proposta';
  const key='clients/'+clientId+'/'+stamp.slice(0,4)+'/'+stamp.slice(5,7)+'/'+documentId+'-'+file.name.replace(/[^a-zA-Z0-9._-]/g,'-');
  locked=true;el('newRenewalSubmit').disabled=true;
@@ -93,10 +104,13 @@ el('renewalNewForm').onsubmit=async e=>{
   const newlyImported=portfolioRows().some(r=>r.data.clientId===clientId&&norm(r.data.insurer)===norm(insurer)&&
    norm(r.data.number)===norm(number)&&r.data.start===start&&r.data.end===end);
   if(newlyImported)throw new Error('Outra sessão já cadastrou esta proposta. Nenhum novo PDF foi gravado.');
+  if(list('document').some(r=>r.data?.fileSha256===fileHash&&String(r.data?.clientId||'')===clientId))
+   throw new Error('Este mesmo PDF já foi importado para o cliente por outra sessão.');
   await api('storage-put',file,{raw:true,key,headers:{'content-type':'application/pdf'}});
   uploaded=true;
   const proposal={clientId,number,insurer,branch,start,end,premium,brokerage,brokerages:brokerage,
    status:'Importada — verificar emissão',source:'Importação manual de renovação',renewalOf:prior?.id||'',
+   importFingerprint,sourcePdfSha256:fileHash,
    renewalType:prior?'Renovação':'Seguro novo',producerPending:true,
    producerAssignmentStatus:'Pendente — conferir relatório',commissionPending:true,
    insuredValuePending:true,insuranceQualityStatus:'A conferir — verificar PDF',
@@ -104,7 +118,7 @@ el('renewalNewForm').onsubmit=async e=>{
    paymentDueText:'Conferir vencimentos no PDF'};
   const documentData={clientId,proposalId,policyId:'',contractId:proposalId,name:file.name,originalFileName:file.name,
    documentType:docType,referenceDate:start,storageKey:key,status:'Recebido',mimeType:'application/pdf',
-   fileSize:file.size,source:'Importação manual da proposta'};
+   fileSize:file.size,fileSha256:fileHash,source:'Importação manual da proposta'};
   await api('write',{ops:[
    {type:'insert',id:proposalId,kind:'proposal',data:proposal,version:1,created_at:stamp,updated_at:stamp},
    {type:'insert',id:documentId,kind:'document',data:documentData,version:1,created_at:stamp,updated_at:stamp}
@@ -118,6 +132,9 @@ el('renewalNewForm').onsubmit=async e=>{
    else finance='Parcelamento em revisão: '+String(output.reason||'cronograma incompleto');
   }catch(err){finance='Parcelamento em revisão: '+String(err.message||err);}
   await loadRecords();clientOptions();
+  document.dispatchEvent(new CustomEvent('lebrime-renewal-import-success',{
+    detail:{clientId,proposalId,documentId,fileSha256:fileHash,importFingerprint}
+  }));
   setMessage('Nova vigência criada no cliente existente. '+finance+' Produtor e comissão pendentes de fonte confirmada.');
   const button=document.createElement('button');button.type='button';button.className='btn ghost small';
   button.textContent='Abrir ficha atualizada do cliente';
