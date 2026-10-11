@@ -116,5 +116,9 @@ style.textContent='#newRenewalPreviewPanel{border:1px solid #e3e9ef;border-radiu
  '.pdf-preview-summary{padding:10px;border:1px solid #e6e9f0;border-radius:8px}'+
  '.pdf-preview-notes{padding-left:20px;font-size:12px;line-height:1.7}';
 document.head.appendChild(style);
-globalThis.LebrimeProposalPreview={linkedClient};
+globalThis.LebrimeProposalPreview={
+ linkedClient,
+ documentFor:file=>file&&analyzed&&activeFile===file?
+  digits(analyzed.fields?.insuredDocument?.value)||null:null
+};
 })();
