@@ -26,7 +26,10 @@
      if(!response.ok||!data.token)throw new Error(data.error||'Nao foi possivel entrar.');
      localStorage.setItem(key,data.token);
      pass.value='';
-     if(data.role==='operacional'){location.replace('operacional.html');return;}
+     if(data.role==='operacional'){
+       try{sessionStorage.setItem('lebrime_operacional_handoff',String(Date.now()));}catch{}
+       location.replace('operacional.html');return;
+     }
      if(data.role!=='gestor')throw new Error('Perfil de acesso nao reconhecido.');
      await boot();
    }catch(e){if(error)error.textContent=e.message||'Falha ao autenticar.';}
