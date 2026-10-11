@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>LEBRIME · Consulta de Segurados</title>
+<meta name="robots" content="noindex,nofollow"><title>LEBRIME · Acesso Operacional</title>
 <style>
 :root{--gold:#b78b51;--gold-dark:#8e672f;--ink:#1d2633;--muted:#647083;--line:#e9edf2;--bg:#f6f7f9;--white:#fff;--blue:#102c50}
 *{box-sizing:border-box}body{margin:0;font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #d4b386;outline-offset:2px}
@@ -32,8 +32,40 @@ dialog{border:1px solid var(--line);border-radius:17px;padding:0;width:min(540px
 .warning-text{margin-top:14px;font-size:12px;color:#835e2c}.monitor-status{color:#667585;font-size:12px;padding:12px 0 0}
 @media(max-width:900px){.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.monitor-tools input,.monitor-tools select{min-width:100%;width:100%}.monitor-tools .right{width:100%}.monitor-tools .right button{flex:1}}
 </style>
+
+<style>
+/* Proteção antes do carregamento do JavaScript e durante a validação da sessão. */
+body:not(.op-authenticated) .app{display:none!important}
+#operationalLogin[hidden],body.op-authenticated #operationalLogin{display:none!important}
+#operationalLogin{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(145deg,#f3f5f8,#f9f5ef)}
+.operational-login-card{width:min(430px,100%);padding:35px;background:#fff;border:1px solid #e6eaf0;border-radius:18px;box-shadow:0 14px 55px #17263814}
+.operational-login-card .monogram{margin:0 auto 15px}
+.operational-login-card h1{text-align:center;font-size:25px;letter-spacing:-.035em;margin:0 0 9px}
+.operational-login-card p{color:#637184;text-align:center;margin:0 0 26px}
+.operational-login-card label{display:block;margin:0 0 7px;font-size:12px;font-weight:750}
+.operational-login-card input{height:47px;width:100%;margin-bottom:16px;border-radius:9px;border:1px solid #dbe1e9;padding:0 13px;background:#fff}
+.operational-login-card .btn.primary{width:100%;min-height:46px}
+.operational-login-card .btn:disabled{opacity:.65}
+#operationalLoginError{min-height:22px;text-align:center;font-size:12px;color:#a33d38;margin:12px 0 0}
+.operational-login-card small{display:block;text-align:center;margin-top:14px;color:#718095}
+@media(max-width:730px){body.op-authenticated .app{display:block!important}}
+</style>
 </head>
 <body>
+<section id="operationalLogin" aria-label="Autenticação operacional">
+ <form id="operationalLoginForm" class="operational-login-card" autocomplete="on">
+  <span class="monogram">L</span>
+  <h1>Portal Lebrime</h1>
+  <p>Entre com seu usuário e senha para acessar a área operacional.</p>
+  <label for="operationalUsername">Usuário</label>
+  <input id="operationalUsername" name="username" autocomplete="username" value="lebrime" required>
+  <label for="operationalPassword">Senha</label>
+  <input id="operationalPassword" name="password" type="password" autocomplete="current-password" required>
+  <button id="operationalLoginButton" class="btn primary" type="submit">Entrar na área operacional</button>
+  <div id="operationalLoginError" role="alert" aria-live="polite"></div>
+  <small>Acesso exclusivo a usuários autorizados da Lebrime.</small>
+ </form>
+</section>
 <div class="app">
 <aside class="sidebar">
  <div class="brand"><span class="monogram">L</span><div><strong>LEBRIME</strong><small>Corretora de seguros</small></div></div>
@@ -283,7 +315,8 @@ $('#monitorFilter').onchange=renderMonitor;
 $('#monitorText').oninput=renderMonitor;
 $('#monitorClear').onclick=()=>{$('#monitorText').value='';$('#monitorFilter').value=currentTab==='payments'?'late':'month';renderMonitor();};
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab));
-(async()=>{try{const status=await api('session');if(status.role!=='operacional'){location.replace('index.html');}}catch(e){$('#results').textContent='Acesso não validado. '+String(e.message||'');}})();
+// A autenticação da área é executada por operacional-auth.js antes de liberar o painel.
 </script>
-<script src="operacional-financeiro.js?v=20.36"></script>
+<script src="operacional-auth.js?v=20.37"></script>
+<script src="operacional-financeiro.js?v=20.37"></script>
 </body></html>
