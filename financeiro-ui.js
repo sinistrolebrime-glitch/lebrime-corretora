@@ -112,7 +112,7 @@
           :'<small class="muted">Conferir antes de cobrar</small>'}`;
       return `<tr><td><strong>${esc(client?.data?.name||'Cliente não identificado')}</strong><small>${esc(contact||'Telefone não informado')}</small></td>
        <td>${esc(c?.data?.number||'—')}<small>${esc(c?.data?.insurer||'')}</small></td>
-       <td>${esc(row.data.installment||'—')}</td><td>${esc(printableDate(row.data.due)||row.data.dueText||'')}</td>
+       <td>${esc(row.data.installment||'—')}</td><td>${esc(FINANCE.validDate(row.data.due)?date(row.data.due):(row.data.dueText||'A conferir'))}</td>
        <td>${row.virtual?'—':money(row.data.amount)}</td>
        <td><span class="status-pill corporate-status ${st.includes('Vencida')?'danger':st.includes('Conferir')?'warning':'neutral'}">${esc(st)}</span></td>
        <td class="actions">${action}</td></tr>`;
