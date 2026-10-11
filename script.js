@@ -2374,9 +2374,16 @@ function renderClientDetail(clientId,brokerageFilter='all'){
       </article>`;
   }).join(''):'<div class="empty compact">Nenhuma proposta ou apólice encontrada para o filtro selecionado.</div>';
 
-  const paymentHtml=openPayments.length?openPayments.slice(0,10).map(r=>`
-    <div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')}</strong><span>${date(r.data.due)} · ${esc(r.data.collectionStatus||'Acompanhar')}</span></div><strong>${money(r.data.amount)}</strong></div>
-  `).join(''):'<div class="empty compact">Nenhuma parcela efetiva em aberto.</div>';
+  const paymentHtml=payments.length?payments.slice().sort((a,b)=>
+    String(a.data.due||'9999').localeCompare(String(b.data.due||'9999'))).map(r=>{
+    const insurance=rowById(r.data.policyId||r.data.proposalId);
+    const migration=/migra/i.test(String(r.data.migrationStatus||''));
+    const status=r.data.status==='Pago'?(migration?'Paga por migração':'Pagamento registrado'):
+      r.data.collectionStatus==='Não cobrar'?'Não cobrar · conferência':
+      r.data.collectionStatus||r.data.status||'Acompanhar';
+    return `<div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')} · ${esc(insurance?.data?.number||'Contrato')}</strong>
+      <span>${esc(r.data.due?date(r.data.due):r.data.dueText||'Vencimento a conferir')} · ${esc(status)}</span></div><strong>${money(r.data.amount)}</strong></div>`;
+  }).join(''):'<div class="empty compact">Nenhuma parcela vinculada aos contratos desta ficha.</div>';
 
   const taskHtml=tasks.length?tasks.slice(0,10).map(r=>`
     <div class="detail-row"><div><strong>${esc(r.data.title||'Pendência')}</strong><span>${esc(r.data.source||'Operação')} · ${r.data.due?date(r.data.due):'Sem prazo'}</span></div><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'Pendente')}</span></div>
@@ -2445,7 +2452,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     </section>
 
     <div class="detail-columns">
-      <section class="detail-section"><div class="section-title-row"><div><h3>Parcelas em aberto</h3><p>Somente parcelas efetivas vinculadas aos contratos exibidos.</p></div></div>${paymentHtml}</section>
+      <section class="detail-section"><div class="section-title-row"><div><h3>Parcelas — histórico completo</h3><p>Todos os pagamentos e vencimentos vinculados aos contratos exibidos, inclusive registros antigos e parcelas em conferência.</p></div></div>${paymentHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Pendências</h3><p>Ações operacionais que ainda exigem acompanhamento.</p></div></div>${taskHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Renovações</h3><p>Contratos do cliente em acompanhamento de renovação.</p></div></div>${renewalHtml}</section>
       <section class="detail-section"><div class="section-title-row"><div><h3>Sinistros</h3><p>Sinistros vinculados às apólices exibidas.</p></div></div>${claimHtml}</section>
