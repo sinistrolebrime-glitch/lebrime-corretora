@@ -14,6 +14,7 @@ function app(file){
       return nodes.get(selector);
     }}
   });
+  vm.runInContext(fs.readFileSync('financeiro.js','utf8'),context);
   vm.runInContext(fs.readFileSync(file,'utf8').split("$('#reloadPortfolioBtn').onclick")[0],context);
   return {context,run:code=>vm.runInContext(code,context),nodes,storage};
 }
