@@ -72,7 +72,7 @@ const FINANCE=(()=>{
       if(st==='Vence hoje')result.today++;
       if(st==='A vencer'&&daysBetween(row.data.due,asOf)<=7)result.soon++;
       if(/^Conferir|^Migração/.test(st))result.review++;
-      if(st==='Cobrança suspensa')result.suspended++;
+      if(st==='Cobrança suspensa'||row.data?.collectionStatus==='Não cobrar')result.suspended++;
       if(st==='Previsão — não cobrar')result.forecast++;
       if(st==='Pagamento registrado')result.paid++;
       if(st==='Pago por migração')result.paidMigration++;
