@@ -43,12 +43,21 @@
   function choice(key,label){return '<option value="'+esc(key)+'" '+(state.view===key?'selected':'')+'>'+esc(label)+'</option>';}
   function summaryMarkup(rows,imported){
     const t=FINANCE.summary(rows,cOf,imported,CUTOFF,todayLocal());
+    const payments=rows.filter(r=>!r.virtual);
+    const validDates=payments.filter(r=>FINANCE.validDate(r.data?.due)).length;
+    const coverage=payments.length?((validDates/payments.length)*100).toFixed(1).replace('.',','):'0,0';
+    const contracts=portfolioRows();
+    const verified=contracts.filter(r=>r.data.installmentExtractionStatus==='Verificado').length;
+    const partial=contracts.filter(r=>r.data.installmentExtractionStatus==='Parcial').length;
     return `<div class="summary-strip" aria-label="Indicadores financeiros">
+      <span class="chip">Vencimentos documentados: ${validDates} de ${payments.length} (${coverage}%)</span>
+      <span class="chip">Contratos verificados: ${verified}</span>
+      <span class="chip">Contratos parcialmente conferidos: ${partial}</span>
       <span class="chip danger">Vencidas sem confirmação: ${t.overdue}</span>
       <span class="chip">Vencem hoje: ${t.today}</span>
       <span class="chip">Próximos 7 dias: ${t.soon}</span>
       <span class="chip ${t.review?'danger':''}">Conferência de PDFs: ${t.review}</span>
-      <span class="chip">Suspensas: ${t.suspended}</span>
+      <span class="chip">Cobranças bloqueadas: ${t.suspended}</span>
       <span class="chip">Pagas confirmadas: ${t.paid}</span>
       <span class="chip">Pagas na migração: ${t.paidMigration}</span>
       <span class="chip">Previsões: ${t.forecast}</span>
