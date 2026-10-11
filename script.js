@@ -2571,7 +2571,7 @@ function openInsuranceDetail(insuranceId){
   `).join(''):'<div class="empty compact">Nenhuma parcela vinculada.</div>';
 
   const commissionHtml=commissions.length?commissions.map(r=>`
-    <div class="detail-row"><div><strong>Comissão ${esc(r.data.status||'Prevista')}</strong><span>Bruta: ${money(r.data.expected)} · Produtor: ${money(r.data.producerExpected)}</span></div><div class="row-end"><strong>Recebida ${money(r.data.received)}</strong><span>Líquido Lebrime ${money(r.data.lebrimeNet)}</span></div></div>
+    <div class="detail-row"><div><strong>${r.data.endorsementId?'Comissão do endosso':'Comissão da proposta principal'} · ${esc(r.data.status||'Prevista')}</strong><span>Bruta: ${money(r.data.expected)} · Produtor: ${money(r.data.producerExpected)}</span></div><div class="row-end"><strong>Recebida ${money(r.data.received)}</strong><span>Líquido Lebrime ${money(r.data.lebrimeNet)}</span></div></div>
   `).join(''):'<div class="empty compact">Nenhuma comissão calculada. O sistema não cria comissão sem produtor, percentual e prêmio líquido válidos.</div>';
 
   const directInsurancePdf=documentExternalUrl(insurance);
