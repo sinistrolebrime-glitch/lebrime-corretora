@@ -162,20 +162,21 @@
       const queue=candidates.slice(0,3);
       if(!queue.length){$('#billingExtractionInfo').textContent='Nenhum PDF novo elegível neste momento. Use Ler parcelamento do PDF na linha para reanalisar individualmente.';return;}
       btn.disabled=true;
-      let ok=0,review=0,unavailable=0;
+      let ok=0,partial=0,review=0,unavailable=0;
       for(let i=0;i<queue.length;i++){
         const message=$('#billingExtractionInfo');
         if(message)message.textContent=`Analisando documento ${i+1} de ${queue.length}...`;
         try{
           const result=await api('payments-extract',{documentId:queue[i].id,apply:true});
-          if(result.applied)ok++;
+          if(result.applied&&result.status==='partial')partial++;
+          else if(result.applied)ok++;
           else if(result.status==='unavailable')unavailable++;
           else review++;
         }catch{review++;}
       }
       try{await loadRecords();renderFinance();}catch(e){alert('Falha ao atualizar o financeiro: '+e.message);}
       const summary=$('#billingExtractionInfo');
-      if(summary)summary.textContent=`Bloco salvo: ${ok} plano(s) conciliado(s), ${review} para conferência e ${unavailable} arquivo(s) inacessível(is). Nenhuma cobrança foi enviada.`;
+      if(summary)summary.textContent=`Bloco salvo: ${ok} plano(s) completos, ${partial} parcial(is) com vencimento pendente, ${review} em revisão e ${unavailable} arquivo(s) inacessível(is). Nenhuma cobrança foi enviada.`;
     };
     document.querySelectorAll('[data-billing-contract]').forEach(b=>b.onclick=()=>{const c=rowById(b.dataset.billingContract);if(c)openInsuranceDetail(c.id);});
     document.querySelectorAll('[data-billing-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.billingEdit)));
@@ -196,7 +197,9 @@
       renderFinance();
       const el=$('#billingExtractionInfo');
       if(el)el.textContent=result.applied
-        ?`PDF conciliado com o prêmio: ${result.count} parcela(s) sincronizada(s). Confira a situação de cobrança antes de enviar lembretes.`
+        ?result.status==='partial'
+          ?`Valores de ${result.count} parcela(s) registrados; vencimentos ainda pendentes de conferência.`
+          :`PDF conciliado com o prêmio: ${result.count} parcela(s) sincronizada(s). Confira a situação de cobrança antes de enviar lembretes.`
         :`PDF requer revisão: ${String(result.reason||'dados insuficientes')}.`;
     }catch(e){alert('Leitura do PDF não concluída: '+e.message);}
   }
