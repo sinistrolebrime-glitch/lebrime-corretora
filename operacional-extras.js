@@ -240,6 +240,10 @@ document.addEventListener('click',e=>{
 detail.addEventListener('close',resetPdf);
 const oldClear=document.getElementById('clear').onclick;
 document.getElementById('clear').onclick=function(){closeSuggestions();if(oldClear)oldClear.call(this);};
+document.addEventListener('lebrime-operacional-logout',()=>{
+ cache=null;loading=null;closeSuggestions();resetPdf();
+ if(detail.open)detail.close();
+});
 document.addEventListener('lebrime-operacional-authenticated',()=>{
  cache=null;loading=null;
  loadIndex().catch(()=>{ /* busca pode tentar novamente na primeira tecla */ });
