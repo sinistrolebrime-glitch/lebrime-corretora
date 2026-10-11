@@ -35,6 +35,13 @@ assert.equal(F.stage(payment('p6',policy,{due:'2026-09-20'}),policy,imported,cut
 assert.equal(F.stage(payment('p7',policy,{due:'2026-10-09'}),policy,imported,cutoff,current),'Vencida — não confirmada');
 assert.equal(F.stage(payment('p8',policy,{due:'2026-10-10'}),policy,imported,cutoff,current),'Vence hoje');
 assert.equal(F.stage(payment('p9',policy,{status:'Pago',migrationStatus:'Paga — Migração'}),policy,imported,cutoff,current),'Pago por migração');
+assert.equal(F.stage(payment('oldPaid',policy,{status:'Pago'}),policy,imported,cutoff,current),'Conferir pagamento sem comprovante');
+assert.equal(F.stage(payment('newPaid',policy,{status:'Pago',paymentEvidence:'Comprovante bancário'}),policy,imported,cutoff,current),'Pagamento registrado');
+const offByOne={...policy,data:{...policy.data,premium:10001,installmentPlan:[{amount:10000,due:'2026-10-12'}]}};
+assert.equal(F.planDifference(offByOne),-1);
+assert.equal(F.stage(payment('reconcile',offByOne),offByOne,imported,cutoff,current),'Conferir diferença no parcelamento');
+assert.equal(F.actionable(payment('reconcile',offByOne),offByOne,imported,cutoff,current),false);
+
 assert.equal(F.actionable(payment('p10',policy,{collectionStatus:'Não cobrar'}),policy,imported,cutoff,current),false);
 assert.equal(F.actionable(payment('p11',policy,{status:'Cancelado'}),policy,imported,cutoff,current),false);
 assert.equal(F.validDate('2026-02-30'),false);
