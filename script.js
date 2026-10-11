@@ -2690,17 +2690,31 @@ async function uploadDocument(e){
       mimeType:f.type||'application/octet-stream',fileSize:f.size,
       notes:$('#uploadNotes').value||placeholder?.data.notes||''
     };
+    const documentId=placeholder?.id||uuid();
     const op=placeholder
-      ?{type:'update',id:placeholder.id,kind:'document',data,version:placeholder.version,updated_at:stamp,strict:true}
-      :{type:'insert',id:uuid(),kind:'document',data,version:1,created_at:stamp,updated_at:stamp};
+      ?{type:'update',id:documentId,kind:'document',data,version:placeholder.version,updated_at:stamp,strict:true}
+      :{type:'insert',id:documentId,kind:'document',data,version:1,created_at:stamp,updated_at:stamp};
     await api('write',{ops:[op]});
     uploaded=false;
+    let extractionNote='';
+    if(insurance && documentType!=='Endosso' && /\.pdf$/i.test(f.name) &&
+       ['Apólice','Proposta'].includes(documentType)){
+      $('#uploadStatus').textContent='Arquivo vinculado. Conferindo automaticamente o parcelamento...';
+      try{
+        const checked=await api('payments-extract',{documentId,apply:true});
+        extractionNote=checked.applied
+          ?' Parcelamento conciliado com o prêmio: '+checked.count+' parcela(s) enviadas à Central.'
+          :' Parcelamento em conferência: '+String(checked.reason||'dados insuficientes')+'.';
+      }catch(error){
+        extractionNote=' Parcelamento pendente de conferência: '+String(error.message||error)+'.';
+      }
+    }
     $('#uploadForm').reset();
-    $('#uploadStatus').textContent=placeholder
+    $('#uploadStatus').textContent=(placeholder
       ?'Arquivo recuperado e vinculado ao seguro com sucesso.'
       :insurance
         ?'Documento armazenado e vinculado ao seguro com sucesso.'
-        :'Documento armazenado na ficha do cliente com sucesso.';
+        :'Documento armazenado na ficha do cliente com sucesso.')+extractionNote;
     await loadRecords();
     uploadPrefill={clientId:'',insuranceId:''};
     await renderImportClients();
