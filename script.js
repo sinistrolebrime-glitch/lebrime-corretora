@@ -696,10 +696,13 @@ async function boot(){
     renderNav();
     navigate('overview');
     // Deep link seguro para a ficha já carregada, sem expor dados sem login.
-    const requestedClient=new URLSearchParams(window.location.search).get('cliente')||'';
-    if(/^[a-z0-9-]{8,100}$/i.test(requestedClient)){
-      const requested=rowById(requestedClient);
-      if(requested?.kind==='client')openClientDetail(requested.id);
+    const linkParams=new URLSearchParams(window.location.search);
+    const requestedRef=linkParams.get('ficha')||linkParams.get('cliente')||'';
+    if(/^[a-z0-9-]{8,100}$/i.test(requestedRef)){
+      const requested=rowById(requestedRef);
+      const client=requested?.kind==='client'?requested:
+        requested?.kind==='endorsement'?rowById(requested.data.clientId):null;
+      if(client?.kind==='client')openClientDetail(client.id);
     }
   }catch(e){
     if(generation!==bootGeneration)return;
