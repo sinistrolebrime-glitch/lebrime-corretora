@@ -27,7 +27,7 @@ function build({cache={},handoff='',loginRole='operacional',reject=false}={}){
  const storage=makeStorage(cache),sessions=makeStorage(handoff?{'lebrime_operacional_handoff':handoff}:{});
  const calls=[];
  const context={
-  document:{body:{classList:{add:s=>classes.add(s),remove:s=>classes.delete(s),contains:s=>classes.has(s)}},
+  document:{dispatchEvent:()=>{},body:{classList:{add:s=>classes.add(s),remove:s=>classes.delete(s),contains:s=>classes.has(s)}},
    getElementById:id=>elements[id]||null},
   localStorage:storage,sessionStorage:sessions,
   fetch:async(url,opts)=>{
@@ -37,7 +37,7 @@ function build({cache={},handoff='',loginRole='operacional',reject=false}={}){
    return {ok,status:ok?200:401,json:async()=>ok?action==='login'?
     {token:'valid.session',role:loginRole}:{role:loginRole}:{error:'Usuário inválido'}};
   },
-  AbortController,setTimeout,clearTimeout,Date,Number,Error,String,JSON,URL,Promise,console
+  AbortController,setTimeout,clearTimeout,Date,Number,Error,String,JSON,URL,Promise,console,Event:class Event{constructor(type){this.type=type}}
  };
  vm.runInNewContext(js,context);
  return {classes,elements,storage,sessions,calls};
