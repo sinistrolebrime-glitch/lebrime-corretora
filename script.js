@@ -2703,7 +2703,9 @@ async function uploadDocument(e){
       try{
         const checked=await api('payments-extract',{documentId,apply:true});
         extractionNote=checked.applied
-          ?' Parcelamento conciliado com o prêmio: '+checked.count+' parcela(s) enviadas à Central.'
+          ?checked.status==='partial'
+            ?' Valores de '+checked.count+' parcela(s) registrados; os vencimentos seguem pendentes de conferência.'
+            :' Parcelamento conciliado com o prêmio: '+checked.count+' parcela(s) enviadas à Central.'
           :' Parcelamento em conferência: '+String(checked.reason||'dados insuficientes')+'.';
       }catch(error){
         extractionNote=' Parcelamento pendente de conferência: '+String(error.message||error)+'.';
