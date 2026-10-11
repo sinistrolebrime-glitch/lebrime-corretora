@@ -855,9 +855,10 @@ function renderDashboard(){
   const futureContracts=contracts.filter(r=>insurancePeriodState(r).key==='future');
   const undatedContracts=contracts.filter(r=>insurancePeriodState(r).key==='unknown');
   const payments=list('payment');
-  const forecasts=payments.filter(r=>r.data.financialTracking==='Previsão da proposta'&&r.data.status!=='Cancelado');
-  const open=payments.filter(r=>r.data.status==='Em aberto'&&r.data.financialTracking!=='Previsão da proposta');
-  const overdue=open.filter(r=>r.data.due&&r.data.due<today());
+  const importedFinance=FINANCE.importedIds(list('document'));
+  const forecasts=payments.filter(r=>!FINANCE.effective(r,contractForRow(r),importedFinance)&&r.data.status!=='Cancelado');
+  const open=payments.filter(r=>FINANCE.actionable(r,contractForRow(r),importedFinance,CUTOFF,today()));
+  const overdue=open.filter(r=>FINANCE.stage(r,contractForRow(r),importedFinance,CUTOFF,today())==='Vencida — não confirmada');
   const renew60=inPeriodContracts.filter(r=>{
     if(!r.data.end)return false;
     const d=(new Date(r.data.end+'T12:00:00Z')-new Date(today()+'T12:00:00Z'))/86400000;
