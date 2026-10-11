@@ -111,9 +111,15 @@
             <label>Início da nova vigência<input id="newRenewalStart" type="date" required></label>
             <label>Fim da nova vigência<input id="newRenewalEnd" type="date" required></label>
             <label>Prêmio total (R$)<input id="newRenewalPremium" placeholder="0,00" required></label>
+            <label>Valor assegurado / LMI total (R$) — se confirmado<input id="newRenewalInsuredValue" inputmode="decimal" placeholder="A conferir"></label>
             <label>Quantidade de parcelas<input id="newRenewalCount" type="number" min="0" max="72" value="0"></label>
             <label>Forma de pagamento<input id="newRenewalPayment" placeholder="Boleto, débito, cartão..."></label>
             <label>PDF da nova proposta<input id="newRenewalPdf" type="file" accept=".pdf,application/pdf" required></label>
+            <div class="span-2" id="newRenewalPreviewPanel">
+              <button type="button" class="btn ghost" id="newRenewalPreviewButton">Ler PDF e mostrar prévia</button>
+              <p id="newRenewalPreviewStatus" class="muted" role="status" aria-live="polite">A análise não salva o arquivo. Confira os dados sugeridos antes de cadastrar.</p>
+              <div id="newRenewalPreviewResults" hidden></div>
+            </div>
             <div class="span-2"><button id="newRenewalSubmit" class="btn primary" type="submit">Cadastrar nova vigência + PDF</button></div>
           </form>
           <div id="newRenewalStatus" class="status" role="status" aria-live="polite"></div>
