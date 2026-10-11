@@ -204,6 +204,40 @@ openDetail=async function(row){
   $('#detailContracts').textContent='Não foi possível carregar a ficha: '+String(e.message||e);
  }
 };
+// A busca completa também usa o índice local: 1 caractere é suficiente.
+search=async function(){
+ const button=document.querySelector('#searchForm button[type="submit"]');
+ closeSuggestions();
+ const terms=fields.map(id=>document.getElementById(id).value.trim()).filter(Boolean).map(matchText);
+ if(!terms.length){
+  $('#results').innerHTML='<div class="empty"><b>Informe um dado para consultar</b>Nome, CPF, CNPJ ou placa.</div>';
+  $('#count').textContent='Aguardando pesquisa';return;
+ }
+ button.disabled=true;button.textContent='Consultando...';
+ try{
+  const index=await loadIndex();
+  const all=new Map();
+  for(const c of index.contracts){
+   const client=index.byClient.get(c.clientId)||{};
+   const haystack=matchText([client.name,client.document,c.number,c.insurer,c.branch,c.plate,
+     (index.plateByContract.get(c.id)||[]).join(' ')].join(' '));
+   if(terms.every(term=>haystack.includes(term)))all.set(c.id,c);
+  }
+  for(const client of index.clients){
+   const basic=matchText([client.name,client.document].join(' '));
+   if(!terms.every(term=>basic.includes(term)))continue;
+   if(!index.contracts.some(c=>c.clientId===client.id&&all.has(c.id))){
+    all.set('client-'+client.id,{clientId:client.id,clientName:client.name,
+     branch:'Cadastro de cliente',number:'',plate:''});
+   }
+  }
+  clientMap=new Map(index.clients.map(c=>[c.id,c]));
+  updateRows([...all.values()]);
+ }catch(e){
+  $('#results').innerHTML='<div class="empty"><b>Não foi possível concluir a consulta</b>'+clean(e.message||'Tente novamente.')+'</div>';
+  $('#count').textContent='Erro';
+ }finally{button.disabled=false;button.textContent='Consultar →';}
+};
 for(const id of fields){
  const input=document.getElementById(id);
  if(!input)return;
