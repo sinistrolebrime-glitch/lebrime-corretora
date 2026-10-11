@@ -18,4 +18,5 @@ jobs:
       - run: node tests/pdf_installments.mjs
       - run: node tests/operational_finance.mjs
       - run: node --experimental-strip-types tests/operational_integration.mjs
+      - run: node tests/operational_auth.cjs
       - run: node tests/live_smoke.cjs
