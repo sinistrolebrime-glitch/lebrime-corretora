@@ -5,7 +5,7 @@
  * conciliação exata com o prêmio contratual. Linhas ambíguas vão para revisão.
  */
 export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={}) {
-  const heading=/parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|presta[cç][oõ]es?\s+vencimento/i;
+  const heading=/^parcelas?$|parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|presta[cç][oõ]es?\s+vencimento/i;
   const explicit=/\b(?:parcela|prestação|prestacao)\s*(?:n[ºo°.]?\s*)?0?(\d{1,2})(?:\s*(?:\/|de)\s*0?(\d{1,2}))?/i;
   const numbered=/^\s*0?(\d{1,2})\s*(?:\/\s*0?(\d{1,2}))?(?=\s|[-|;:])/;
   const dates=/\b([0-3]?\d)\/([01]?\d)\/(20\d{2})\b/g;
