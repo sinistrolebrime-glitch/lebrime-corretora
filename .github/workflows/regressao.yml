@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check script.js && node --check financeiro.js && node --check financeiro-ui.js
+      - run: node --check script.js && node --check financeiro.js && node --check financeiro-ui.js && node --check operacional-financeiro.js && node --check supabase/functions/lebrime-api/operational_finance_rules.mjs
       - run: node tests/regression.cjs
       - run: node tests/financeiro.cjs
 
