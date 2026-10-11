@@ -44,3 +44,12 @@
 ## Observações
 - Esta fase não alterou nem importou proposta real; somente código e endpoint da área operacional foram publicados.
 - O backend ainda precisa de teste funcional com credenciais válidas e documentos reais para homologação total.
+## Evolução subsequente — v20.43 e v20.44 (11/10/2026)
+
+- **v20.43 — Fila de até 50 PDFs por seleção:** módulo `importacao-lote.js`, no menu Gerencial > Arquivos, recebe PDFs no navegador, confere assinatura e limite de 15MB por arquivo, calcula SHA-256, identifica duplicatas dentro do lote e em documentos já cadastrados com hash, e sugere cliente **somente** por CPF/CNPJ ou nome completo no arquivo. Não salva ou cadastra documentos sem confirmação.
+- Ao clicar em **Revisar**, o arquivo é transferido ao formulário validado de renovação. O gestor confirma CPF/CNPJ, seguradora, ramo, número, datas, corretora e prêmio antes de concluir. A fila marca **Importado** apenas quando o novo contrato foi gravado e o documento relacionado; é possível exportar andamento em CSV. O navegador não conserva os bytes dos PDFs após fechar a aba.
+- **Antiduplicidade reforçada:** `renovacao-cadastro.js` passou a gravar `sourcePdfSha256` / `fileSha256` e um `importFingerprint` determinístico (cliente, seguradora, ramo, número, início, fim). Índice único `lebrime_unique_import_fingerprint` já aplicado em produção e versionado em `supabase/migrations/20261011_import_fingerprint.sql`. Os registros anteriores não foram modificados.
+- **v20.44 — Central de pendências:** módulo `central-conferencia.js` reúne clientes com contratos vencidos, contratos sem PDF, produtor a conferir, parcelas abertas sem vencimento documentado e planos de parcelas cuja soma diverge do prêmio. Os números são derivados dos dados, com filtro de cliente e atalho para a ficha. Nenhuma cobrança ou baixa é disparada pelo painel.
+- Suites adicionadas: `tests/bulk_import.cjs` e `tests/review_center.cjs`. Testes de produção incluem o carregamento dos novos arquivos. A primeira importação real com credenciais válidas ainda exige homologação manual.
+- **Data sensível:** a lista privada dos 309 clientes continua no Google Sheets original, não foi inserida em arquivos do site público.
+- Estado da carteira antes de carregar propostas novas: 663 clientes, 717 propostas, 49 apólices, 961 documentos, 5.473 parcelas. Nenhum novo cadastro real foi criado pela etapa de desenvolvimento.
