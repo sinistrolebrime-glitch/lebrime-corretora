@@ -1,3 +1,4 @@
+import { parseAllianzPreview } from "./proposal_allianz.mjs";
 /* Leitor conservador de campos de proposta.
  * Extrai apenas rótulos explícitos do texto PDF; nenhum valor é inventado.
  */
@@ -60,6 +61,8 @@ const amount=labels=>labels.map(l=>pattern(l,moneyPattern));
 const date=labels=>labels.map(l=>pattern(l,datePattern));
 const cut=v=>String(v||'').replace(/\s+(?:CPF|CNPJ|ENDERE[ÇC]O|CEP|VIG[EÊ]NCIA)\\b.*$/i,'').trim();
 export function previewProposalFromPages(pages){
+ const allianz=parseAllianzPreview(pages);
+ if(allianz)return allianz;
  const rows=records(Array.isArray(pages)?pages:[]);
  const warnings=[];
  const cpf=found(rows,[
