@@ -99,7 +99,7 @@ export async function operationalPaymentAction(db:any,input:any){
   const id=String(input?.paymentId||"");
   const action=String(input?.operation||"");
   if(!/^[a-zA-Z0-9_-]{5,150}$/.test(id))throw new Error("Identificação da parcela inválida.");
-  if(!["contact","review-note","confirm-payment"].includes(action))throw new Error("Operação não permitida.");
+  if(!["contact","review-note","confirm-payment","attach-evidence"].includes(action))throw new Error("Operação não permitida.");
   const responsible=String(input?.responsible||"").trim().slice(0,100);
   const note=String(input?.note||"").trim().slice(0,700);
   if(responsible.length<3||note.length<10)throw new Error("Informe responsável e observação com pelo menos 10 caracteres.");
@@ -128,7 +128,12 @@ export async function operationalPaymentAction(db:any,input:any){
   if(action==="confirm-payment"&&(p.data?.status==="Pago"||p.data?.status==="Cancelado"))
     throw new Error("Parcela já baixada ou cancelada; solicite conferência do gestor.");
   const evidence=String(input?.evidence||"").trim().slice(0,350);
-  if(action==="confirm-payment"&&evidence.length<8)throw new Error("É obrigatório informar a evidência do pagamento.");
+  if(["confirm-payment","attach-evidence"].includes(action)&&evidence.length<8)
+    throw new Error("É obrigatório informar a evidência do pagamento.");
+  if(action==="attach-evidence"&&
+      (p.data?.status!=="Pago"||/migra/i.test(String(p.data?.migrationStatus||""))||
+      String(p.data?.paymentEvidence||"").trim()))
+    throw new Error("Apenas pagamentos antigos sem evidência podem receber comprovação complementar.");
   const stamp=new Date().toISOString(),raw=p.data||{};
   const history=Array.isArray(raw.contactHistory)?raw.contactHistory.slice(-49):[];
   const event={at:stamp,by:responsible,action,note,...(evidence?{evidence}:{} )};
@@ -144,6 +149,11 @@ export async function operationalPaymentAction(db:any,input:any){
     }
   }else if(action==="review-note"){
     next.reviewNote=note;next.reviewUpdatedAt=stamp;next.reviewResponsible=responsible;
+  }else if(action==="attach-evidence"){
+    // Não altera a baixa original nem sua data: complementa apenas a evidência.
+    next.paymentEvidence=evidence;
+    next.paidEvidenceAttachedAt=stamp;
+    next.paidEvidenceAttachedBy=responsible;
   }else{
     const paidDate=String(input?.paidDate||"")||localToday();
     if(!validDue(paidDate))throw new Error("Data de pagamento inválida.");
@@ -158,5 +168,5 @@ export async function operationalPaymentAction(db:any,input:any){
     type:"update",id:p.id,kind:"payment",data:next,version:p.version,updated_at:stamp,strict:true
   }]});
   if(writeError)throw writeError;
-  return {ok:true,id:p.id,operation:action,updatedAt:stamp,stage:action==="confirm-payment"?"paid":stage};
+  return {ok:true,id:p.id,operation:action,updatedAt:stamp,stage:["confirm-payment","attach-evidence"].includes(action)?"paid":stage};
 }
