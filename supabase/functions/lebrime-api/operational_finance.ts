@@ -60,8 +60,17 @@ export async function operationalFinance(db:any,input:any){
   let matched=rows.filter((r:any)=>includeByFilter(r,view,day));
   const safeBroker=String(input?.brokerage||"").trim().slice(0,100);
   if(safeBroker)matched=matched.filter((r:any)=>r.brokerage.split("|").includes(safeBroker));
-  if(search)matched=matched.filter((r:any)=>
-    [r.contractNumber,r.insurer,r.branch,r.installment,r.clientId].join(" ").toLowerCase().includes(search));
+  if(search){
+    const {data:clients,error:searchError}=await db.from("records").select("id,data").eq("kind","client").range(0,999);
+    if(searchError)throw searchError;
+    const searchableClients=new Map<string,string>((clients||[]).map((c:any)=>[c.id,
+      String(c.data?.name||"")+" "+String(c.data?.document||"")+" "+String(c.data?.mobile||c.data?.phone||"")]));
+    const normalized=(v:string)=>String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    const query=normalized(search);
+    matched=matched.filter((r:any)=>normalized(
+      [r.contractNumber,r.insurer,r.branch,r.installment,r.clientId,searchableClients.get(r.clientId)].join(" ")
+    ).includes(query));
+  }
   matched.sort((a:any,b:any)=>stageRank(a,day)-stageRank(b,day)||
     String(a.due||"9999").localeCompare(String(b.due||"9999"))||a.id.localeCompare(b.id));
   const total=matched.length;
@@ -104,7 +113,7 @@ export async function operationalPaymentAction(db:any,input:any){
   if(ce)throw ce;
   if(!contract)throw new Error("O vínculo do contrato precisa ser corrigido pelo gestor.");
   const {data:docs,error:de}=await db.from("records").select("id,data").eq("kind","document")
-    .or("data->>policyId.eq."+cid+",data->>proposalId.eq."+cid).limit(100);
+    .eq("data->>"+(contract.kind==="policy"?"policyId":"proposalId"),cid).limit(100);
   if(de)throw de;
   const imported=new Set<string>();
   for(const doc of docs||[]){
