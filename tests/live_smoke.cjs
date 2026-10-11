@@ -13,7 +13,9 @@ async function request(url,options={}){
   [base+'/operacional.html?smoke=finance',['operacional-financeiro.js','lebrime_token_v1']],
   [base+'/operacional-financeiro.js?smoke=finance',['attach-evidence','financeApi']],
   [base+'/operacional-extras.js?smoke=pdf',['operationalPdfFrame','suggestions','openDetail']],
-  [base+'/operacional.html?smoke=pdf',['detailDocuments','operacional-extras.js','operationalPdfFrame']]
+  [base+'/operacional.html?smoke=pdf',['detailDocuments','operacional-extras.js','operationalPdfFrame']],
+  [base+'/operacional-renovacoes.js?smoke=renewals',['monthWindow','shiftMonth','renewalMonthInput']],
+  [base+'/operacional.html?smoke=renewals',['operacional-renovacoes.js','operacional-financeiro.js']]
  ]){
   const response=await request(url);
   assert.equal(response.status,200,'Página inacessível: '+url+' ('+response.status+')');
