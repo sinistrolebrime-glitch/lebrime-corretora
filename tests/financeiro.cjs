@@ -50,4 +50,7 @@ assert.equal(F.message(payment('p13',policy,{due:''}),'Cliente','123',current),'
 const summary=F.summary([policyPay,proposalPay,quotePay],r=>({p1:policy,p2:proposal,p3:quote})[r.id],imported,cutoff,current);
 assert.equal(summary.forecast,1);
 assert.equal(summary.openValue,24690);
+const locked=F.summary([payment('blocked',policy,{due:'',collectionStatus:'Não cobrar'})],()=>policy,imported,cutoff,current);
+assert.equal(locked.suspended,1);
+assert.equal(locked.review,1);
 console.log('PASS: classificações, propostas importadas, cobranças bloqueadas, migração, dados ausentes, mensagens e fila de revisão');
