@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
+const {webcrypto}=require('node:crypto');
 
 const html=fs.readFileSync('index.html','utf8');
 const js=fs.readFileSync('renovacao-cadastro.js','utf8');
@@ -20,7 +21,7 @@ class Node{
 }
 const E=id=>{if(!elements.has(id))elements.set(id,new Node(id));return elements.get(id)};
 function pdf(name='nova.pdf',magic='%PDF-'){
- return {name,size:400,type:'application/pdf',slice:()=>({arrayBuffer:async()=>new TextEncoder().encode(magic).buffer})}
+ return {name,size:400,type:'application/pdf',slice:()=>({arrayBuffer:async()=>new TextEncoder().encode(magic).buffer}),arrayBuffer:async()=>new TextEncoder().encode(magic+':'+name).buffer}
 }
 const clients=[{id:'c1',kind:'client',data:{name:'Cliente de Teste',document:'00011122233'}}];
 const old={id:'p-old',kind:'proposal',data:{clientId:'c1',number:'OLD',insurer:'Porto',branch:'Automóvel',
@@ -37,8 +38,9 @@ const values={
 for(const [k,v]of Object.entries(values))E(k).value=v;
 E('newRenewalPdf').files=[pdf()];
 const sourceObject={
- document:{getElementById:E,createElement:()=>new Node()},
- portfolioRows:()=>contracts.slice(),list:kind=>kind==='client'?clients:[],
+ document:{getElementById:E,createElement:()=>new Node(),dispatchEvent:()=>{}},
+ CustomEvent:class CustomEvent{constructor(type,options){this.type=type;this.detail=options.detail}},
+ portfolioRows:()=>contracts.slice(),list:kind=>kind==='client'?clients:kind==='document'?docs:[],
  rowById:id=>clients.concat(contracts).find(x=>x.id===id)||null,
  uuid:()=> 'uuid-'+sequence++,now:()=> '2026-10-11T15:00:00.000Z',
  esc:x=>String(x),api:async(action,body,opts)=>{
@@ -55,7 +57,7 @@ const sourceObject={
   return {ok:true};
  },
  loadRecords:async()=>{},openClientDetail:()=>{},navigate:()=>{},
- date:()=>'',crypto:{},TextEncoder,Uint8Array,String,Array,Number,Date,Map,console,
+ date:()=>'',crypto:webcrypto,TextEncoder,Uint8Array,String,Array,Number,Date,Map,console,
 };
 vm.createContext(sourceObject);
 vm.runInContext(js,sourceObject);
@@ -78,6 +80,8 @@ async function submit(){
  assert.equal(document.data.proposalId,proposal.id);
  assert.equal(document.data.clientId,'c1');
  assert.equal(document.data.storageKey.split('/')[0],'clients');
+ assert.match(proposal.data.importFingerprint,/^[a-f0-9]{64}$/);
+ assert.equal(proposal.data.sourcePdfSha256,document.data.fileSha256);
  assert.equal(old.data.end,'2026-10-10','contrato anterior não pode ser modificado');
  assert.deepEqual(calls.filter(c=>c.action==='write').length,1);
  assert.equal(calls.filter(c=>c.action==='storage-put').length,1);
