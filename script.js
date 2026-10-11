@@ -99,7 +99,7 @@ function toggleTheme(){ applyTheme('light'); }
 const token=()=>localStorage.getItem(TOKEN_KEY)||'';
 const uuid=()=>crypto.randomUUID();
 const now=()=>new Date().toISOString();
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10); // America/Fortaleza
 const digits=v=>String(v||'').replace(/\D/g,'');
 const norm=v=>String(v||'').trim().toLocaleLowerCase('pt-BR');
 const fold=v=>norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1249,7 +1249,7 @@ const config={
       ['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['installment','Parcela','text'],['amount','Valor','money'],['due','Vencimento','date'],
       ['status','Status','select',['Em aberto','Pago','Cancelado']],['paidDate','Data pagamento','date'],['paymentMethod','Forma','select',['','Boleto','Débito em conta','Cartão de crédito','Cartão de débito','PIX','Transferência','Outro']],
       ['collectionStatus','Cobrança','select',['Não iniciado','Acompanhar','Cliente avisado','Boleto solicitado','Boleto enviado','Comprovante recebido','Em tratativa','Regularizado','Não cobrar']],
-      ['responsible','Responsável','text'],['notes','Observações','textarea']
+      ['responsible','Responsável','text'],['paymentEvidence','Evidência do pagamento','text'],['nextActionDate','Próximo contato','date'],['notes','Observações','textarea']
     ]
   },
   commission:{
@@ -2129,16 +2129,18 @@ function validateBeforeSave(data){
     if(!data.policyId&&!data.proposalId)return 'Vincule a parcela a uma apólice ou proposta.';
     if(data.policyId&&data.proposalId)return 'Use apenas apólice ou proposta.';
     const month=String(data.due||'').slice(0,7);
-    if(data.proposalId){
-      data.financialTracking='Previsão da proposta';
-      data.migrationStatus='';
-    }else{
-      data.financialTracking='Acompanhamento financeiro';
-      if(month&&month<CUTOFF&&data.status==='Em aberto'){
-        data.status='Pago';data.migrationStatus='Paga — Migração';
-        if(!data.paidDate)data.paidDate=data.due;
-      }else data.migrationStatus='Acompanhar';
-    }
+    const contract=rowById(data.policyId||data.proposalId);
+    if(!contract)return 'O contrato vinculado não foi encontrado.';
+    if(data.proposalId&&contract.kind!=='proposal'||data.policyId&&contract.kind!=='policy')return 'O vínculo não corresponde ao tipo de contrato.';
+    if(data.status==='Pago'&&editing?.data?.status!=='Pago'&&!String(data.paymentEvidence||'').trim())
+      return 'Registre a evidência ou confirmação do pagamento antes da baixa manual.';
+    const imported=contract.kind==='policy'||FINANCE.importedIds(list('document')).has(contract.id);
+    data.financialTracking=imported?'Acompanhamento financeiro':'Previsão da proposta';
+    if(imported&&month&&month<CUTOFF&&data.status==='Em aberto'){
+      data.status='Pago';data.migrationStatus='Paga — Migração';
+      if(!data.paidDate)data.paidDate=data.due;
+    }else if(data.migrationStatus!=='Paga — Migração')data.migrationStatus=imported?'Acompanhar':'';
+    if(data.status==='Pago'&&data.migrationStatus!=='Paga — Migração'&&!data.paidDate)data.paidDate=today();
   }
   return '';
 }
