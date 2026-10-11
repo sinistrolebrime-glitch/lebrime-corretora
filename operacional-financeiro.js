@@ -185,6 +185,8 @@
  const oldClear=$('#monitorClear').onclick;
  selectTab=function(mode){
    if(mode!=='payments'){
+     $('#monitorText').onkeydown=null;
+     $('#monitorText').onblur=null;
      $('#monitorRefresh').onclick=oldRefresh;
      $('#monitorFilter').onchange=oldFilter;
      $('#monitorText').oninput=oldText;
