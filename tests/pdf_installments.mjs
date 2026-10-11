@@ -47,4 +47,42 @@ assert.equal(partial.plan.length,1);
 assert.equal(partial.plan[0].amount,589059);
 assert.equal(partial.plan[0].due,'');
 assert.equal(partial.plan[0].dueText,'Vencimento: 29');
+// Estruturas dos quadros Allianz observados em Auto, Empresarial e Frota reais.
+const allianzAuto=[
+  'INFORMAÇÕES DE PAGAMENTO\nDébito em conta bancária em 6 parcelas\n'+
+  'Preço Total (impostos inclusos) R$ 2.696,03\nParcelas Valor da Parcela Parcelas Valor da Parcela\n'+
+  '1 R$ 449,34 4 R$ 449,34\n2 R$ 449,34 5 R$ 449,34\n3 R$ 449,34 6 R$ 449,33'
+];
+const autoParse=parseInstallmentSchedule(allianzAuto,{premium:269603,paymentMethod:'Débito em conta'});
+assert.equal(autoParse.status,'partial','Allianz Auto: sem datas completas não marcar vencimentos conferidos');
+assert.equal(autoParse.plan.length,6);
+assert.equal(autoParse.amountTotal,269603);
+assert.ok(autoParse.plan.every(x=>!x.due));
+
+const allianzCorporate=[
+  'INFORMAÇÕES DE PAGAMENTO\nForma de Pagamento: Boleto Bancário Nº de Parcelas: 7\n'+
+  'Prêmio Total (R$): 59.183,98\nParc. Vencimento Valor Parc. Vencimento Valor Parc. Vencimento Valor\n'+
+  '1 13/08/2026 8.454,84 4 05/11/2026 8.454,84 7 05/02/2027 8.454,94\n'+
+  '2 05/09/2026 8.454,84 5 05/12/2026 8.454,84\n'+
+  '3 05/10/2026 8.454,84 6 05/01/2027 8.454,84'
+];
+const corporateParse=parseInstallmentSchedule(allianzCorporate,{premium:5918398,paymentMethod:'Boleto'});
+assert.equal(corporateParse.status,'verified','Allianz Empresarial: devem ser sete parcelas com datas');
+assert.equal(corporateParse.plan.length,7);
+assert.equal(corporateParse.amountTotal,5918398);
+
+const allianzFleet=[
+ 'INFORMAÇÕES DE PAGAMENTO\nBoleto Bancário em 8 parcelas\n'+
+ 'TOTAL A PAGAR (IMPOSTOS INCLUÍDOS): 9.018,77\n'+
+ 'PARCELA VENCIMENTO VALOR (R$) PARCELA VENCIMENTO VALOR (R$)\n'+
+ '1 15/08/2026 1.127,34 5 10/12/2026 1.127,34\n'+
+ '2 10/09/2026 1.127,34 6 10/01/2027 1.127,34\n'+
+ '3 10/10/2026 1.127,34 7 10/02/2027 1.127,34\n'+
+ '4 10/11/2026 1.127,34 8 10/03/2027 1.127,39'
+];
+const fleetParse=parseInstallmentSchedule(allianzFleet,{premium:901877,paymentMethod:'Boleto'});
+assert.equal(fleetParse.status,'verified','Allianz Frota: oito vencimentos conferidos');
+assert.equal(fleetParse.plan.length,8);
+assert.equal(fleetParse.amountTotal,901877);
+
 console.log('PASS: parser PDF, datas, valores, duplicatas, conciliação e revisão de ambiguidades');
