@@ -28,6 +28,15 @@ assert.equal(cla.amountTotal,8149612);
 const duplicateTwoColumn=parseInstallmentSchedule([...twoColumns,twoColumns[0]],{premium:8149612});
 assert.equal(duplicateTwoColumn.status,'verified');
 
+const creditCardTable=[
+  'INFORMAÇÕES DE PAGAMENTO\nCartão de Crédito\nem 10 parcelas\nTotal a pagar R$ 806,13\nParcelas\n1 R$ 80,61 5 R$ 80,61 9 R$ 80,61\n2 R$ 80,61 6 R$ 80,61 10 R$ 80,64\n3 R$ 80,61 7 R$ 80,61\n4 R$ 80,61 8 R$ 80,61'
+];
+const partialCard=parseInstallmentSchedule(creditCardTable,{premium:80613,paymentMethod:'Cartão'});
+assert.equal(partialCard.status,'partial',partialCard.reason);
+assert.equal(partialCard.plan.length,10);
+assert.equal(partialCard.plan[9].amount,8064);
+assert.ok(partialCard.plan.every(p=>p.due===''));
+assert.equal(partialCard.amountTotal,80613);
 const good=parseInstallmentSchedule(fixtures[0][1],{premium:30100});
 assert.equal(good.plan.length,3);
 assert.deepEqual(good.plan.map(p=>p.amount),[10000,10000,10100]);
