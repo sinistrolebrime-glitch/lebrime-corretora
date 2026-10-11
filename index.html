@@ -96,6 +96,29 @@
       </section>
 
       <section id="importView" class="view hidden">
+        <div class="panel" id="renewalNewFlow">
+          <h2>Importar nova proposta / Renovação</h2>
+          <p class="muted">Selecione o cliente já cadastrado e, se for renovação, o seguro anterior. O sistema preserva a vigência antiga, cria uma nova e vincula o PDF e as parcelas ao novo contrato.</p>
+          <form id="renewalNewForm" class="form-grid">
+            <label>Cliente existente<select id="newRenewalClient" required><option value="">Selecione</option></select></label>
+            <label>Vigência anterior<select id="newRenewalPrevious"><option value="">Seguro novo — sem vigência anterior</option></select></label>
+            <label>Corretora da nova proposta<select id="newRenewalBrokerage" required>
+              <option value="">Selecione</option><option>Lebrime</option><option>FF Apolinário</option><option>Homeni</option><option>Eólica</option>
+            </select></label>
+            <label>Seguradora<input id="newRenewalInsurer" required></label>
+            <label>Ramo<input id="newRenewalBranch" required></label>
+            <label>Número da proposta<input id="newRenewalNumber" required></label>
+            <label>Início da nova vigência<input id="newRenewalStart" type="date" required></label>
+            <label>Fim da nova vigência<input id="newRenewalEnd" type="date" required></label>
+            <label>Prêmio total (R$)<input id="newRenewalPremium" placeholder="0,00" required></label>
+            <label>Quantidade de parcelas<input id="newRenewalCount" type="number" min="0" max="72" value="0"></label>
+            <label>Forma de pagamento<input id="newRenewalPayment" placeholder="Boleto, débito, cartão..."></label>
+            <label>PDF da nova proposta<input id="newRenewalPdf" type="file" accept=".pdf,application/pdf" required></label>
+            <div class="span-2"><button id="newRenewalSubmit" class="btn primary" type="submit">Cadastrar nova vigência + PDF</button></div>
+          </form>
+          <div id="newRenewalStatus" class="status" role="status" aria-live="polite"></div>
+          <p class="muted">Sem comprovante do produtor/comissão ou datas de parcelas, esses campos serão encaminhados à conferência, sem cobranças automáticas.</p>
+        </div>
         <div class="panel">
           <h2>Documentos</h2>
           <p class="muted">Anexe o arquivo ao cliente e, quando for documento de seguro, vincule diretamente à proposta ou apólice correspondente. Assim o PDF ficará disponível dentro da ficha do cliente e do contrato.</p>
