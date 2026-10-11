@@ -28,4 +28,6 @@ jobs:
       - run: node tests/renewal_import.cjs
       - run: node --check gerencial-ficha-abas.js
       - run: node tests/manager_client_tabs.cjs
+      - run: node --check qualidade-carteira.js
+      - run: node tests/portfolio_quality.cjs
       - run: node tests/live_smoke.cjs
