@@ -161,6 +161,10 @@ function buildDocumentList(docs){
    '<small>'+clean(doc.name||'Arquivo do contrato')+'</small></span><span class="doc-action">Visualizar</span></button>'
  ).join('');
 }
+const endossoStyle=document.createElement('style');
+endossoStyle.textContent='.op-endorsement-event{border-left:3px solid #b78b51;padding:10px 12px;margin:0 0 12px 16px;background:#fcf7f0;border-radius:0 8px 8px 0;display:grid;gap:4px}'+
+'.op-endorsement-event small{display:block;font-size:11px;color:#526274;line-height:1.6}';
+document.head.appendChild(endossoStyle);
 const tabs=document.getElementById('clientDetailTabs');
 function showClientTab(name){
  if(!['history','data','payments','documents'].includes(name))name='history';
@@ -209,7 +213,8 @@ openDetail=async function(row){
  try{
   const info=await operationalPortal('client',{clientId:id});
   if(!detail.open||sequence!==detailSequence)return;
-  const c=info.client||{},contracts=info.contracts||[],docs=info.documents||[],payments=info.payments||[];
+  const c=info.client||{},contracts=info.contracts||[],docs=info.documents||[],
+   payments=info.payments||[],endorsements=info.endorsements||[];
   renderClientPayments(payments,contracts);
   clientMap.set(id,c);
   $('#detailName').textContent=c.name||'Segurado';
@@ -219,6 +224,11 @@ openDetail=async function(row){
   ].map(([label,value])=>'<div><span>'+clean(label)+'</span><b>'+clean(value)+'</b></div>').join('');
   const sorted=contracts.slice().sort((a,b)=>String(b.end||'').localeCompare(String(a.end||'')));
   const perContract=new Map();
+  const endorsementByContract=new Map();
+  for(const e of endorsements){
+   if(!endorsementByContract.has(e.contractId))endorsementByContract.set(e.contractId,[]);
+   endorsementByContract.get(e.contractId).push(e);
+  }
   for(const doc of docs){
    if(!perContract.has(doc.contractId))perContract.set(doc.contractId,[]);
    perContract.get(doc.contractId).push(doc);
@@ -226,11 +236,18 @@ openDetail=async function(row){
   $('#detailContracts').innerHTML='<h3>Propostas e apólices · histórico de vigências</h3>'+
    (sorted.length?sorted.map(contract=>{
     const list=perContract.get(contract.id)||[];
+    const extras=endorsementByContract.get(contract.id)||[];
+    const events=extras.slice().sort((a,b)=>String(a.effectiveDate).localeCompare(String(b.effectiveDate)))
+      .map(e=>'<div class="op-endorsement-event"><b>Endosso '+clean(e.number||'')+' · '+clean(normDate(e.effectiveDate))+'</b>'+
+        '<small>'+clean(e.type||'Movimento de apólice')+' · '+clean(e.priorVehicle||'Veículo anterior')+
+        ' → '+clean(e.newVehicle||'Veículo substituto')+'</small>'+
+        '<small>Prêmio adicional: '+clean(currency(e.premium))+
+        ' · Mesma apólice '+clean(e.parentPolicyNumber||contract.number||'')+'</small></div>').join('');
     return '<div class="contract-line"><div><b>'+clean(contract.insurer||'Seguradora')+' · '+
       clean(contract.number||'Sem número')+'</b><small>'+clean(contract.branch||'Seguro')+' · '+
       clean(normDate(contract.start))+' a '+clean(normDate(contract.end))+'</small>'+
       '<small>'+clean(list.length?list.length+' PDF(s) vinculado(s)':'PDF pendente de vinculação')+'</small></div>'+
-      '<span class="status-line">'+clean(cleanStatus(contract))+'</span></div>';
+      '<span class="status-line">'+clean(cleanStatus(contract))+'</span></div>'+events;
    }).join(''):'<p class="hint">Nenhum contrato vinculado a esta ficha.</p>');
   $('#detailDocuments').innerHTML='<h3>Arquivos de propostas e apólices</h3>'+
    (docs.length?'<div class="doc-list">'+buildDocumentList(docs)+'</div>':
