@@ -70,6 +70,15 @@ el('renewalNewForm').onsubmit=async e=>{
  if(!Number.isSafeInteger(premium)||premium<=0)return setMessage('Informe o prêmio total conforme o PDF.');
  if(!Number.isInteger(count)||count<0||count>72)return setMessage('Quantidade de parcelas inválida.');
  if(!file||!/\.pdf$/i.test(file.name)||file.size<10||file.size>15*1024*1024)return setMessage('Selecione um PDF válido de até 15 MB.');
+ // Conferir assinatura PDF, não apenas extensão ou MIME, antes de armazenar.
+ let pdfSignature='';
+ try{
+  const bytes=new Uint8Array(await file.slice(0,5).arrayBuffer());
+  pdfSignature=String.fromCharCode(...bytes);
+ }catch{return setMessage('Não foi possível ler o início do arquivo PDF.');}
+ if(pdfSignature!=='%PDF-')return setMessage('O arquivo selecionado não possui assinatura PDF válida.');
+
+ // Snapshot recente: verificar novamente antes da operação, inclusive imports de outra sessão.
  const duplicate=portfolioRows().some(r=>r.data.clientId===clientId&&norm(r.data.insurer)===norm(insurer)&&
   norm(r.data.number)===norm(number)&&r.data.start===start&&r.data.end===end);
  if(duplicate)return setMessage('Já existe proposta/apólice com o mesmo número e vigência nesse cliente. Não foi duplicada.');
@@ -79,12 +88,18 @@ el('renewalNewForm').onsubmit=async e=>{
  let uploaded=false,committed=false;
  try{
   setMessage('Enviando PDF e criando uma nova vigência para este cliente...');
+  // Nunca confiar apenas na cópia em memória se outra pessoa acabou de importar a mesma proposta.
+  await loadRecords();
+  const newlyImported=portfolioRows().some(r=>r.data.clientId===clientId&&norm(r.data.insurer)===norm(insurer)&&
+   norm(r.data.number)===norm(number)&&r.data.start===start&&r.data.end===end);
+  if(newlyImported)throw new Error('Outra sessão já cadastrou esta proposta. Nenhum novo PDF foi gravado.');
   await api('storage-put',file,{raw:true,key,headers:{'content-type':'application/pdf'}});
   uploaded=true;
   const proposal={clientId,number,insurer,branch,start,end,premium,brokerage,brokerages:brokerage,
    status:'Importada — verificar emissão',source:'Importação manual de renovação',renewalOf:prior?.id||'',
    renewalType:prior?'Renovação':'Seguro novo',producerPending:true,
    producerAssignmentStatus:'Pendente — conferir relatório',commissionPending:true,
+   insuredValuePending:true,insuranceQualityStatus:'A conferir — verificar PDF',
    installmentCount:count,installmentExtractionStatus:'Pendente',paymentMethod:method,
    paymentDueText:'Conferir vencimentos no PDF'};
   const document={clientId,proposalId,policyId:'',contractId:proposalId,name:file.name,originalFileName:file.name,
@@ -109,7 +124,9 @@ el('renewalNewForm').onsubmit=async e=>{
   button.onclick=()=>openClientDetail(clientId);
   el('newRenewalStatus').append(' ',button);
  }catch(err){
-  if(uploaded&&!committed)try{await api('storage-delete',{}, {key})}catch{}
+  if(uploaded&&!committed)try{await api('storage-delete',{}, {key})}catch(cleanupError){
+   console.warn('Arquivo não vinculado exige limpeza pela gestão:',documentId,cleanupError);
+  }
   setMessage((committed?'Contrato cadastrado, mas a conferência falhou: ':'Falha na importação (nenhum contrato antigo alterado): ')+String(err.message||err));
  }finally{locked=false;el('newRenewalSubmit').disabled=false;}
 };
