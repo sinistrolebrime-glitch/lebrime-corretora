@@ -6,8 +6,11 @@
 const today=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
 const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const hasPdf=row=>Boolean(row.data?.storageKey||row.data?.sourceDriveFileId||row.data?.externalUrl||row.data?.sourceDriveUrl);
-const validDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))&&
- new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;
+const validDate=v=>{
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||'')))return false;
+ const parsed=new Date(v+'T12:00:00Z');
+ return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===v;
+};
 const byId=(items)=>new Map(items.map(i=>[i.id,i]));
 function analyze(clients,contracts,documents,payments,asOf=today()){
  const clientById=byId(clients);
