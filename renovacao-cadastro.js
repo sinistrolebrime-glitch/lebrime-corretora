@@ -102,12 +102,12 @@ el('renewalNewForm').onsubmit=async e=>{
    insuredValuePending:true,insuranceQualityStatus:'A conferir — verificar PDF',
    installmentCount:count,installmentExtractionStatus:'Pendente',paymentMethod:method,
    paymentDueText:'Conferir vencimentos no PDF'};
-  const document={clientId,proposalId,policyId:'',contractId:proposalId,name:file.name,originalFileName:file.name,
+  const documentData={clientId,proposalId,policyId:'',contractId:proposalId,name:file.name,originalFileName:file.name,
    documentType:docType,referenceDate:start,storageKey:key,status:'Recebido',mimeType:'application/pdf',
    fileSize:file.size,source:'Importação manual da proposta'};
   await api('write',{ops:[
    {type:'insert',id:proposalId,kind:'proposal',data:proposal,version:1,created_at:stamp,updated_at:stamp},
-   {type:'insert',id:documentId,kind:'document',data:document,version:1,created_at:stamp,updated_at:stamp}
+   {type:'insert',id:documentId,kind:'document',data:documentData,version:1,created_at:stamp,updated_at:stamp}
   ]});
   committed=true;
   setMessage('PDF e proposta vinculados. Conferindo as parcelas...');
