@@ -4,6 +4,8 @@ const vm=require('node:vm');
 const source=fs.readFileSync('operacional-extras.js','utf8');
 const html=fs.readFileSync('operacional.html','utf8');
 assert.match(html,/id="detailDocuments"/);
+assert.match(html,/data-client-tab="payments"/);
+assert.match(html,/id="detailPayments"/);
 assert.match(html,/id="operationalPdfFrame"/);
 assert.match(html,/operacional-extras\.js\?v=/);
 assert.ok(html.indexOf('operacional-auth.js')<html.indexOf('operacional-extras.js'));
@@ -37,12 +39,14 @@ const fakeClient={
  client:{id:'client-alpha',name:'Ana Barbosa',document:'12345678900',phone:'85990000000'},
  contracts:fakeIndex.contracts,
  documents:[{id:'document-alpha',contractId:'ins-alpha',type:'Proposta',
-  name:'proposta.pdf',driveFileId:'1Ak5w7JkN0otiAlEId8c7jlVXSk8LtuCa',stored:false}]
+  name:'proposta.pdf',driveFileId:'1Ak5w7JkN0otiAlEId8c7jlVXSk8LtuCa',stored:false}],
+ payments:[{id:'payment-alpha',contractId:'ins-alpha',installment:'1/10',amount:13330,due:'2026-11-11',status:'Em aberto',collectionStatus:'Não cobrar',migrationStatus:''}]
 };
 const dListeners={};
 const document={
  body:{classList:{contains:x=>x==='op-authenticated'&&authenticated}},
  getElementById:el,
+ querySelectorAll:()=>[],
  createElement:id=>new Element(id),
  querySelector:s=>{
   if(s==='#searchForm button[type="submit"]')return el('submit');
@@ -92,6 +96,9 @@ const spin=()=>new Promise(resolve=>setImmediate(resolve));
  assert.ok(root.lastRows.some(r=>r.clientId==='client-alpha'),'busca por uma letra deve mostrar resultados');
  await vm.runInContext("openDetail({clientId:'client-alpha'})",ctx);
  assert.match(el('detailDocuments').innerHTML,/proposta\.pdf/);
+ assert.match(el('detailPayments').innerHTML,/Parcela 1\/10/);
+ assert.match(el('detailPayments').innerHTML,/Não cobrar/);
+ assert.doesNotMatch(el('detailPayments').innerHTML,/comissão|produtor/i);
  assert.equal(el('detailPdf').hidden,false);
  assert.match(el('operationalPdfFrame').src,/drive\.google\.com\/file\/d\/1Ak5w7JkN0otiAlEId8c7jlVXSk8LtuCa\/preview/);
  assert.match(el('operationalPdfExternal').href,/\/view$/);
