@@ -24,4 +24,6 @@ jobs:
       - run: node tests/operational_extras.cjs
       - run: node --check operacional-renovacoes.js
       - run: node tests/operational_renewals.cjs
+      - run: node --check renovacao-cadastro.js
+      - run: node tests/renewal_import.cjs
       - run: node tests/live_smoke.cjs
