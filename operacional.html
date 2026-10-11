@@ -85,6 +85,15 @@ body:not(.op-authenticated) .app{display:none!important}
 #renewalMonthToday{min-width:86px}
 @media(max-width:730px){.renewal-month-picker{width:100%}.renewals-month-controls{width:100%}.renewals-month-controls input{flex:1;min-width:145px}}
 </style>
+<style>
+.client-detail-tabs{display:flex;gap:6px;overflow:auto;padding:12px 0;margin:8px 0 13px;border-bottom:1px solid #e1e7ee}
+.client-detail-tabs button{border:1px solid #d8e1eb;background:#fff;color:#536076;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:700;white-space:nowrap}
+.client-detail-tabs button.active{background:#fff4e3;border-color:#b38b52;color:#775529}
+[data-client-pane][hidden]{display:none!important}
+.op-payment-row{border:1px solid #e5e9ed;border-radius:9px;padding:11px;margin:8px 0}
+.op-payment-row .op-payment-title{display:flex;justify-content:space-between;gap:10px;font-weight:700}
+.op-payment-row small{display:block;color:#617082;margin-top:4px}
+</style>
 </head>
 <body>
 <section id="operationalLogin" aria-label="Autenticação operacional">
@@ -142,7 +151,16 @@ body:not(.op-authenticated) .app{display:none!important}
  </div>
 </main>
 </div>
-<dialog id="detail"><div class="modal-inner"><div class="modal-top"><div><span class="eyebrow">Ficha do segurado · propostas e apólices</span><h2 id="detailName"></h2></div><button class="close" type="button" id="closeDetail" aria-label="Fechar">×</button></div><div class="detail-grid" id="detailInfo"></div><div id="detailContracts" class="detail-contracts"></div><div id="detailDocuments"></div><section id="detailPdf" hidden aria-label="Visualização do PDF"><p id="operationalPdfInfo"></p><a id="operationalPdfExternal" target="_blank" rel="noopener noreferrer" hidden>Abrir PDF em outra aba ↗</a><iframe id="operationalPdfFrame" title="PDF da proposta ou apólice" referrerpolicy="no-referrer"></iframe></section><p class="note">Histórico consolidado de propostas e apólices. Dados financeiros estratégicos e comissões não são disponibilizados neste perfil.</p></div></dialog>
+<dialog id="detail"><div class="modal-inner"><div class="modal-top"><div><span class="eyebrow">Ficha do segurado · propostas e apólices</span><h2 id="detailName"></h2></div><button class="close" type="button" id="closeDetail" aria-label="Fechar">×</button></div><nav class="client-detail-tabs" id="clientDetailTabs" aria-label="Áreas da ficha">
+ <button type="button" data-client-tab="history" class="active">Histórico</button>
+ <button type="button" data-client-tab="data">Dados</button>
+ <button type="button" data-client-tab="payments">Parcelas</button>
+ <button type="button" data-client-tab="documents">PDFs</button>
+ </nav>
+ <div data-client-pane="history"><div id="detailContracts" class="detail-contracts"></div></div>
+ <div data-client-pane="data" hidden><div class="detail-grid" id="detailInfo"></div></div>
+ <div data-client-pane="payments" hidden><div id="detailPayments"></div></div>
+ <div data-client-pane="documents" hidden><div id="detailDocuments"></div><section id="detailPdf" hidden aria-label="Visualização do PDF"><p id="operationalPdfInfo"></p><a id="operationalPdfExternal" target="_blank" rel="noopener noreferrer" hidden>Abrir PDF em outra aba ↗</a><iframe id="operationalPdfFrame" title="PDF da proposta ou apólice" referrerpolicy="no-referrer"></iframe></section></div><p class="note">Histórico consolidado de propostas e apólices. Dados financeiros estratégicos e comissões não são disponibilizados neste perfil.</p></div></dialog>
 <script>
 const API='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-api';
 const TOKEN_KEY='lebrime_token_v1';
