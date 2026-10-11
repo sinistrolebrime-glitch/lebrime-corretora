@@ -16,3 +16,4 @@ jobs:
       - run: node tests/financeiro.cjs
 
       - run: node tests/pdf_installments.mjs
+      - run: node tests/operational_finance.mjs
