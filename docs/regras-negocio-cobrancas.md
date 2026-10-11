@@ -99,3 +99,15 @@ Versão inicial: 2026-10-10. Estas regras são obrigatórias para novas importa�
 - Leitor de PDF passou a reconhecer tabelas com **duas colunas de parcelas na mesma linha**; foram criados testes para esse formato e executadas as regressões no repositório. O serviço original \`lebrime-api\` foi atualizado para v25 com o parser novo.
 
 **Próximas verificações operacionais:** login e funcionamento real da fila com sessão operacional; desempenho da paginação com o volume total; conferência pontual de 10 PDFs por lote, preservando dados e gerando relatório de resultados e exceções. Até essas verificações, não afirmar que 100% das importações históricas foram reconciliadas.
+
+
+## Conclusão técnica da etapa — v20.35 (10/10/2026)
+
+- Corrigidos os indicadores de segurança de cobrança: registros "Não cobrar" continuam bloqueados mesmo sem data. Para a gestão, a **cobertura de vencimentos** é exibida como percentual de parcelas com data ISO válida, **não** como confiabilidade geral do projeto. Estados "Verificado" e "Parcial" são contados por contrato.
+- PDF Allianz: leitor atualizado para cabeçalhos "Parcelas" isolados, tabelas de parcelas em até duas colunas, e tabelas do tipo "1 R$ 80,61 5 R$ 80,61". Todas as parcelas precisam reconciliar exatamente o prêmio; se não houver data completa, manter vazio e observação, jamais criar vencimentos a partir da vigência.
+- Backend principal atualizado para \`lebrime-api\` v26 e operacional para \`lebrime-finance-operational\` v4. Regra operacional: cobranças bloqueadas também aparecem no filtro "Não cobrar / previsões" quando faltar vencimento.
+- Amostra documental historicamente conferida na fonte: proposta 140675343, 10 parcelas com datas completas (R$ 81.496,12), além de três propostas com 26 parcelas de valores conciliados e datas não informadas nos PDFs: cartão em 10 × R$ 330,11 (R$ 3.301,10), cartão em 9 × R$ 80,61 + 1 × R$ 80,64 (R$ 806,13), e boleto/débito em 6 × R$ 286,97 (R$ 1.721,82).
+- As 36 parcelas **já existiam**, foram reconciliadas em contratos cadastrados, e não geraram novas cobranças ou registros duplicados. Bloqueios de cobranças preservados; uma parcela antiga recebeu marcação técnica "Paga por migração".
+- O legado **não** está 100% reprocessado: após o bloco, o estoque de parcelas continua 5.473, com 297 datas completas e 5.176 vencimentos sem data. A inexistência da data no PDF, especialmente para fatura de cartão, **não** deve ser classificada como erro da leitura; é pendência de comprovante/fatura/seguradora ou cronograma de cobrança.
+- A ferramenta permite ao gestor continuar a análise em blocos pequenos e persistidos por documento. O operacional tem fila paginada, histórico de contato e baixa com evidência, mantendo perfis separados.
+- Nunca gerar cobrança automática, nunca inventar data do cartão nem boleto futuro e nunca confundir prêmio parcelado na seguradora com contas a receber próprias da corretora. O processo precisa de conciliação documental e teste de sessão real antes de homologação financeira total.
