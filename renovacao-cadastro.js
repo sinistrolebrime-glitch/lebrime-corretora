@@ -60,6 +60,8 @@ el('renewalNewForm').onsubmit=async e=>{
  const insurer=el('newRenewalInsurer').value.trim(),branch=el('newRenewalBranch').value.trim();
  const number=el('newRenewalNumber').value.trim(),start=el('newRenewalStart').value,end=el('newRenewalEnd').value;
  const premium=toCents(el('newRenewalPremium').value),count=Number(el('newRenewalCount').value||0);
+ const insuredValueText=el('newRenewalInsuredValue').value.trim();
+ const insuredValue=insuredValueText?toCents(insuredValueText):0;
  const brokerage=el('newRenewalBrokerage').value,method=el('newRenewalPayment').value.trim();
  const file=el('newRenewalPdf').files?.[0],setMessage=message=>el('newRenewalStatus').textContent=message;
  const validDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
@@ -68,6 +70,7 @@ el('renewalNewForm').onsubmit=async e=>{
  if(!insurer||!branch||!number||!brokerage)return setMessage('Informe seguradora, ramo, número e corretora.');
  if(!validDate(start)||!validDate(end)||start>end)return setMessage('As datas de início e fim precisam ser válidas.');
  if(!Number.isSafeInteger(premium)||premium<=0)return setMessage('Informe o prêmio total conforme o PDF.');
+ if(insuredValueText&&(!Number.isSafeInteger(insuredValue)||insuredValue<=0))return setMessage('Valor assegurado/LMI inválido. Deixe vazio se não estiver comprovado.');
  if(!Number.isInteger(count)||count<0||count>72)return setMessage('Quantidade de parcelas inválida.');
  if(!file||!/\.pdf$/i.test(file.name)||file.size<10||file.size>15*1024*1024)return setMessage('Selecione um PDF válido de até 15 MB.');
  // Conferir assinatura PDF, não apenas extensão ou MIME, antes de armazenar.
@@ -113,7 +116,9 @@ el('renewalNewForm').onsubmit=async e=>{
    importFingerprint,sourcePdfSha256:fileHash,
    renewalType:prior?'Renovação':'Seguro novo',producerPending:true,
    producerAssignmentStatus:'Pendente — conferir relatório',commissionPending:true,
-   insuredValuePending:true,insuranceQualityStatus:'A conferir — verificar PDF',
+   insuredValue:insuredValue||0,insuredValuePending:!insuredValue,
+   insuredValueSource:insuredValue?'PDF da proposta — valor confirmado pelo gestor':'Pendente',
+   insuranceQualityStatus:'A conferir — verificar PDF',
    installmentCount:count,installmentExtractionStatus:'Pendente',paymentMethod:method,
    paymentDueText:'Conferir vencimentos no PDF'};
   const documentData={clientId,proposalId,policyId:'',contractId:proposalId,name:file.name,originalFileName:file.name,
