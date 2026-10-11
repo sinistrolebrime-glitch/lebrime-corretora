@@ -9,7 +9,7 @@ async function request(url,options={}){
 }
 (async()=>{
  for(const [url,markers] of [
-  [base+'/?smoke=finance',['financeiro.js','financeiro-ui.js','role-bridge.js','importacao-lote.js','central-conferencia.js']],
+  [base+'/?smoke=preview',['financeiro.js','renovacao-previa.js','newRenewalPreviewButton','newRenewalInsuredValue']],
   [base+'/operacional.html?smoke=finance',['operacional-financeiro.js','lebrime_token_v1']],
   [base+'/operacional-financeiro.js?smoke=finance',['attach-evidence','financeApi']],
   [base+'/operacional-extras.js?smoke=pdf',['operationalPdfFrame','suggestions','openDetail']],
@@ -17,7 +17,8 @@ async function request(url,options={}){
   [base+'/operacional-renovacoes.js?smoke=renewals',['monthWindow','shiftMonth','renewalMonthInput']],
   [base+'/operacional.html?smoke=renewals',['operacional-renovacoes.js','operacional-financeiro.js']],
   [base+'/importacao-lote.js?smoke=renewals',['bulkPdfInput','digest','lebrime-renewal-import-success']],
-  [base+'/central-conferencia.js?smoke=review',['expired','producer','due','plan','lebrimeReviewCenter']]
+  [base+'/central-conferencia.js?smoke=review',['expired','producer','due','plan','lebrimeReviewCenter']],
+  [base+'/renovacao-previa.js?smoke=preview',['proposal-preview','newRenewalApplyPreview','linkedClient']]
  ]){
   const response=await request(url);
   assert.equal(response.status,200,'Página inacessível: '+url+' ('+response.status+')');
@@ -42,6 +43,15 @@ async function request(url,options={}){
  }
  const operationalPreflight=await request(operationalApi+'?action=index',{method:'OPTIONS',headers:{origin:base,'access-control-request-method':'POST'}});
  assert.equal(operationalPreflight.status,204);
+ const previewApi='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-api';
+ for(const headers of [{'content-type':'application/pdf'},
+  {'content-type':'application/pdf',authorization:'Bearer invalid.token'}]){
+  const denied=await request(previewApi+'?action=proposal-preview',{
+   method:'POST',headers,body:'%PDF-fake'
+  });
+  assert.equal(denied.status,401,'Prévia PDF sem sessão não pode acessar o leitor');
+  assert.ok(!denied.text.includes('fields')&&!denied.text.includes('insuredDocument'));
+ }
  const preflight=await request(api+'?action=queue',{method:'OPTIONS',headers:{origin:base,'access-control-request-method':'POST'}});
  assert.equal(preflight.status,204,'Preflight do financeiro falhou');
  console.log('PASS CORS e verificação pública do portal');
