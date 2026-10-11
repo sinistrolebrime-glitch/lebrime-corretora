@@ -33,7 +33,7 @@ export const includeByFilter=(row,filter,day=localToday())=>{
   if(filter==='week')return (s==='upcoming'&&days<=7)||s==='today';
   if(filter==='month')return (s==='upcoming'&&days<=30)||s==='today';
   if(filter==='review')return review(s);
-  if(filter==='blocked')return s==='blocked'||s==='forecast';
+  if(filter==='blocked')return s==='blocked'||s==='forecast'||row.collectionStatus==='Não cobrar';
   if(filter==='paid')return ['paid','paid_migration'].includes(s);
   return true;
 };
@@ -66,7 +66,7 @@ export function summary(rows,day=localToday()){
     if(r.stage==='upcoming'&&d<=7||r.stage==='today')totals.week++;
     if(r.stage==='upcoming'&&d<=30||r.stage==='today')totals.month++;
     if(review(r.stage))totals.review++;
-    if(r.stage==='blocked')totals.blocked++;
+    if(r.stage==='blocked'||r.collectionStatus==='Não cobrar')totals.blocked++;
     if(r.stage==='forecast')totals.forecast++;
     if(r.stage==='paid')totals.paid++;
     if(r.stage==='paid_migration')totals.paidMigration++;
