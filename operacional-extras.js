@@ -31,7 +31,8 @@ async function operationalPortal(action,body={},blob=false){
   return blob?response.blob():response.json();
  }finally{clearTimeout(timer);}
 }
-function loadIndex(){
+function loadIndex(force=false){
+ if(force){cache=null;loading=null;}
  if(cache)return Promise.resolve(cache);
  if(!loading)loading=operationalPortal('index').then(data=>{
   const clients=Array.isArray(data.clients)?data.clients:[];
@@ -49,6 +50,8 @@ function loadIndex(){
  }).finally(()=>{loading=null;});
  return loading;
 }
+// A agenda mensal reutiliza o mesmo índice operacional protegido e não carrega comissões.
+globalThis.lebrimeOperationalIndex=loadIndex;
 function resultsFor(input){
  if(!cache)return [];
  const needle=matchText(input);
