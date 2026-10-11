@@ -80,16 +80,23 @@ Deno.serve(async(req:Request)=>{
    const {data:client,error:ce}=await db.from("records").select("id,data").eq("kind","client").eq("id",id).maybeSingle();
    if(ce)throw ce;
    if(!client)return json({error:"Cliente não encontrado."},404);
-   const [{data:contracts,error:pe},{data:docs,error:de}]=await Promise.all([
+   const [{data:contracts,error:pe},{data:docs,error:de},{data:payments,error:payError}]=await Promise.all([
     db.from("records").select("id,kind,data").in("kind",["proposal","policy"]).eq("data->>clientId",id).limit(500),
-    db.from("records").select("id,data").eq("kind","document").eq("data->>clientId",id).limit(500)
+    db.from("records").select("id,data").eq("kind","document").eq("data->>clientId",id).limit(500),
+    db.from("records").select("id,data").eq("kind","payment").eq("data->>clientId",id).limit(1500)
    ]);
-   if(pe||de)throw pe||de;
+   if(pe||de||payError)throw pe||de||payError;
    const allowed=new Set<string>((contracts||[]).map((r:any)=>r.id));
    const documents=(docs||[]).map((r:any)=>safeDocument(r,allowed)).filter(Boolean);
    return json({client:{id,name:String(client.data?.name||""),document:String(client.data?.document||""),
      phone:String(client.data?.phone||""),mobile:String(client.data?.mobile||"")},
-     contracts:(contracts||[]).map(contractPreview),documents});
+     contracts:(contracts||[]).map(contractPreview),documents,
+    payments:(payments||[]).filter(p=>allowed.has(String(p.data?.policyId||p.data?.proposalId||"")))
+      .map(p=>({id:p.id,contractId:String(p.data?.policyId||p.data?.proposalId||""),
+        installment:String(p.data?.installment||""),due:String(p.data?.due||""),
+        dueText:String(p.data?.dueText||""),amount:Number(p.data?.amount||0),
+        status:String(p.data?.status||""),collectionStatus:String(p.data?.collectionStatus||""),
+        migrationStatus:String(p.data?.migrationStatus||"")}))});
   }
   const id=String(input.documentId||"");
   if(!docId.test(id))return json({error:"Documento inválido."},400);
