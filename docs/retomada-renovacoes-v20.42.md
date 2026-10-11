@@ -53,3 +53,15 @@
 - Suites adicionadas: `tests/bulk_import.cjs` e `tests/review_center.cjs`. Testes de produção incluem o carregamento dos novos arquivos. A primeira importação real com credenciais válidas ainda exige homologação manual.
 - **Data sensível:** a lista privada dos 309 clientes continua no Google Sheets original, não foi inserida em arquivos do site público.
 - Estado da carteira antes de carregar propostas novas: 663 clientes, 717 propostas, 49 apólices, 961 documentos, 5.473 parcelas. Nenhum novo cadastro real foi criado pela etapa de desenvolvimento.
+
+## Evolução — prévia conservadora de propostas v20.45 (11/10/2026)
+
+- Nova ação autenticada `proposal-preview` na Edge Function `lebrime-api` v27. Exige perfil `gestor`, content-type PDF, limite de 15 MB e assinatura `%PDF-`. Lê em memória, sem criar registro ou arquivo.
+- Arquivos: `supabase/functions/lebrime-api/proposal_preview.mjs` (parser puro por rótulos e evidências) e `pdf_reader.ts` (PDF.js, até 20 páginas de texto, sem OCR). `index.ts` é gerido pelo deploy ativo no Supabase; não foi copiado ao repositório GitHub por conter informações de autenticação/segredos existentes.
+- Gerencial > Arquivos > Formulário nova proposta: botão **Ler PDF e mostrar prévia**, campos identificados com página/trecho, aviso de divergência de CPF/CNPJ, confirmação manual de transferência ao formulário.
+- Campos possíveis: CPF/CNPJ, segurado, seguradora, ramo, número, início/fim de vigência, prêmio total, valor assegurado/LMI total (somente rótulos explícitos). **Não** inferir FIPE/valor segurado, produtor ou comissão. Para PDF escaneado sem texto selecionável, retornar pendência manual.
+- Parcelamento da prévia é apenas informativo; a quantidade de parcelas só é sugerida quando valores e todas as datas conciliam com o prêmio. **Nenhuma parcela é gravada na prévia**; a conciliação de produção ocorre no fluxo original após salvar a proposta.
+- Dados só entram no formulário quando o gestor clica em Aplicar campos conferidos. A gravação do contrato e PDF continua sujeita a confirmação explícita e validações de duplicidade.
+- Novos testes `tests/proposal_preview.mjs` (datas, valores, ambiguidade, arquivo sem texto) e `tests/proposal_preview_ui.cjs` (sem alteração antes da confirmação, CPF divergente). Smoke confirma que `proposal-preview` recusa tokens ausentes/inválidos.
+- Estado: implementação com testes simulados, **ainda não homologada com PDF real e autenticação de gestor**. Não usar para importação massiva sem primeiro validar proposta real e dados gerados nas fichas de gerencial e operacional.
+- Próximos passos: homologar PDF real de frota, empresarial, auto e renovações; melhorar reconhecimento por seguradora; incorporar checklist de revisão de producer/comissão e prova de parcelas; preservar histórico.
