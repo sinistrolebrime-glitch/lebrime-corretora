@@ -44,7 +44,7 @@ function contractPreview(c:any){
 function safeDocument(doc:any,allow:Set<string>){
  const d=doc.data||{},cid=String(d.policyId||d.proposalId||"");
  const category=kindOf(d.documentType);
- if(!allow.has(cid)||(!category.includes("proposta")&&!category.includes("apolice")))return null;
+ if(!allow.has(cid)||(!category.includes("proposta")&&!category.includes("apolice")&&!category.includes("endosso")))return null;
  const fid=String(d.sourceDriveFileId||"");
  return {id:doc.id,contractId:cid,type:String(d.documentType||""),
   name:String(d.originalFileName||d.name||"Proposta / Apólice").slice(0,180),
@@ -80,17 +80,27 @@ Deno.serve(async(req:Request)=>{
    const {data:client,error:ce}=await db.from("records").select("id,data").eq("kind","client").eq("id",id).maybeSingle();
    if(ce)throw ce;
    if(!client)return json({error:"Cliente não encontrado."},404);
-   const [{data:contracts,error:pe},{data:docs,error:de},{data:payments,error:payError}]=await Promise.all([
+   const [{data:contracts,error:pe},{data:docs,error:de},{data:payments,error:payError},{data:endRows,error:endError}]=await Promise.all([
     db.from("records").select("id,kind,data").in("kind",["proposal","policy"]).eq("data->>clientId",id).limit(500),
     db.from("records").select("id,data").eq("kind","document").eq("data->>clientId",id).limit(500),
-    db.from("records").select("id,data").eq("kind","payment").eq("data->>clientId",id).limit(1500)
+    db.from("records").select("id,data").eq("kind","payment").eq("data->>clientId",id).limit(1500),
+    db.from("records").select("id,data").eq("kind","endorsement").eq("data->>clientId",id).limit(300)
    ]);
-   if(pe||de||payError)throw pe||de||payError;
+   if(pe||de||payError||endError)throw pe||de||payError||endError;
    const allowed=new Set<string>((contracts||[]).map((r:any)=>r.id));
    const documents=(docs||[]).map((r:any)=>safeDocument(r,allowed)).filter(Boolean);
    return json({client:{id,name:String(client.data?.name||""),document:String(client.data?.document||""),
      phone:String(client.data?.phone||""),mobile:String(client.data?.mobile||"")},
      contracts:(contracts||[]).map(contractPreview),documents,
+     endorsements:(endRows||[])
+      .filter(e=>allowed.has(String(e.data?.parentInsuranceId||e.data?.proposalId||"")))
+      .map(e=>({id:e.id,contractId:String(e.data?.parentInsuranceId||e.data?.proposalId||""),
+        number:String(e.data?.number||""),parentPolicyNumber:String(e.data?.parentPolicyNumber||""),
+        effectiveDate:String(e.data?.start||""),end:String(e.data?.end||""),
+        type:String(e.data?.endorsementType||"Endosso"),
+        priorVehicle:String(e.data?.priorVehicle||""),
+        newVehicle:String(e.data?.newVehicle||""),
+        premium:Number(e.data?.premium||0)})),
     payments:(payments||[]).filter(p=>allowed.has(String(p.data?.policyId||p.data?.proposalId||"")))
       .map(p=>({id:p.id,contractId:String(p.data?.policyId||p.data?.proposalId||""),
         installment:String(p.data?.installment||""),due:String(p.data?.due||""),
@@ -105,7 +115,7 @@ Deno.serve(async(req:Request)=>{
   if(!doc)return json({error:"Documento não encontrado."},404);
   const d=doc.data||{},cid=String(d.policyId||d.proposalId||""),clientId=String(d.clientId||"");
   if(!docId.test(cid)||!docId.test(clientId)||
-     (!kindOf(d.documentType).includes("proposta")&&!kindOf(d.documentType).includes("apolice")))
+     (!kindOf(d.documentType).includes("proposta")&&!kindOf(d.documentType).includes("apolice")&&!kindOf(d.documentType).includes("endosso")))
    return json({error:"Documento sem vínculo válido."},403);
   const {data:contract,error:pe}=await db.from("records").select("id,kind,data").eq("id",cid)
     .in("kind",["proposal","policy"]).maybeSingle();
