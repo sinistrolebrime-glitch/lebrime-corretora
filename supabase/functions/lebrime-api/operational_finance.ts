@@ -1,6 +1,6 @@
 // Área operacional: acesso restrito a parcelas, clientes e dados de seguro.
 // Não retorna comissões, prêmio do contrato, ou produtor.
-import {stateOf,stageLabel,stageRank,summary,includeByFilter,localToday,actionable,review,makeReminder} from "./operational_finance_rules.mjs";
+import {stateOf,stageLabel,stageRank,summary,includeByFilter,localToday,actionable,review,makeReminder,validDue} from "./operational_finance_rules.mjs";
 const PAGE=60;
 const getId=(p:any)=>String(p?.data?.policyId||p?.data?.proposalId||"");
 const digits=(s:string)=>String(s||"").replace(/\D/g,"");
@@ -138,13 +138,16 @@ export async function operationalPaymentAction(db:any,input:any){
     next.responsible=responsible;
     next.lastContactAt=stamp;
     next.lastContactNote=note;
-    if(/^\d{4}-\d{2}-\d{2}$/.test(String(input?.nextActionDate||"")))
+    if(input?.nextActionDate){
+      if(!validDue(String(input.nextActionDate)))throw new Error("Data do próximo contato inválida.");
       next.nextActionDate=String(input.nextActionDate);
+    }
   }else if(action==="review-note"){
     next.reviewNote=note;next.reviewUpdatedAt=stamp;next.reviewResponsible=responsible;
   }else{
-    next.status="Pago";next.paidDate=String(input?.paidDate||"").match(/^\d{4}-\d{2}-\d{2}$/)
-      ?String(input.paidDate):localToday();
+    const paidDate=String(input?.paidDate||"")||localToday();
+    if(!validDue(paidDate))throw new Error("Data de pagamento inválida.");
+    next.status="Pago";next.paidDate=paidDate;
     next.paymentEvidence=evidence;
     next.paidConfirmedAt=stamp;
     next.paidConfirmedBy=responsible;
