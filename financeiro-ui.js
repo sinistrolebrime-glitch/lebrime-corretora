@@ -29,7 +29,7 @@
       if(state.view==='next7'&&!(st==='Vence hoje'||st==='A vencer'&&days!==null&&days<=7))return false;
       if(state.view==='review'&&!(/^Conferir|^Migração/.test(st)||st==='Cobrança suspensa'))return false;
       if(state.view==='forecast'&&st!=='Previsão — não cobrar')return false;
-      if(state.view==='paid'&&!['Pagamento registrado','Pago por migração'].includes(st))return false;
+      if(state.view==='paid'&&!['Pagamento registrado','Pago por migração','Conferir pagamento sem comprovante'].includes(st))return false;
       if(state.brokerage!=='all'&&!String(c?.data?.brokerages||c?.data?.brokerage||'').split('|').includes(state.brokerage))return false;
       if(state.status!=='all'&&String(row.data.collectionStatus||'')!==state.status)return false;
       if(state.dueFrom&&(!due||due<state.dueFrom))return false;
@@ -58,7 +58,8 @@
       <span class="chip">Próximos 7 dias: ${t.soon}</span>
       <span class="chip ${t.review?'danger':''}">Conferência de PDFs: ${t.review}</span>
       <span class="chip">Cobranças bloqueadas: ${t.suspended}</span>
-      <span class="chip">Pagas confirmadas: ${t.paid}</span>
+      <span class="chip">Pagas com evidência: ${t.paid}</span>
+      <span class="chip">Pagamentos sem comprovante: ${t.paidUnverified}</span>
       <span class="chip">Pagas na migração: ${t.paidMigration}</span>
       <span class="chip">Previsões: ${t.forecast}</span>
     </div>`;
@@ -108,7 +109,7 @@
             ${choice('next7','A vencer nos próximos 7 dias')}
             ${choice('overdue','Vencidas sem confirmação')}
             ${choice('all','Todas as parcelas')}
-            ${choice('paid','Pagamentos registrados')}
+            ${choice('paid','Pagamentos registrados / migração')}
             ${choice('forecast','Previsões sem contrato confirmado')}
           </select></label>
           <label>Corretora<select id="billingBrokerage"><option value="all">Todas</option>
