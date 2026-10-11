@@ -14,6 +14,7 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   // Só analisar como tabela após encontrar o cabeçalho explícito de parcelas.
   const tableHeader=/PARCELAS?\s+VENCIMENTO\s+VALOR|PARCELAS?\s+VALOR\s+VENCIMENTO/i;
   const tableRow=/(?:^|\s)(0?[1-9]|[1-6]\d|7[0-2])\s+([0-3]?\d\/[01]?\d\/20\d{2})\s+(?:R\$\s*)?((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})(?=\s|$|P[aá]gina)/gi;
+  const amountPair=/(?:^|\s)(0?[1-9]|[1-6]\d|7[0-2])\s+R\$\s*((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})(?=\s|$)/gi;
   const parseMoney=raw=>{
     const v=String(raw||'').replace(/R\$\s*/i,'').replace(/\./g,'').replace(',','.');
     return /^\d+\.\d{2}$/.test(v)?Math.round(Number(v)*100):0;
@@ -50,6 +51,22 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
             const amount=parseMoney(item[3]);
             if(no<1||no>72||!due||amount<=0||amount>100_000_000_000)continue;
             candidates.push({number:no,totalHint:0,amount,due,dueText:'',
+              paymentMethod:String(paymentMethod||''),sourcePage:pageIndex+1,sourceLine:i+1,
+              explicit:false,context:true});
+          }
+          continue;
+        }
+      }
+      // Algumas propostas Allianz apresentam "Parcelas" seguido de
+      // "1 R$ 80,61 5 R$ 80,61 9 R$ 80,61" sem datas.
+      // Salvar apenas valores comprovados; vencimentos ficam em conferência.
+      if(context>0){
+        const pairs=[...line.matchAll(amountPair)];
+        if(pairs.length>0 && pairs.every(item=>Number(item[1])>=1)){
+          for(const pair of pairs){
+            const no=Number(pair[1]),amount=parseMoney(pair[2]);
+            if(!amount||amount>100_000_000_000)continue;
+            candidates.push({number:no,totalHint:0,amount,due:'',dueText:dueReference||'Vencimento não informado',
               paymentMethod:String(paymentMethod||''),sourcePage:pageIndex+1,sourceLine:i+1,
               explicit:false,context:true});
           }
