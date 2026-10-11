@@ -20,6 +20,8 @@ let authenticated=false;
 const showLogin=(msg='')=>{
   authenticated=false;
   document.body.classList.remove('op-authenticated');
+  document.dispatchEvent(new Event('lebrime-operacional-logout'));
+
   wall.hidden=false;
   wall.removeAttribute('aria-hidden');
   error.textContent=msg;
@@ -32,6 +34,8 @@ const showPortal=()=>{
   wall.hidden=true;
   wall.setAttribute('aria-hidden','true');
   document.body.classList.add('op-authenticated');
+  document.dispatchEvent(new Event('lebrime-operacional-authenticated'));
+
 };
 const request=async(action,body,token='')=>{
   const controller=new AbortController();
