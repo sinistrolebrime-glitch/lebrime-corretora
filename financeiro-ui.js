@@ -118,7 +118,7 @@
           <button type="button" class="btn ghost small" id="billingNext" ${page===pageCount-1?'disabled':''}>Próxima</button>
         </div>
       </div>`;
-    $('#tableHead').innerHTML='<tr><th>Cliente / contato</th><th>Seguro</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Situação</th><th>Ações</th></tr>';
+    $('#tableHead').innerHTML='<tr><th>Cliente / contato</th><th>Seguro</th><th>Parcela</th><th>Vencimento</th><th>Valor</th><th>Situação</th><th>Último contato</th><th>Ações</th></tr>';
     $('#tableBody').innerHTML=paged.length?paged.map(row=>{
       const c=cOf(row),client=clientOf(row),st=financialState(row,imported);
       const able=FINANCE.actionable(row,c,imported,CUTOFF,todayLocal());
@@ -141,8 +141,9 @@
        <td>${esc(row.data.installment||'—')}</td><td>${esc(FINANCE.validDate(row.data.due)?date(row.data.due):(row.data.dueText||'A conferir'))}</td>
        <td>${row.virtual?'—':money(row.data.amount)}</td>
        <td><span class="status-pill corporate-status ${st.includes('Vencida')?'danger':st.includes('Conferir')?'warning':'neutral'}">${esc(st)}</span></td>
+       <td>${row.data.lastContactAt?esc(date(row.data.lastContactAt.slice(0,10))):'—'}<small>${esc(row.data.responsible||'')}</small></td>
        <td class="actions">${action}</td></tr>`;
-    }).join(''):'<tr><td colspan="7"><div class="empty">Nenhuma parcela encontrada para este filtro. Use “Conferir PDF / dados” para investigar cronogramas incompletos.</div></td></tr>';
+    }).join(''):'<tr><td colspan="8"><div class="empty">Nenhuma parcela encontrada para este filtro. Use “Conferir PDF / dados” para investigar cronogramas incompletos.</div></td></tr>';
     const setValue=(id,key)=>{$(id).onchange=e=>{state[key]=e.target.value;page=0;renderFinance();};};
     setValue('#billingView','view');
     setValue('#billingBrokerage','brokerage');
