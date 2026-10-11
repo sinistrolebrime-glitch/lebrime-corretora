@@ -15,6 +15,19 @@ for(const [title,pages,premium,expected] of fixtures){
   const r=parseInstallmentSchedule(pages,{premium});
   assert.equal(r.status,expected,title+': '+r.reason);
 }
+const twoColumns=[
+  'INFORMAÇÕES DE PAGAMENTO\nPARCELA VENCIMENTO VALOR (R$) PARCELA VENCIMENTO VALOR (R$)\n1 14/09/2026 8.149,60 4 20/12/2026 8.149,60\n2 20/10/2026 8.149,60 5 20/01/2027 8.149,60\n3 20/11/2026 8.149,60 6 20/02/2027 8.149,60',
+  'PARCELA VENCIMENTO VALOR (R$) PARCELA VENCIMENTO VALOR (R$)\n7 20/03/2027 8.149,60 9 20/05/2027 8.149,60\n8 20/04/2027 8.149,60 10 20/06/2027 8.149,72'
+];
+const cla= parseInstallmentSchedule(twoColumns,{premium:8149612});
+assert.equal(cla.status,'verified',cla.reason);
+assert.equal(cla.plan.length,10);
+assert.equal(cla.plan[0].due,'2026-09-14');
+assert.equal(cla.plan[9].due,'2027-06-20');
+assert.equal(cla.amountTotal,8149612);
+const duplicateTwoColumn=parseInstallmentSchedule([...twoColumns,twoColumns[0]],{premium:8149612});
+assert.equal(duplicateTwoColumn.status,'verified');
+
 const good=parseInstallmentSchedule(fixtures[0][1],{premium:30100});
 assert.equal(good.plan.length,3);
 assert.deepEqual(good.plan.map(p=>p.amount),[10000,10000,10100]);
