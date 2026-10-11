@@ -14,3 +14,5 @@ jobs:
       - run: node --check script.js && node --check financeiro.js && node --check financeiro-ui.js
       - run: node tests/regression.cjs
       - run: node tests/financeiro.cjs
+
+      - run: node tests/pdf_installments.mjs
