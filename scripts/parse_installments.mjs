@@ -10,6 +10,10 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   const numbered=/^\s*0?(\d{1,2})\s*(?:\/\s*0?(\d{1,2}))?(?=\s|[-|;:])/;
   const dates=/\b([0-3]?\d)\/([01]?\d)\/(20\d{2})\b/g;
   const currency=/(?:R\$\s*)?(?:\d{1,3}(?:\.\d{3})+|\d+),\d{2}\b/g;
+  // Quadros em duas colunas: "1 14/09/2026 8.149,60 4 20/12/2026 8.149,60".
+  // Só analisar como tabela após encontrar o cabeçalho explícito de parcelas.
+  const tableHeader=/PARCELAS?\s+VENCIMENTO\s+VALOR|PARCELAS?\s+VALOR\s+VENCIMENTO/i;
+  const tableRow=/(?:^|\s)(0?[1-9]|[1-6]\d|7[0-2])\s+([0-3]?\d\/[01]?\d\/20\d{2})\s+(?:R\$\s*)?((?:\d{1,3}(?:\.\d{3})+|\d+),\d{2})(?=\s|$|P[aá]gina)/gi;
   const parseMoney=raw=>{
     const v=String(raw||'').replace(/R\$\s*/i,'').replace(/\./g,'').replace(',','.');
     return /^\d+\.\d{2}$/.test(v)?Math.round(Number(v)*100):0;
@@ -24,6 +28,7 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   for(let pageIndex=0;pageIndex<Math.min(source.length,20);pageIndex++){
     const lines=String(source[pageIndex]||'').split(/\r?\n/).map(line=>line.replace(/\s+/g,' ').trim()).filter(Boolean);
     let context=0;
+    let tableContext=0;
     let dueReference='';
 
     for(let i=0;i<lines.length;i++){
@@ -33,6 +38,24 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
       if(/fatura\s+d[oa]\s+cart[aã]o/i.test(line))dueReference='Fatura do cartão';
       if(heading.test(line)){context=25;headings++;}
       else context=Math.max(0,context-1);
+      if(tableHeader.test(line))tableContext=20;
+      else tableContext=Math.max(0,tableContext-1);
+      // Uma mesma linha pode conter duas colunas do quadro de pagamentos.
+      // Cada tripla numeração/data/valor continua validada separadamente.
+      if(tableContext){
+        const found=[...line.matchAll(tableRow)];
+        if(found.length){
+          for(const item of found){
+            const no=Number(item[1]),dmY=item[2].split('/'),due=validISO(...dmY);
+            const amount=parseMoney(item[3]);
+            if(no<1||no>72||!due||amount<=0||amount>100_000_000_000)continue;
+            candidates.push({number:no,totalHint:0,amount,due,dueText:'',
+              paymentMethod:String(paymentMethod||''),sourcePage:pageIndex+1,sourceLine:i+1,
+              explicit:false,context:true});
+          }
+          continue;
+        }
+      }
       const explicitMatch=explicit.exec(line);
       const numberedMatch=context>0?numbered.exec(line):null;
       const n=explicitMatch?Number(explicitMatch[1]):numberedMatch?Number(numberedMatch[1]):0;
