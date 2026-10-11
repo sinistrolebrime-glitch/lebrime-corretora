@@ -7,12 +7,28 @@ export const validDue=d=>{
   return Number.isFinite(t.getTime())&&t.toISOString().slice(0,10)===d;
 };
 export const localToday=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
+export const planDifference=contract=>{
+  const d=contract?.data||{},plan=d.installmentPlan;
+  if(!Array.isArray(plan)||!plan.length)return null;
+  const premium=Number(d.premium);
+  if(!Number.isSafeInteger(premium)||premium<=0)return null;
+  let total=0;
+  for(const p of plan){
+    const amount=Number(p?.amount);
+    if(!Number.isSafeInteger(amount)||amount<0)return null;
+    total+=amount;
+  }
+  return Number.isSafeInteger(total)?total-premium:null;
+};
 export const stateOf=(p,contract,importedIds,day=localToday())=>{
   const d=p?.data||p||{};
-  if(d.status==='Pago')return /migra/i.test(String(d.migrationStatus||''))?'paid_migration':'paid';
+  if(d.status==='Pago')return /migra/i.test(String(d.migrationStatus||''))?'paid_migration':
+    String(d.paymentEvidence||'').trim()?'paid':'review_paid_evidence';
   if(d.status==='Cancelado')return 'cancelled';
   if(!contract)return 'review_link';
   if(contract.kind!=='policy'&&!(contract.kind==='proposal'&&importedIds.has(contract.id)))return 'forecast';
+  const difference=planDifference(contract);
+  if(difference!==null&&difference!==0)return 'review_plan';
   if(!Number.isSafeInteger(Number(d.amount))||Number(d.amount)<=0)return 'review_amount';
   if(!validDue(d.due))return 'review_due';
   if(d.due.slice(0,7)<CUTOFF_MONTH)return 'review_migration';
@@ -34,12 +50,13 @@ export const includeByFilter=(row,filter,day=localToday())=>{
   if(filter==='month')return (s==='upcoming'&&days<=30)||s==='today';
   if(filter==='review')return review(s);
   if(filter==='blocked')return s==='blocked'||s==='forecast'||row.collectionStatus==='Não cobrar';
-  if(filter==='paid')return ['paid','paid_migration'].includes(s);
+  if(filter==='paid')return ['paid','paid_migration','review_paid_evidence'].includes(s);
   return true;
 };
 export const stageLabel=s=>({
   late_unconfirmed:'Vencida — sem confirmação',today:'Vence hoje',
   upcoming:'A vencer',review_due:'Conferir vencimento',
+  review_plan:'Conferir soma das parcelas',review_paid_evidence:'Pago registrado sem comprovante',
   review_amount:'Conferir valor',review_link:'Conferir vínculo',
   review_migration:'Conferir migração',review_status:'Conferir situação',
   blocked:'Cobrança suspensa',forecast:'Previsão — não cobrar',
@@ -58,7 +75,7 @@ export const stageRank=(row,day=localToday())=>{
   return 7;
 };
 export function summary(rows,day=localToday()){
-  const totals={late:0,today:0,week:0,month:0,review:0,blocked:0,forecast:0,paid:0,paidMigration:0,all:rows.length};
+  const totals={late:0,today:0,week:0,month:0,review:0,blocked:0,forecast:0,paid:0,paidUnverified:0,paidMigration:0,all:rows.length};
   for(const r of rows){
     const d=daysUntil(r.due,day);
     if(r.stage==='late_unconfirmed')totals.late++;
@@ -69,6 +86,7 @@ export function summary(rows,day=localToday()){
     if(r.stage==='blocked'||r.collectionStatus==='Não cobrar')totals.blocked++;
     if(r.stage==='forecast')totals.forecast++;
     if(r.stage==='paid')totals.paid++;
+    if(r.stage==='review_paid_evidence')totals.paidUnverified++;
     if(r.stage==='paid_migration')totals.paidMigration++;
   }
   return totals;
