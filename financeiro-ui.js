@@ -6,7 +6,7 @@
   const priorRenderList=renderList;
   const pageSize=80;
   let page=0;
-  const state={view:'attention',brokerage:'all',status:'all',dueFrom:'',dueTo:''};
+  const state={view:'review',brokerage:'all',status:'all',dueFrom:'',dueTo:''};
   const todayLocal=()=>new Date(Date.now()-3*3600000).toISOString().slice(0,10);
   const contractOf=row=>rowById(row?.data?.policyId||row?.data?.proposalId)||null;
   const clientOf=row=>rowById(row?.data?.clientId||contractOf(row)?.data?.clientId)||null;
@@ -58,6 +58,22 @@
     if(current!=='payment')return priorRenderList();
     const {rows,imported}=currentSnapshot();
     const displayed=filterRows(rows,imported);
+    const documentIndex=new Map();
+    for(const doc of list('document')){
+      const id=String(doc.data.policyId||doc.data.proposalId||'');
+      const type=fold(doc.data.documentType||'');
+      if(!id||!['apolice','proposta'].some(k=>type.includes(k)))continue;
+      if(!documentAvailable(doc))continue;
+      const old=documentIndex.get(id);
+      if(!old||Boolean(doc.data.storageKey)&&!Boolean(old.data.storageKey))documentIndex.set(id,doc);
+    }
+    const candidates=[...documentIndex.values()].filter(doc=>{
+      const status=String(doc.data.financeExtractionStatus||'');
+      const contract=rowById(doc.data.policyId||doc.data.proposalId);
+      const hasPlan=Array.isArray(contract?.data?.installmentPlan)&&contract.data.installmentPlan.length>0;
+      return !status&&contract&&Number(contract.data.premium||0)>0&&!hasPlan;
+    });
+
     const pageCount=Math.max(1,Math.ceil(displayed.length/pageSize));
     page=Math.min(page,pageCount-1);
     const paged=displayed.slice(page*pageSize,(page+1)*pageSize);
@@ -68,8 +84,12 @@
       <div class="portfolio-list-guide">
         <div><strong>Financeiro · fila para agir com segurança</strong>
           <p>As propostas importadas entram no acompanhamento. Sem vencimento confirmado, a parcela vai para conferência, não para cobrança. Nenhuma mensagem é enviada automaticamente.</p></div>
-        <button type="button" class="btn ghost small" id="billingRefresh">Atualizar dados</button>
+        <div class="finance-filter-actions">
+          <button type="button" class="btn ghost small" id="billingAnalyzeBatch">Analisar 3 PDFs da carteira</button>
+          <button type="button" class="btn ghost small" id="billingRefresh">Atualizar dados</button>
+        </div>
       </div>
+      <div id="billingExtractionInfo" class="muted" aria-live="polite">Documentos candidatos à leitura: ${candidates.length}. Processamento por blocos pequenos; somente dados conferidos são lançados.</div>
       ${summaryMarkup(rows,imported)}
       <div class="finance-filter-shell">
         <div class="finance-filter-grid">
@@ -103,10 +123,16 @@
       const c=cOf(row),client=clientOf(row),st=financialState(row,imported);
       const able=FINANCE.actionable(row,c,imported,CUTOFF,todayLocal());
       const contact=client?.data?.mobile||client?.data?.phone||'';
+      const doc=documentIndex.get(c?.id);
+      const docAction=doc?`<button class="link-btn" data-billing-extract="${esc(doc.id)}">Ler parcelamento do PDF</button>`:
+        c?`<button class="link-btn" data-billing-upload="${esc(c.id)}">Anexar PDF</button>`:'';
+      const enable=st==='Cobrança suspensa'&&c?.data?.installmentExtractionStatus==='Verificado'&&row.data.collectionStatus==='Não cobrar'
+        ?`<button class="link-btn" data-billing-enable="${esc(row.id)}">Liberar acompanhamento</button>`:'';
       const action=row.virtual?
-        `<button class="link-btn" data-billing-contract="${esc(c?.id||'')}">Conferir contrato</button>`
+        `<button class="link-btn" data-billing-contract="${esc(c?.id||'')}">Conferir contrato</button>${docAction}
         :`<button class="link-btn" data-billing-contract="${esc(c?.id||'')}">Abrir contrato</button>
           <button class="link-btn" data-billing-edit="${esc(row.id)}">Editar parcela</button>
+          ${docAction}${enable}
           ${able?`<button class="link-btn" data-billing-copy="${esc(row.id)}">Copiar mensagem</button>
           <button class="link-btn" data-billing-contact="${esc(row.id)}">Registrar contato</button>`
           :'<small class="muted">Conferir antes de cobrar</small>'}`;
@@ -131,10 +157,63 @@
       try{await loadRecords();renderFinance();}catch(e){alert('Falha ao atualizar a carteira: '+e.message);}
       finally{const b=$('#billingRefresh');if(b)b.disabled=false;}
     };
+    $('#billingAnalyzeBatch').onclick=async()=>{
+      const btn=$('#billingAnalyzeBatch');
+      const queue=candidates.slice(0,3);
+      if(!queue.length){$('#billingExtractionInfo').textContent='Nenhum PDF novo elegível neste momento. Use Ler parcelamento do PDF na linha para reanalisar individualmente.';return;}
+      btn.disabled=true;
+      let ok=0,review=0,unavailable=0;
+      for(let i=0;i<queue.length;i++){
+        const message=$('#billingExtractionInfo');
+        if(message)message.textContent=`Analisando documento ${i+1} de ${queue.length}...`;
+        try{
+          const result=await api('payments-extract',{documentId:queue[i].id,apply:true});
+          if(result.applied)ok++;
+          else if(result.status==='unavailable')unavailable++;
+          else review++;
+        }catch{review++;}
+      }
+      try{await loadRecords();renderFinance();}catch(e){alert('Falha ao atualizar o financeiro: '+e.message);}
+      const summary=$('#billingExtractionInfo');
+      if(summary)summary.textContent=`Bloco salvo: ${ok} plano(s) conciliado(s), ${review} para conferência e ${unavailable} arquivo(s) inacessível(is). Nenhuma cobrança foi enviada.`;
+    };
     document.querySelectorAll('[data-billing-contract]').forEach(b=>b.onclick=()=>{const c=rowById(b.dataset.billingContract);if(c)openInsuranceDetail(c.id);});
     document.querySelectorAll('[data-billing-edit]').forEach(b=>b.onclick=()=>openEditor(rowById(b.dataset.billingEdit)));
+    document.querySelectorAll('[data-billing-extract]').forEach(b=>b.onclick=()=>readSinglePdf(b.dataset.billingExtract));
+    document.querySelectorAll('[data-billing-upload]').forEach(b=>b.onclick=()=>{
+      const c=rowById(b.dataset.billingUpload);
+      if(c)openClientUpload(c.data.clientId,c.id);
+    });
+    document.querySelectorAll('[data-billing-enable]').forEach(b=>b.onclick=()=>releaseCollection(rowById(b.dataset.billingEnable)));
     document.querySelectorAll('[data-billing-copy]').forEach(b=>b.onclick=()=>copyMessage(rowById(b.dataset.billingCopy),imported));
     document.querySelectorAll('[data-billing-contact]').forEach(b=>b.onclick=()=>recordContact(rowById(b.dataset.billingContact),imported));
+  }
+  async function readSinglePdf(id){
+    if(!id)return;
+    try{
+      const result=await api('payments-extract',{documentId:id,apply:true});
+      await loadRecords();
+      renderFinance();
+      const el=$('#billingExtractionInfo');
+      if(el)el.textContent=result.applied
+        ?`PDF conciliado com o prêmio: ${result.count} parcela(s) sincronizada(s). Confira a situação de cobrança antes de enviar lembretes.`
+        :`PDF requer revisão: ${String(result.reason||'dados insuficientes')}.`;
+    }catch(e){alert('Leitura do PDF não concluída: '+e.message);}
+  }
+  async function releaseCollection(row){
+    if(!row||row.virtual||row.data.collectionStatus!=='Não cobrar')return;
+    const contract=cOf(row);
+    if(contract?.data?.installmentExtractionStatus!=='Verificado')return;
+    if(!window.confirm('Liberação manual: você conferiu o documento, os valores, o vencimento e a situação de pagamento?'))return;
+    const reason=window.prompt('Justificativa da liberação (obrigatória):','Parcelamento conferido no PDF; pagamento ainda não confirmado.');
+    if(!reason?.trim())return;
+    const stamp=now();
+    const data={...row.data,collectionStatus:'Não iniciado',
+      financialReleaseAt:stamp,financialReleaseReason:reason.trim()};
+    try{
+      await api('write',{ops:[{type:'update',id:row.id,kind:'payment',data,version:row.version,updated_at:stamp,strict:true}]});
+      await loadRecords();renderFinance();
+    }catch(e){alert('Não foi possível liberar esta parcela: '+e.message);}
   }
   async function copyMessage(row,imported){
     if(!FINANCE.actionable(row,cOf(row),imported,CUTOFF,todayLocal()))return;
