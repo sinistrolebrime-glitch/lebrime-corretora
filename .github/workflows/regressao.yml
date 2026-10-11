@@ -28,6 +28,8 @@ jobs:
       - run: node tests/renewal_import.cjs
       - run: node --check importacao-lote.js
       - run: node tests/bulk_import.cjs
+      - run: node --check central-conferencia.js
+      - run: node tests/review_center.cjs
       - run: node --check gerencial-ficha-abas.js
       - run: node tests/manager_client_tabs.cjs
       - run: node --check qualidade-carteira.js
