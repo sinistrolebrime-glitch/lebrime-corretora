@@ -695,6 +695,12 @@ async function boot(){
     $('#appView').classList.remove('hidden');
     renderNav();
     navigate('overview');
+    // Deep link seguro para a ficha já carregada, sem expor dados sem login.
+    const requestedClient=new URLSearchParams(window.location.search).get('cliente')||'';
+    if(/^[a-z0-9-]{8,100}$/i.test(requestedClient)){
+      const requested=rowById(requestedClient);
+      if(requested?.kind==='client')openClientDetail(requested.id);
+    }
   }catch(e){
     if(generation!==bootGeneration)return;
     if(!token()){logout();return;}
@@ -876,8 +882,21 @@ function renderDashboard(){
   const ff=comm.reduce((s,r)=>s+Number(r.data.ffFee||0),0);
   const producerExpected=comm.reduce((s,r)=>s+Number(r.data.producerExpected||0),0);
   const lebrimeNet=comm.reduce((s,r)=>s+Number(r.data.lebrimeNet||0),0);
-  const activePremium=inPeriodContracts.reduce((s,r)=>s+Number(r.data.premium||0),0);
-  const totalPortfolioPremium=contracts.reduce((s,r)=>s+Number(r.data.premium||0),0);
+  // Somente prêmio adicional COMPROVADO de endosso: outros registros históricos
+  // não são somados, pois podem ser recálculo integral sem acréscimo financeiro.
+  const validIds=new Set(contracts.map(r=>r.id));
+  const validatedAdditions=list('endorsement').filter(e=>{
+    const d=e.data||{},linked=rowById(d.parentInsuranceId||d.proposalId);
+    return d.premiumAdditionalConfirmed===true&&Number(d.premium||0)>0&&
+      validIds.has(linked?.id)&&String(linked?.data?.clientId||'')===String(d.clientId||'');
+  });
+  const additionalPremium=validatedAdditions.reduce((sum,e)=>sum+Number(e.data.premium||0),0);
+  const activeAdditional=validatedAdditions.filter(e=>{
+    const linked=rowById(e.data.parentInsuranceId||e.data.proposalId);
+    return linked&&isContractInPeriod(linked);
+  }).reduce((sum,e)=>sum+Number(e.data.premium||0),0);
+  const activePremium=inPeriodContracts.reduce((s,r)=>s+Number(r.data.premium||0),0)+activeAdditional;
+  const totalPortfolioPremium=contracts.reduce((s,r)=>s+Number(r.data.premium||0),0)+additionalPremium;
   const missingPortfolioPremium=contracts.filter(r=>!Number(r.data.premium||0)).length;
   const itemValueIndex=insuredValuationIndex();
   const valuedContracts=contracts.map(r=>({insurance:r,...insuranceInsuredValuation(r,itemValueIndex)}));
@@ -2352,6 +2371,8 @@ function renderClientDetail(clientId,brokerageFilter='all'){
     const relatedEndorsements=relatedEndorsementsFor(r);
     const endorsementDocs=insuranceDocuments(r).filter(x=>fold(x.data.documentType||'')==='endosso');
     const endorsementCount=Math.max(relatedEndorsements.length,endorsementDocs.length);
+    const totalEndorsementPremium=relatedEndorsements.filter(e=>e.data.premiumAdditionalConfirmed===true)
+      .reduce((sum,e)=>sum+Number(e.data.premium||0),0);
     const endorsementHistoryHtml=relatedEndorsements.slice().sort((a,b)=>
       String(a.data.start||'').localeCompare(String(b.data.start||''))).map(e=>{
       const v=e.data||{};
@@ -2389,7 +2410,8 @@ function renderClientDetail(clientId,brokerageFilter='all'){
           <div><span>Corretora</span><strong>${esc(broker)}</strong></div>
           <div><span>Vigência</span><strong>${date(r.data.start)} a ${date(r.data.end)}</strong></div>
           <div><span>Situação da vigência</span><strong class="insurance-period-${periodState.key}">${esc(periodState.label)}</strong></div>
-          <div><span>Prêmio</span><strong>${money(r.data.premium)}</strong></div>
+          <div><span>Prêmio original</span><strong>${money(r.data.premium)}</strong></div>
+          ${totalEndorsementPremium? `<div><span>Prêmio acumulado com endossos</span><strong>${money(Number(r.data.premium||0)+totalEndorsementPremium)}</strong></div>`:''}
         </div>
         <div class="insurance-card-foot">
           <span class="contract-file-state ${hasPdf?'ready':doc?'pending':'neutral'}">${esc(fileState)}</span>
