@@ -66,6 +66,12 @@ el('renewalNewForm').onsubmit=async e=>{
  const file=el('newRenewalPdf').files?.[0],setMessage=message=>el('newRenewalStatus').textContent=message;
  const validDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
  if(!client||client.kind!=='client')return setMessage('Selecione um cliente existente.');
+ // A conferência do documento permanece obrigatória mesmo que o gestor troque
+ // o cliente depois de aplicar a prévia.
+ const seenDocument=globalThis.LebrimeProposalPreview?.documentFor?.(file);
+ if(seenDocument&&String(client.data?.document||'').replace(/\D/g,'')!==seenDocument)
+  return setMessage('CPF/CNPJ da proposta diverge do cliente. Confirme o cliente correto antes de importar.');
+
  if(prior&&(prior.data.clientId!==clientId||!['proposal','policy'].includes(prior.kind)))return setMessage('O seguro anterior não pertence a este cliente.');
  if(!insurer||!branch||!number||!brokerage)return setMessage('Informe seguradora, ramo, número e corretora.');
  if(!validDate(start)||!validDate(end)||start>end)return setMessage('As datas de início e fim precisam ser válidas.');
