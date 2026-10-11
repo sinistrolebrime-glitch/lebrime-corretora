@@ -177,6 +177,8 @@ selectTab=function(mode){
  $r('monitorText').value='';
  $r('monitorFilter').onchange=()=>render();
  $r('monitorText').oninput=()=>render();
+ $r('monitorText').onkeydown=null;
+ $r('monitorText').onblur=null;
  $r('monitorRefresh').onclick=()=>load(true);
  $r('monitorClear').onclick=()=>{
   $r('monitorText').value='';
