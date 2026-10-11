@@ -9,6 +9,8 @@ const pdfArea=document.getElementById('detailPdf');
 const iframe=document.getElementById('operationalPdfFrame');
 const pdfInfo=document.getElementById('operationalPdfInfo');
 const pdfExternal=document.getElementById('operationalPdfExternal');
+const paymentsArea=document.getElementById('detailPayments');
+let detailSequence=0;
 let fileUrl='',pendingFile=0;
 let cache=null,loading=null,suggestions=[],focused=null,activeIndex=-1;
 const matchText=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -159,10 +161,44 @@ function buildDocumentList(docs){
    '<small>'+clean(doc.name||'Arquivo do contrato')+'</small></span><span class="doc-action">Visualizar</span></button>'
  ).join('');
 }
+const tabs=document.getElementById('clientDetailTabs');
+function showClientTab(name){
+ if(!['history','data','payments','documents'].includes(name))name='history';
+ tabs?.querySelectorAll('[data-client-tab]').forEach(btn=>{
+  const active=btn.dataset.clientTab===name;
+  btn.classList.toggle('active',active);btn.setAttribute('aria-selected',String(active));
+ });
+ document.querySelectorAll('[data-client-pane]').forEach(pane=>{
+  pane.hidden=pane.dataset.clientPane!==name;
+ });
+}
+tabs?.querySelectorAll('[data-client-tab]').forEach(btn=>btn.addEventListener('click',()=>showClientTab(btn.dataset.clientTab)));
+const currency=value=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(value)||0)/100);
+function renderClientPayments(payments,contracts){
+ if(!paymentsArea)return;
+ const insuranceById=new Map(contracts.map(c=>[c.id,c]));
+ const sorted=payments.slice().sort((a,b)=>
+  String(a.due||'9999').localeCompare(String(b.due||'9999'))||
+  String(a.installment||'').localeCompare(String(b.installment||''),'pt-BR'));
+ paymentsArea.innerHTML='<h3>Parcelas e histórico financeiro do cliente</h3>'+
+  (sorted.length?sorted.map(p=>{
+   const contract=insuranceById.get(p.contractId)||{};
+   const migrated=/migra/i.test(String(p.migrationStatus||''));
+   const situation=p.status==='Pago'?(migrated?'Paga — migração':'Pagamento registrado'):
+    p.collectionStatus==='Não cobrar'?'Não cobrar · conferência':
+    p.status||'Conferir';
+   return '<div class="op-payment-row"><div class="op-payment-title"><span>'+
+    clean('Parcela '+(p.installment||'—')+' · '+(contract.number||'Seguro'))+'</span><span>'+
+    clean(currency(p.amount))+'</span></div>'+
+    '<small>'+clean(contract.insurer||'Seguradora')+' · '+clean(p.due?normDate(p.due):
+      p.dueText||'Vencimento pendente')+'</small><small>'+clean(situation)+'</small></div>';
+  }).join(''):'<p class="hint">Nenhuma parcela vinculada aos contratos deste cliente.</p>');
+}
 // Mantém a ficha existente e acrescenta documentos, sem abrir comissões.
 openDetail=async function(row){
  if(!document.body.classList.contains('op-authenticated'))return;
- resetPdf();closeSuggestions();
+ resetPdf();closeSuggestions();showClientTab('history');
+ const sequence=++detailSequence;
  const id=String(row?.clientId||"");
  $('#detailName').textContent=clientMap.get(id)?.name||'Ficha do segurado';
  $('#detailInfo').innerHTML='';
@@ -172,8 +208,9 @@ openDetail=async function(row){
  if(!id){$('#detailContracts').textContent='Contrato sem vínculo com cliente.';return;}
  try{
   const info=await operationalPortal('client',{clientId:id});
-  if(!detail.open)return;
-  const c=info.client||{},contracts=info.contracts||[],docs=info.documents||[];
+  if(!detail.open||sequence!==detailSequence)return;
+  const c=info.client||{},contracts=info.contracts||[],docs=info.documents||[],payments=info.payments||[];
+  renderClientPayments(payments,contracts);
   clientMap.set(id,c);
   $('#detailName').textContent=c.name||'Segurado';
   $('#detailInfo').innerHTML=[
@@ -278,6 +315,7 @@ detail.addEventListener('close',resetPdf);
 const oldClear=document.getElementById('clear').onclick;
 document.getElementById('clear').onclick=function(){closeSuggestions();if(oldClear)oldClear.call(this);};
 document.addEventListener('lebrime-operacional-logout',()=>{
+ detailSequence++;
  cache=null;loading=null;closeSuggestions();resetPdf();
  if(detail.open)detail.close();
 });
