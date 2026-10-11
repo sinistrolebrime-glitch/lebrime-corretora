@@ -24,6 +24,7 @@ class Query{
     if(this.sort)xs=xs.slice().sort((a,b)=>String(a[this.sort]).localeCompare(String(b[this.sort])));
     return xs
   }
+  then(resolve,reject){return Promise.resolve({data:this.findAll(),error:null}).then(resolve,reject)}
   async range(start,end){return {data:this.findAll().slice(start,end+1),error:null}}
   async maybeSingle(){return {data:this.findAll()[0]||null,error:null}}
 }
