@@ -21,7 +21,7 @@ vm.createContext(context);
 vm.runInContext(code,context);
 const result=context.globalThis.LebrimePortfolioQuality.coverage(clients,contracts,docs,payments);
 assert.equal(result.missingClient,1);
-assert.deepEqual(result.stats.map(x=>[x.value,x.total]),[[1,2],[2,3],[1,3],[2,3],[1,2]]);
+assert.equal(JSON.stringify(result.stats.map(x=>[x.value,x.total])),JSON.stringify([[1,2],[2,3],[1,3],[2,3],[1,2]]));
 assert.equal(context.globalThis.LebrimePortfolioQuality.percentage(1,2),50);
 assert.equal(context.globalThis.LebrimePortfolioQuality.percentage(0,0),0);
 assert.equal(context.globalThis.LebrimePortfolioQuality.isoDate('2026-02-30'),false);
