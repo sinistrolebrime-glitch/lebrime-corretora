@@ -50,6 +50,31 @@ body:not(.op-authenticated) .app{display:none!important}
 .operational-login-card small{display:block;text-align:center;margin-top:14px;color:#718095}
 @media(max-width:730px){body.op-authenticated .app{display:block!important}}
 </style>
+
+<style>
+/* Busca instantânea e visualizador de apólices na ficha operacional. */
+.searchgrid .field{position:relative;min-width:0}
+.operational-suggestions[hidden],#detailPdf[hidden]{display:none!important}
+.operational-suggestions{position:absolute;z-index:110;left:0;right:0;top:100%;margin-top:5px;max-height:340px;overflow:auto;background:#fff;border:1px solid #d9e0e8;border-radius:10px;box-shadow:0 18px 44px #18263821}
+.suggest-option{display:flex;flex-direction:column;gap:3px;padding:10px 12px;width:100%;text-align:left;border:0;border-bottom:1px solid #f0f1f3;background:#fff;color:var(--ink)}
+.suggest-option:hover,.suggest-option.active{background:#fff6e8}
+.suggest-option strong{font-size:12px}.suggest-option small{font-size:11px;color:var(--muted);white-space:normal}
+.suggest-note{padding:12px;font-size:12px;color:var(--muted)}
+#detail{width:min(980px,calc(100% - 22px));max-height:95vh;overflow:auto}
+#detail .modal-inner{padding:clamp(18px,3vw,30px)}
+#detailDocuments h3{font-size:14px;margin:20px 0 10px}
+.doc-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px}
+.doc-choice{display:flex;align-items:center;gap:10px;padding:12px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;min-width:0}
+.doc-choice:hover,.doc-choice.selected{border-color:#ba955d;background:#fdf7ed}
+.doc-choice span:nth-child(2){min-width:0;flex:1}.doc-choice strong{display:block;font-size:12px}.doc-choice small{display:block;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.pdf-symbol{background:#f7eaea;color:#923832;padding:5px 6px;border-radius:5px;font-size:10px;font-weight:800}
+.doc-action{font-size:11px;color:#8f672d}
+#detailPdf{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:12px}
+#operationalPdfInfo{font-size:12px;color:var(--muted);margin:0 0 10px}
+#operationalPdfExternal{display:inline-block;margin-bottom:11px;color:#805b2a;font-size:12px;font-weight:750}
+#operationalPdfFrame{display:block;width:100%;height:min(67vh,720px);border:1px solid #e4e7ed;border-radius:8px;background:#f8f9fa}
+@media(max-width:730px){.operational-suggestions{max-height:270px}.doc-list{grid-template-columns:1fr}#operationalPdfFrame{height:55vh}}
+</style>
 </head>
 <body>
 <section id="operationalLogin" aria-label="Autenticação operacional">
@@ -107,7 +132,7 @@ body:not(.op-authenticated) .app{display:none!important}
  </div>
 </main>
 </div>
-<dialog id="detail"><div class="modal-inner"><div class="modal-top"><div><span class="eyebrow">Ficha de segurado · demonstração</span><h2 id="detailName"></h2></div><button class="close" type="button" id="closeDetail" aria-label="Fechar">×</button></div><div class="detail-grid" id="detailInfo"></div><div id="detailContracts" class="detail-contracts"></div><p class="note">Histórico consolidado de propostas e apólices. Dados financeiros estratégicos e comissões não são disponibilizados neste perfil.</p></div></dialog>
+<dialog id="detail"><div class="modal-inner"><div class="modal-top"><div><span class="eyebrow">Ficha do segurado · propostas e apólices</span><h2 id="detailName"></h2></div><button class="close" type="button" id="closeDetail" aria-label="Fechar">×</button></div><div class="detail-grid" id="detailInfo"></div><div id="detailContracts" class="detail-contracts"></div><div id="detailDocuments"></div><section id="detailPdf" hidden aria-label="Visualização do PDF"><p id="operationalPdfInfo"></p><a id="operationalPdfExternal" target="_blank" rel="noopener noreferrer" hidden>Abrir PDF em outra aba ↗</a><iframe id="operationalPdfFrame" title="PDF da proposta ou apólice" referrerpolicy="no-referrer"></iframe></section><p class="note">Histórico consolidado de propostas e apólices. Dados financeiros estratégicos e comissões não são disponibilizados neste perfil.</p></div></dialog>
 <script>
 const API='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-api';
 const TOKEN_KEY='lebrime_token_v1';
@@ -317,6 +342,7 @@ $('#monitorClear').onclick=()=>{$('#monitorText').value='';$('#monitorFilter').v
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab));
 // A autenticação da área é executada por operacional-auth.js antes de liberar o painel.
 </script>
-<script src="operacional-auth.js?v=20.37"></script>
-<script src="operacional-financeiro.js?v=20.37"></script>
+<script src="operacional-auth.js?v=20.38"></script>
+<script src="operacional-extras.js?v=20.38"></script>
+<script src="operacional-financeiro.js?v=20.38"></script>
 </body></html>
