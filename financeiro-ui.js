@@ -129,7 +129,7 @@
       const enable=st==='Cobrança suspensa'&&c?.data?.installmentExtractionStatus==='Verificado'&&row.data.collectionStatus==='Não cobrar'
         ?`<button class="link-btn" data-billing-enable="${esc(row.id)}">Liberar acompanhamento</button>`:'';
       const action=row.virtual?
-        `<button class="link-btn" data-billing-contract="${esc(c?.id||'')}">Conferir contrato</button>${docAction}
+        `<button class="link-btn" data-billing-contract="${esc(c?.id||'')}">Conferir contrato</button>${docAction}`
         :`<button class="link-btn" data-billing-contract="${esc(c?.id||'')}">Abrir contrato</button>
           <button class="link-btn" data-billing-edit="${esc(row.id)}">Editar parcela</button>
           ${docAction}${enable}
