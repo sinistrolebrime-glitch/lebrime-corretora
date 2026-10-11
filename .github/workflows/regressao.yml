@@ -17,6 +17,7 @@ jobs:
 
       - run: node tests/pdf_installments.mjs
       - run: node tests/proposal_preview.mjs
+      - run: node tests/allianz_real_layouts.mjs
       - run: node --check renovacao-previa.js
       - run: node tests/proposal_preview_ui.cjs
       - run: node --check supabase/functions/lebrime-api/proposal_preview.mjs
