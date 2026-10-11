@@ -41,3 +41,23 @@ Versão inicial: 2026-10-10. Estas regras são obrigatórias para novas importa�
 7. Todas as alterações financeiras deixam registro auditável.
 
 **Estado de implementação:** especificação registrada; funcionalidade depende de implementação no código e validação com dados reais.
+
+
+## Implantação por módulos — 10/10/2026, v20.31
+
+**Módulo 1 — Auditoria da carteira:** consultas em produção identificaram 766 contratos, 5.473 parcelas vinculadas, 5.186 sem data de vencimento, 5.125 marcadas como previsão de proposta, 677 contratos com parcelas todas sem vencimento e 36 contratos sem qualquer parcela. São contagens de referência, variáveis com as importações.
+
+**Módulo 2 — Central de Cobranças (gestão):** arquivos `financeiro.js` e `financeiro-ui.js` no portal com fila paginada (80 por página), filtros por prioridade e corretora, status baseado em evidência, identificação de cronogramas sem data, links para contrato, mensagens copiáveis mediante validação e registro manual de contatos com responsável e histórico. A vista gerencial usa os mesmos critérios da central. Não há envio automático.
+
+**Regras complementares para a primeira entrega:**
+1. Propostas importadas com documento disponível devem aparecer no acompanhamento financeiro; propostas sem confirmação continuam como previsão não cobrável.
+2. `Não cobrar` é bloqueio de cobrança até que uma pessoa revise e retire expressamente a restrição. Não remover automaticamente a restrição legada dos PDFs históricos.
+3. Parcela sem vencimento válido, sem valor comprovado ou anterior ao corte da migração não gera mensagem de cobrança.
+4. Gerar um registro virtual de **Conferir parcelamento** para cada contrato da carteira sem nenhuma parcela; não gravar parcelas artificiais ou presumir inadimplência.
+5. Status de pagamento manual novo exige evidência anotada; pagamento por migração permanece distinto de pagamento confirmado.
+6. Nunca marcar contato como enviado por simplesmente copiar a mensagem; só registro humano explícito pode confirmar o contato.
+7. Indicadores de cobrança e a fila operacional devem partir da mesma fonte; perfis podem ter interfaces diferentes, sem acesso operacional às comissões.
+
+**Módulo 3 — Importação documental a implementar:** o processo de leitura de PDF deverá produzir `installmentPlan` como array estruturado com número, valor em centavos, vencimento ISO `YYYY-MM-DD` se comprovado no PDF, `dueText` se só houver referência textual, método e página/origem. Conferir soma com prêmio; bloquear geração de cronogramas inventados. A rotina existente do banco já gera parcelas quando `installmentPlan` ou `installmentCount` são fornecidos na proposta/apólice, mas o upload atual de arquivo ainda não extrai os dados sozinho. Antes de considerar este módulo completo: testar amostras de seguradoras, repetições, renovações, migração, baixa manual preservada e recuperação do histórico.
+
+**Módulo 4 — Portal operacional e conciliação:** o acesso `operacional.html` usa endpoint de acompanhamento independente, que deve ser corrigido para retornar os vencimentos ausentes sem risco de cobrança e para paginar a revisão. A conciliação de pagamentos com seguradoras e envios WhatsApp dependem de integrações aprovadas e evidência auditável.
