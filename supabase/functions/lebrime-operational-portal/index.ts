@@ -104,6 +104,8 @@ Deno.serve(async(req:Request)=>{
     payments:(payments||[]).filter(p=>allowed.has(String(p.data?.policyId||p.data?.proposalId||"")))
       .map(p=>({id:p.id,contractId:String(p.data?.policyId||p.data?.proposalId||""),
         installment:String(p.data?.installment||""),due:String(p.data?.due||""),
+        estimatedDue:String(p.data?.estimatedDue||""),
+        dueDateSource:String(p.data?.dueDateSource||""),
         dueText:String(p.data?.dueText||""),amount:Number(p.data?.amount||0),
         status:String(p.data?.status||""),collectionStatus:String(p.data?.collectionStatus||""),
         migrationStatus:String(p.data?.migrationStatus||"")}))});
