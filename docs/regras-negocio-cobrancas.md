@@ -6,7 +6,7 @@ Versão inicial: 2026-10-10. Estas regras são obrigatórias para novas importa�
 1. Para cada proposta ou apólice, extrair do PDF: segurado, contrato, seguradora, corretora de origem, prêmio, quantidade de parcelas, número da parcela, vencimento, valor e forma de pagamento (quando presentes). Preservar o arquivo e a origem de cada dado.
 2. Associar parcelas a um identificador estável do contrato e a seu cliente, distinguindo renovações por vigência. Nunca mesclar parcelas de contratos distintos do mesmo cliente.
 3. Usar chave de deduplicação por contrato + vigência + número da parcela; conferir valor e vencimento antes de atualizar. Reprocessar de forma idempotente; não apagar alterações financeiras confirmadas.
-4. Conferir soma das parcelas versus prêmio (considerar IOF, juros e diferenças documentadas); se houver divergência, marcar para revisão e não inventar valores/datas.
+4. Conferir soma das parcelas versus prêmio (considerar IOF, juros e diferenças documentadas). Diferenças absolutas **até 100 centavos (R$ 1,00 inclusive)** são aceitas como tolerância, **somente com os valores e a quantidade das parcelas documentados**; registrar a diferença sem modificar valor algum. Acima disso, marcar revisão. Datas ou valores individuais desconhecidos continuam pendentes; nunca inferir parcelas ou liberar cobranças.
 5. Contratos sem quadro de parcelamento devem aparecer na fila **Parcelamento pendente de conferência**, nunca sumir silenciosamente.
 6. Ao importar documentos novos, atualizar somente campos seguros, registrando fonte, data e histórico de alteração.
 
@@ -66,9 +66,9 @@ Versão inicial: 2026-10-10. Estas regras são obrigatórias para novas importa�
 - Código versionado em \`scripts/parse_installments.mjs\` e \`supabase/functions/lebrime-api/pdf_reader.ts\`; processamento implantado na Edge Function autenticada \`lebrime-api\`, ação \`payments-extract\` (somente gestor).
 - Cada PDF de proposta/apólice vinculado ao contrato, enviado pelo portal, é analisado imediatamente após salvar o documento; arquivos gerais e endossos não geram parcelas.
 - Uma origem pode ser o bucket privado ou arquivo de Drive cujo ID esteja previamente registrado no documento. O servidor não recebe URL arbitrária para buscar conteúdo; arquivos privados/inacessíveis são classificados como pendentes para anexação manual. Limite 15 MB, no máximo 20 páginas analisadas.
-- \`verified\`: todas as parcelas numeradas têm valor em centavos, data completa \`AAAA-MM-DD\`, somatório exatamente igual ao prêmio total e contexto de parcelamento no PDF. Pode alimentar \`installmentPlan\` automaticamente.
+- \`verified\`: todas as parcelas numeradas têm valor em centavos, data completa \`AAAA-MM-DD\`, somatório com diferença absoluta de até R$ 1,00 do prêmio total, com o desvio registrado, e contexto de parcelamento no PDF. Pode alimentar \`installmentPlan\` automaticamente.
 - \`partial\`: valor/quantidade das parcelas conciliados ao prêmio, mas alguma parcela não tem vencimento completo. Salvar valores, número e \`dueText\`, deixando a data em branco e o financeiro na fila **Conferir vencimento**; proibir cobrança desse registro.
-- \`review\`: diferença de prêmio, datas incorretas, números duplicados divergentes, falta de contexto, plano pré-existente diferente ou baixa confirmada conflitante. Não sobrescrever os dados financeiros.
+- \`review\`: diferença de prêmio superior a R$ 1,00, datas incorretas, números duplicados divergentes, falta de contexto, plano pré-existente diferente ou baixa confirmada conflitante. Não sobrescrever os dados financeiros.
 - \`unavailable\`: PDF não acessível; registrar o impedimento no documento para evitar reprocessamento automático repetido. Permitir novo upload/reanálise manual.
 - Fonte e auditabilidade: cada parcela extraída carrega página/linha, ID do documento, e cada documento carrega estado, data e motivo da tentativa. Contratos possuem \`installmentExtractionStatus\` \`Verificado\` ou \`Parcial\`.
 - Na Central de Parcelas, gestor pode reprocessar **até 3 PDFs por bloco**, ver o resultado, reanalisar PDF individual ou anexar um arquivo substituto. Os blocos registram seu estado antes de avançar.
