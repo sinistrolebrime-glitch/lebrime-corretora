@@ -51,7 +51,13 @@ function render(result){
  const summary='<div class="pdf-preview-summary"><strong>Conferência de parcelamento</strong><p>'+
   clean(plan.reason||'O parcelamento precisa de conferência.')+'</p>'+
   '<p>'+installments.length+' parcela(s) identificada(s)'+
-  (verified?' · soma e datas conciliadas':' · não aplicar automaticamente')+'</p></div>';
+  (verified?' · soma e datas conciliadas':' · não aplicar automaticamente')+'</p>'+
+  (installments.some(p=>p.estimatedDue)?
+  '<p><strong>Previsão mensal pelo dia informado: </strong>'+
+  clean(installments[0].estimatedDue.split('-').reverse().join('/'))+' até '+
+  clean(installments[installments.length-1].estimatedDue.split('-').reverse().join('/'))+
+  '. Meses/anos projetados, não são vencimentos confirmados nem liberam cobrança.</p>':'')+
+  '</div>';
  const cautions=[...result.warnings||[]];
  if(client)cautions.unshift('Cliente identificado pelo CPF/CNPJ: '+String(client.data.name||'')+'. Confira antes de aplicar.');
  if(documentConflict)cautions.unshift('ATENÇÃO: CPF/CNPJ do PDF diverge do cliente selecionado. Corrija o cadastro antes de aplicar.');
