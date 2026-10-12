@@ -27,6 +27,15 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 - Demais produtores: produtor 60%; Taxa Lebrime 40%; Taxa FF 30%; líquido efetivo Lebrime 10%.
 - Leandro: recebe 70% da comissão bruta; Taxa FF 30%; Taxa Lebrime 0%.
 
+## Tolerância para diferenças financeiras de até R$ 1,00 (regra permanente — 12/10/2026)
+- Aceitar diferenças monetárias absolutas de **até 100 centavos (R$ 1,00 inclusive)**, tanto nas importações novas quanto na revisão das antigas, quando houver evidência documental dos valores comparados.
+- Exemplos: prêmio líquido repetido com arredondamento nas páginas do PDF; total de parcelas **individualmente comprovadas** versus prêmio total indicado.
+- Preservar **sem alteração** todos os valores originais (prêmio líquido, prêmio total, IOF, comissão e cada parcela), documentos e evidências. Registrar variação em centavos, fonte e classificação `Diferença aceita por tolerância`.
+- **Não** criar compensação artificial, reajustar última parcela, inventar vencimentos nem considerar pago/autorizar cobrança por causa da tolerância.
+- Se faltar valor individual de parcela, data, aceitação do risco, identificação do cliente/contrato, documento ou qualquer outra evidência necessária, a pendência específica permanece, mesmo que a diferença nominal seja de até R$ 1,00.
+- Diferença superior a R$ 1,00 exige revisão. Não aplicar esta tolerância a divergências percentuais de comissão, de vínculo, identidade ou valores de naturezas diferentes.
+- Em conflito entre resumo e quadro de pagamento do mesmo contrato, manter o valor usado no cálculo original já documentado e anotar a variante, sem trocar a base de comissão automaticamente.
+
 ## Proposta ou apólice importada
 - Uma proposta ou apólice com PDF importado e vinculado é considerada comissão recebida.
 - Valor recebido pela Lebrime = comissão bruta menos Taxa FF, quando houver.
