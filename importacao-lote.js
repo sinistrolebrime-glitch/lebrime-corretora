@@ -38,7 +38,7 @@ panel.innerHTML='<div class="queue-header"><div><h3>Fila de PDFs para renovaçã
  '<input id="bulkPdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>'+
  '<button type="button" class="btn ghost" id="bulkQueueClear">Limpar fila</button>'+
  '<button type="button" class="btn ghost" id="bulkQueueExport">Exportar acompanhamento</button></div>'+
- '<p id="bulkQueueStatus" class="muted" role="status" aria-live="polite">Você pode selecionar até 50 arquivos por vez. A fila existe nesta aba; os PDFs ainda não foram enviados ao servidor.</p>'+
+ '<p id="bulkQueueStatus" class="muted" role="status" aria-live="polite">Selecione até 50 PDFs. A lista de recuperação conserva cópias neste dispositivo; os arquivos ainda não foram enviados ao Supabase.</p>'+
  '<div class="queue-list-wrap"><table><thead><tr><th>Arquivo</th><th>Possível cliente</th><th>Situação</th><th>Próxima ação</th></tr></thead>'+
  '<tbody id="bulkQueueRows"></tbody></table></div>';
 holder.insertAdjacentElement('beforebegin',panel);
@@ -97,8 +97,14 @@ async function addFiles(files){
       reason:same?'Repetido nesta seleção':'Este PDF já foi importado'});
     continue;
    }
-   queue.push({file,name:file.name,size:file.size,sha,
-    match:matchClient(file.name,clients()),state:'pending'});
+   const match=matchClient(file.name,clients());
+   queue.push({file,name:file.name,size:file.size,sha,match,state:'pending'});
+   // A fila visível é temporária; os PDFs ficam duráveis no IndexedDB até a conferência.
+   try{
+    await globalThis.LebrimeImportRecovery?.stageFile(file,sha,match?.id||'');
+   }catch(checkpointError){
+    status('ATENÇÃO: cópia local não salva ('+String(checkpointError.message||checkpointError)+'). Mantenha o PDF original em lugar seguro.');
+   }
    if(queue.length%5===0){render();await Promise.resolve();}
   }
   status('Arquivos conferidos. Revise cada item para confirmar cliente, vigência, seguradora, prêmio e parcelas antes de importar.');
