@@ -110,8 +110,7 @@ el('renewalNewForm').onsubmit=async e=>{
   // Salvar antes de qualquer chamada de rede: a falha não perde o arquivo.
   try{
    if(globalThis.LebrimeImportRecovery){
-    await globalThis.LebrimeImportRecovery.stage({fingerprint:importFingerprint,sha:fileHash,file,clientId,previousId:prior?.id||''});
-    checkpoint=true;
+    checkpoint=Boolean(await globalThis.LebrimeImportRecovery.stage({fingerprint:importFingerprint,sha:fileHash,file,clientId,previousId:prior?.id||''}));
    }
   }catch(checkpointError){
    console.warn('Checkpoint local indisponível; mantenha o PDF original no Drive:',checkpointError);
