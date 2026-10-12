@@ -46,7 +46,7 @@ const FINANCE=(()=>{
     if(!contract)return 'Conferir vínculo';
     if(!effective(row,contract,imported))return 'Previsão — não cobrar';
     const difference=planDifference(contract);
-    if(difference!==null&&difference!==0)return 'Conferir diferença no parcelamento';
+    if(difference!==null&&Math.abs(difference)>100)return 'Conferir diferença no parcelamento';
     if(!Number(d.amount||0))return 'Conferir valor';
     if(!validDate(d.due))return 'Conferir vencimento';
     if(d.due.slice(0,7)<cutoff)return 'Migração a conferir';
