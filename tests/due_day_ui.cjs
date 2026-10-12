@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const manager=fs.readFileSync('script.js','utf8');
+const operation=fs.readFileSync('operacional-extras.js','utf8');
+const operationApi=fs.readFileSync('supabase/functions/lebrime-operational-portal/index.ts','utf8');
+const quality=fs.readFileSync('qualidade-carteira.js','utf8');
+const review=fs.readFileSync('central-conferencia.js','utf8');
+const reader=fs.readFileSync('supabase/functions/lebrime-api/pdf_reader.ts','utf8');
+const parser=fs.readFileSync('supabase/functions/lebrime-api/parse_installments.mjs','utf8');
+assert.match(manager,/Previsão ['"]?\+/);
+assert.match(manager,/estimatedDue/);
+assert.match(operation,/Previsão ['"]?\+/);
+assert.match(operationApi,/estimatedDue:String\(p\.data\?\.estimatedDue/);
+assert.match(operationApi,/dueDateSource:String/);
+assert.match(quality,/payments\.filter\(p=>isoDate\(p\.data\?\.due\)\)/,
+ 'vencimento projetado não pode elevar confiabilidade documental');
+assert.match(review,/Vencimento projetado — confirmar/);
+assert.match(reader,/parseInstallmentSchedule\(pages,\{premium,paymentMethod,startDate,issueDate\}\)/);
+assert.match(parser,/dueEvidence:'Dia de vencimento no PDF; mês\/ano projetados'/);
+const migration=fs.readFileSync('supabase/migrations/20261012_projected_due_day.sql','utf8');
+assert.match(migration,/collectionStatus',''\)='Não cobrar'/);
+assert.match(migration,/estimatedDue/);
+assert.ok(!migration.includes("'due',v_date"),'vencimento previsto nunca preenche o vencimento confirmado');
+console.log('PASS: previsão aparece nas duas fichas, permanece fora de cobrança e qualidade verificada');
