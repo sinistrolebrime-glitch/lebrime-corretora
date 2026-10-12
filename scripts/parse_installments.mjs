@@ -1,10 +1,11 @@
+import {projectedMonthlyDates,explicitDueDay} from "./due_day_projection.mjs";
 /**
  * Extrator conservador do quadro de parcelamento em PDF.
  * Recebe o texto separado por linhas e páginas, nunca dados financeiros inventados.
  * Unidades monetárias: centavos. Uma extração "alta" exige sequência, datas e
  * conciliação exata com o prêmio contratual. Linhas ambíguas vão para revisão.
  */
-export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={}) {
+export function parseInstallmentSchedule(pages, {premium=0,paymentMethod='',startDate='',issueDate=''}={}) {
   const heading=/^parcelas?$|parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|parc\.\s+vencimento\s+valor|presta[cç][oõ]es?\s+vencimento/i;
   const explicit=/\b(?:parcela|prestação|prestacao)\s*(?:n[ºo°.]?\s*)?0?(\d{1,2})(?:\s*(?:\/|de)\s*0?(\d{1,2}))?/i;
   const numbered=/^\s*0?(\d{1,2})\s*(?:\/\s*0?(\d{1,2}))?(?=\s|[-|;:])/;
@@ -116,6 +117,13 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   const premiumMatch=Number.isSafeInteger(expectedPremium)&&expectedPremium>0&&total===expectedPremium;
   const reconciled=sourceValid&&sequential&&consistentCount&&strongContext&&premiumMatch;
   const hasAllDates=plan.every(p=>p.due);
+  // A evidência de "Vencimento: 5" não contém meses/anos; nunca inventar due.
+  // Projetar somente quando todos os valores foram conciliados e nenhum
+  // vencimento completo consta no quadro. A cobrança segue desabilitada.
+  const singleDay=reconciled&&!plan.some(p=>p.due)?explicitDueDay(source):null;
+  const estimated=singleDay?projectedMonthlyDates({
+    dueDay:singleDay,installmentCount:plan.length,issueDate,startDate
+  }):[];
   const high=reconciled&&hasAllDates;
   const partial=reconciled&&!hasAllDates;
   let reason='Conciliação pendente';
@@ -126,7 +134,14 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod=''}={})
   else if(!premiumMatch)reason='Soma das parcelas diferente do prêmio total cadastrado';
   else if(!hasAllDates)reason='Valores conciliados; falta confirmar os vencimentos no PDF';
   else reason='Valores, vencimentos e prêmio conciliados';
-  return {status:high?'verified':partial?'partial':'review',reason,plan:plan.map(({number,totalHint,explicit,context,...rest})=>({installmentNo:number,...rest})),
+  return {status:high?'verified':partial?'partial':'review',reason,
+    dueDay:singleDay,estimatedDatesAvailable:estimated.length===plan.length,
+    plan:plan.map(({number,totalHint,explicit,context,...rest},i)=>({
+      installmentNo:number,...rest,
+      ...(estimated.length===plan.length?{
+        estimatedDue:estimated[i],dueDay:singleDay,dueEvidence:'Dia de vencimento no PDF; mês/ano projetados'
+      }: {})
+    })),
     pages:source.length,found:candidates.length,amountTotal:total,premium:expectedPremium,
     variance:expectedPremium?total-expectedPremium:null,matchedPremium:premiumMatch};
 }
