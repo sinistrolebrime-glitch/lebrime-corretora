@@ -35,6 +35,8 @@ jobs:
       - run: node tests/renewal_import.cjs
       - run: node --check importacao-lote.js
       - run: node tests/bulk_import.cjs
+      - run: node --check continuidade-importacao.js
+      - run: node tests/import_recovery.cjs
       - run: node --check central-conferencia.js
       - run: node tests/review_center.cjs
       - run: node --check gerencial-ficha-abas.js
