@@ -38,7 +38,7 @@ panel.innerHTML='<div class="queue-header"><div><h3>Fila de PDFs para renovaçã
  '<input id="bulkPdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>'+
  '<button type="button" class="btn ghost" id="bulkQueueClear">Limpar fila</button>'+
  '<button type="button" class="btn ghost" id="bulkQueueExport">Exportar acompanhamento</button></div>'+
- '<p id="bulkQueueStatus" class="muted" role="status" aria-live="polite">Selecione até 50 PDFs. A lista de recuperação conserva cópias neste dispositivo; os arquivos ainda não foram enviados ao Supabase.</p>'+
+ '<p id="bulkQueueStatus" class="muted" role="status" aria-live="polite">Selecione até 50 PDFs. A lista de recuperação só conserva cópias neste dispositivo se você autorizar essa opção explicitamente; os arquivos ainda não foram enviados ao Supabase.</p>'+
  '<div class="queue-list-wrap"><table><thead><tr><th>Arquivo</th><th>Possível cliente</th><th>Situação</th><th>Próxima ação</th></tr></thead>'+
  '<tbody id="bulkQueueRows"></tbody></table></div>';
 holder.insertAdjacentElement('beforebegin',panel);
