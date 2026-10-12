@@ -3,7 +3,7 @@ import {projectedMonthlyDates,explicitDueDay} from "./due_day_projection.mjs";
  * Extrator conservador do quadro de parcelamento em PDF.
  * Recebe o texto separado por linhas e páginas, nunca dados financeiros inventados.
  * Unidades monetárias: centavos. Uma extração "alta" exige sequência, datas e
- * conciliação exata com o prêmio contratual. Linhas ambíguas vão para revisão.
+ * conciliação com tolerância de até 100 centavos do prêmio contratual. Linhas ambíguas vão para revisão.
  */
 export function parseInstallmentSchedule(pages, {premium=0,paymentMethod='',startDate='',issueDate=''}={}) {
   const heading=/^parcelas?$|parcelamento|plano\s+de\s+pagamento|demonstrativo\s+de\s+parcelas|parcelas?\s+vencimento|parcelas?\s+valor\s+da\s+parcela|vencimento\s+valor|condi[cç][oõ]es?\s+de\s+pagamento|quadro\s+de\s+parcelas|parc\.\s+vencimento\s+valor|presta[cç][oõ]es?\s+vencimento/i;
@@ -114,7 +114,9 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod='',star
   const consistentCount=expectedCount===0||expectedCount===plan.length;
   const strongContext=headings>0||plan.every(r=>r.explicit);
   const sourceValid=source.length>0&&plan.length>0;
-  const premiumMatch=Number.isSafeInteger(expectedPremium)&&expectedPremium>0&&total===expectedPremium;
+  const variance=expectedPremium?total-expectedPremium:null;
+  const premiumMatch=Number.isSafeInteger(expectedPremium)&&expectedPremium>0&&
+    Number.isSafeInteger(total)&&Math.abs(variance)<=100;
   const reconciled=sourceValid&&sequential&&consistentCount&&strongContext&&premiumMatch;
   const hasAllDates=plan.every(p=>p.due);
   // A evidência de "Vencimento: 5" não contém meses/anos; nunca inventar due.
@@ -134,6 +136,7 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod='',star
   else if(!premiumMatch)reason='Soma das parcelas diferente do prêmio total cadastrado';
   else if(!hasAllDates)reason='Valores conciliados; falta confirmar os vencimentos no PDF';
   else reason='Valores, vencimentos e prêmio conciliados';
+  if(reconciled&&variance!==0)reason+='; diferença de R$ '+(Math.abs(variance)/100).toFixed(2).replace('.',',')+' aceita por tolerância';
   return {status:high?'verified':partial?'partial':'review',reason,
     dueDay:singleDay,estimatedDatesAvailable:estimated.length===plan.length,
     plan:plan.map(({number,totalHint,explicit,context,...rest},i)=>({
@@ -143,5 +146,7 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod='',star
       }: {})
     })),
     pages:source.length,found:candidates.length,amountTotal:total,premium:expectedPremium,
-    variance:expectedPremium?total-expectedPremium:null,matchedPremium:premiumMatch};
+    variance,matchedPremium:premiumMatch,
+    toleranceApplied:premiumMatch&&variance!==0,
+    toleranceCents:premiumMatch?Math.abs(variance):null};
 }
