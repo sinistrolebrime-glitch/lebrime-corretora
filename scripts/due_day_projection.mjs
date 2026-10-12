@@ -27,7 +27,7 @@ export function projectedMonthlyDates({dueDay,installmentCount,issueDate='',star
 }
 export function explicitDueDay(pages){
  const text=(Array.isArray(pages)?pages:[String(pages||'')]).join('\n');
- const matches=[...text.matchAll(/\bvencimento\s*:\s*(0?[1-9]|[12]\d|3[01])(?=\s|$|[;|])/gim)]
+ const matches=[...text.matchAll(/\b(?:vencimento\s*(?::|-)?\s*(?:dia\s*)?|dia\s+(?:de\s+)?vencimento\s*(?::|-)?\s*)(0?[1-9]|[12]\d|3[01])(?=\s|$|[;|,])/gim)]
   .map(m=>Number(m[1]));
  const distinct=[...new Set(matches)];
  return distinct.length===1?distinct[0]:null;
