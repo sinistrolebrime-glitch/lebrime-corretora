@@ -85,4 +85,30 @@ assert.equal(fleetParse.status,'verified','Allianz Frota: oito vencimentos confe
 assert.equal(fleetParse.plan.length,8);
 assert.equal(fleetParse.amountTotal,901877);
 
+
+// Regra FF/Allianz: dia 05 explícito, meses e anos apenas projetados.
+const monthlyDayOnly=[
+ 'INFORMAÇÕES DE PAGAMENTO\nDébito em conta bancária em 6 parcelas\n'+
+ 'Vencimento: 5\nPreço Total (impostos inclusos) R$ 2.696,03',
+ 'Parcelas Valor da Parcela Parcelas Valor da Parcela\n'+
+ '1 R$ 449,34 4 R$ 449,34\n2 R$ 449,34 5 R$ 449,34\n3 R$ 449,34 6 R$ 449,33'
+];
+const projection=parseInstallmentSchedule(monthlyDayOnly,{
+ premium:269603,paymentMethod:'Débito em conta',startDate:'2026-10-10',issueDate:'2026-10-01'
+});
+assert.equal(projection.status,'partial');
+assert.equal(projection.dueDay,5);
+assert.equal(projection.estimatedDatesAvailable,true);
+assert.deepEqual(projection.plan.map(x=>x.estimatedDue),
+ ['2026-10-05','2026-11-05','2026-12-05','2027-01-05','2027-02-05','2027-03-05']);
+assert.ok(projection.plan.every(x=>x.due===''&&x.dueEvidence.includes('projetados')));
+const noIssue=parseInstallmentSchedule(monthlyDayOnly,{premium:269603,startDate:'2026-10-10'});
+assert.equal(noIssue.plan[0].estimatedDue,'2026-11-05');
+const withoutAnchor=parseInstallmentSchedule(monthlyDayOnly,{premium:269603});
+assert.ok(withoutAnchor.plan.every(x=>!x.estimatedDue));
+const ambiguous=parseInstallmentSchedule(monthlyDayOnly.map(x=>x.replace('Vencimento: 5','Vencimento: 5\nVencimento: 10')),
+ {premium:269603,startDate:'2026-10-10'});
+assert.equal(ambiguous.estimatedDatesAvailable,false);
+assert.ok(ambiguous.plan.every(x=>!x.estimatedDue));
+
 console.log('PASS: parser PDF, datas, valores, duplicatas, conciliação e revisão de ambiguidades');
