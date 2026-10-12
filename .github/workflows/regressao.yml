@@ -17,6 +17,7 @@ jobs:
 
       - run: node tests/pdf_installments.mjs
       - run: node tests/due_day_projection.mjs
+      - run: node tests/due_day_ui.cjs
       - run: node tests/proposal_preview.mjs
       - run: node tests/allianz_real_layouts.mjs
       - run: node --check renovacao-previa.js
