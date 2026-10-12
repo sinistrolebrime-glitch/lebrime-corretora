@@ -39,8 +39,13 @@ assert.equal(F.stage(payment('oldPaid',policy,{status:'Pago'}),policy,imported,c
 assert.equal(F.stage(payment('newPaid',policy,{status:'Pago',paymentEvidence:'Comprovante bancário'}),policy,imported,cutoff,current),'Pagamento registrado');
 const offByOne={...policy,data:{...policy.data,premium:10001,installmentPlan:[{amount:10000,due:'2026-10-12'}]}};
 assert.equal(F.planDifference(offByOne),-1);
-assert.equal(F.stage(payment('reconcile',offByOne),offByOne,imported,cutoff,current),'Conferir diferença no parcelamento');
-assert.equal(F.actionable(payment('reconcile',offByOne),offByOne,imported,cutoff,current),false);
+assert.equal(F.stage(payment('reconcile',offByOne),offByOne,imported,cutoff,current),'A vencer');
+assert.equal(F.actionable(payment('reconcile',offByOne),offByOne,imported,cutoff,current),true);
+const offByReal={...policy,data:{...policy.data,premium:10100,installmentPlan:[{amount:10000,due:'2026-10-12'}],installmentCount:1}};
+assert.equal(F.stage(payment('limit',offByReal),offByReal,imported,cutoff,current),'A vencer');
+const aboveLimit={...policy,data:{...policy.data,premium:10101,installmentPlan:[{amount:10000,due:'2026-10-12'}],installmentCount:1}};
+assert.equal(F.stage(payment('aboveLimit',aboveLimit),aboveLimit,imported,cutoff,current),'Conferir diferença no parcelamento');
+assert.equal(F.actionable(payment('aboveLimit',aboveLimit),aboveLimit,imported,cutoff,current),false);
 
 assert.equal(F.actionable(payment('p10',policy,{collectionStatus:'Não cobrar'}),policy,imported,cutoff,current),false);
 assert.equal(F.actionable(payment('p11',policy,{status:'Cancelado'}),policy,imported,cutoff,current),false);
