@@ -215,3 +215,16 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - Comissão bruta prevista e comissão do produtor prevista seguem as regras financeiras vigentes.
 - Valores “recebida pela Lebrime” e “paga ao produtor” refletem os registros de comissão associados aos contratos do produtor.
 - A navegação pela ficha do produtor para cliente ou contrato é somente consulta e não altera vínculos.
+
+
+## Motor de importação contínua — chat + Drive + sistema (12/10/2026)
+- **O projeto LEBRIME nesta conversa é a base de coordenação.** PDFs chegam aqui ou pelo link do Drive; o Work é opcional para tarefas pesadas, nunca requisito geral.
+- **Uma ficha só está atualizada após gravação e consulta confirmadas no Supabase**, incluindo seguro/cliente corretos, nova vigência, produtor/comissão, documento e parcelas. PDF em Drive ou checkpoint não é cadastro.
+- As importações plenamente revisadas podem entrar em `public.lebrime_import_queue`, com deduplicação por identidade do contrato e data. Agendador `lebrime-import-queue-every-minute` executa lotes de até 10 registros por minuto; cada falha é isolada em revisão ou nova tentativa.
+- A API `lebrime-import-queue` exige sessão **gestor**, verificada no servidor. Não expor chave de serviço, banco ou PDFs em endpoints públicos; funções SQL da fila são restritas a funções privilegiadas, com RLS habilitado.
+- Os estados são **queued**, **processing**, **retry**, **review** e **done**. Itens em `review` não são ignorados nem aprovados automaticamente. O histórico original e os anexos não devem ser sobrescritos.
+- A rotina autenticada exige confirmação do **mesmo veículo do contrato anterior**. Quando houver troca de veículo, mudança de risco, produtor não comprovado ou qualquer identidade ambígua, colocar em revisão e cadastrar somente após vínculo correto ser confirmado.
+- **Cobranças**: nunca inferir datas ou valores; itens com vencimento não comprovado ficam **Não cobrar**. A tolerância financeira de R$ 1,00 não permite completar parcelas desconhecidas.
+- Falha do conector no chat não autoriza outro canal a contornar segurança. Se a proposta já está na fila do servidor, o processamento continua; se ainda não entrou, usar o fluxo autenticado de entrada/manifesto no portal ou preservar PDF/checkpoint até o envio regular.
+- O agendador trata trabalhos já preparados; **não acessa automaticamente PDFs privados do Google Drive nem opera o ChatGPT durante a ausência da conversa**. A integração automática entre Drive e servidor exige configuração explícita de acesso próprio. Nem mesmo um serviço agendado elimina todas as indisponibilidades; monitorar e alertar falhas.
+- Acompanhamento pela seção **Arquivos → Importações contínuas**, incluindo revisão humana, evitando duplicidade de cliente e período.
