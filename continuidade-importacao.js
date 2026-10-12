@@ -10,6 +10,7 @@ const root=$('renewalNewFlow');
 if(!root)return;
 const DB='lebrime-import-recovery-v1',STORE='queue';
 const LIMIT=50,MAX_BYTES=15*1024*1024;
+const allowLocalFiles=()=>Boolean(document.getElementById('recoveryLocalConsent')?.checked);
 const KEY_FIELDS=['newRenewalClient','newRenewalPrevious','newRenewalBrokerage',
   'newRenewalInsurer','newRenewalBranch','newRenewalNumber','newRenewalStart',
   'newRenewalEnd','newRenewalPremium','newRenewalInsuredValue',
@@ -63,13 +64,16 @@ panel.innerHTML='<div class="queue-header"><div><h3>Continuidade e recuperação
  '<p class="muted">Se o sistema ficar indisponível, os arquivos selecionados e os dados revisados ficam aguardando neste navegador. Nenhum item desta fila é um contrato cadastrado.</p></div>'+
  '<div class="queue-metrics" id="recoveryMetrics">Verificando checkpoints…</div></div>'+
  '<p id="recoveryNotice" class="muted" role="status" aria-live="polite">Os PDFs locais ficam neste dispositivo, não no banco. Mantenha também cópia na pasta privada do Drive. Só retome em dispositivo autorizado.</p>'+
+ '<label class="muted"><input type="checkbox" id="recoveryLocalConsent"> Permitir cópia temporária de PDFs neste dispositivo confiável (desativado por padrão)</label>'+
  '<div class="queue-pick"><button class="btn ghost" type="button" id="recoveryRefresh">Atualizar fila</button>'+
- '<button class="btn ghost" type="button" id="recoveryExport">Exportar checkpoint (sem PDF)</button></div>'+
+ '<button class="btn ghost" type="button" id="recoveryExport">Exportar checkpoint (sem PDF)</button>'+
+ '<button class="btn ghost" type="button" id="recoveryPurge">Apagar cópias locais</button></div>'+
  '<div class="queue-list-wrap"><table><thead><tr><th>PDF / proposta</th><th>Etapa</th><th>Próxima ação</th></tr></thead>'+
  '<tbody id="recoveryRows"><tr><td colspan="3">Verificando…</td></tr></tbody></table></div>';
 root.insertAdjacentElement('beforebegin',panel);
 function notice(message){$('recoveryNotice').textContent=message}
 async function stageFile(file,sha,clientId=''){
+ if(!allowLocalFiles())return false;
  if(!sha||!file||file.size>MAX_BYTES)throw new Error('PDF inválido para a fila local');
  const current=await all();
  if(!current.some(x=>x.id===draftId(sha))&&current.length>=LIMIT)
@@ -80,6 +84,7 @@ async function stageFile(file,sha,clientId=''){
  return item.id;
 }
 async function stage({fingerprint,sha,file,clientId,previousId}){
+ if(!allowLocalFiles())return false;
  if(!/^[a-f0-9]{64}$/i.test(fingerprint)||!file||!sha)throw new Error('Dados do checkpoint incompletos');
  const id=fingerprintId(fingerprint),prior=await get(id);
  const current=await all();
@@ -192,6 +197,13 @@ $('recoveryExport').onclick=async()=>{
  setTimeout(()=>URL.revokeObjectURL(url),5000);
  notice('Checkpoint exportado SEM PDFs. Arquivo pode conter dados de clientes: guarde em local privado.');
 };
+$('recoveryPurge').onclick=async()=>{
+ if(!confirm('Apagar TODAS as cópias locais de PDFs e checkpoints neste navegador? Arquivos no Drive e cadastros no Supabase não serão excluídos. Preserve no Drive qualquer documento ainda pendente.'))return;
+ const rows=await all();
+ for(const item of rows)await remove(item.id);
+ await render();
+ notice('Cópias locais excluídas neste dispositivo. Nenhum documento remoto foi alterado.');
+};
 render();
-globalThis.LebrimeImportRecovery={stage,stageFile,failure,complete,verify,render,all};
+globalThis.LebrimeImportRecovery={stage,stageFile,failure,complete,verify,render,all,allowLocalFiles};
 })();
