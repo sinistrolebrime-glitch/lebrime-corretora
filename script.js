@@ -1269,7 +1269,7 @@ const config={
     ]
   },
   payment:{
-    title:'Parcela',columns:[['Cliente',r=>nameById(r.data.clientId||dataById(r.data.policyId||r.data.proposalId).clientId)],['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Origem',r=>r.data.financialTracking||'—'],['Parcela',r=>r.data.installment],['Vencimento',r=>r.data.due?date(r.data.due):(r.data.dueText||'—')],['Valor',r=>money(r.data.amount)],['Status',r=>r.data.status],['Cobrança',r=>r.data.collectionStatus]],
+    title:'Parcela',columns:[['Cliente',r=>nameById(r.data.clientId||dataById(r.data.policyId||r.data.proposalId).clientId)],['Contrato',r=>nameById(r.data.policyId||r.data.proposalId)],['Origem',r=>r.data.financialTracking||'—'],['Parcela',r=>r.data.installment],['Vencimento',r=>r.data.due?date(r.data.due):(r.data.estimatedDue?'Previsão '+date(r.data.estimatedDue)+' · conferir':r.data.dueText||'—')],['Valor',r=>money(r.data.amount)],['Status',r=>r.data.status],['Cobrança',r=>r.data.collectionStatus]],
     fields:[
       ['policyId','Apólice','ref','policy'],['proposalId','Proposta','ref','proposal'],['installment','Parcela','text'],['amount','Valor','money'],['due','Vencimento','date'],
       ['status','Status','select',['Em aberto','Pago','Cancelado']],['paidDate','Data pagamento','date'],['paymentMethod','Forma','select',['','Boleto','Débito em conta','Cartão de crédito','Cartão de débito','PIX','Transferência','Outro']],
@@ -2436,7 +2436,7 @@ function renderClientDetail(clientId,brokerageFilter='all'){
       r.data.collectionStatus==='Não cobrar'?'Não cobrar · conferência':
       r.data.collectionStatus||r.data.status||'Acompanhar';
     return `<div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')} · ${esc(insurance?.data?.number||'Contrato')}</strong>
-      <span>${esc(r.data.due?date(r.data.due):r.data.dueText||'Vencimento a conferir')} · ${esc(status)}</span></div><strong>${money(r.data.amount)}</strong></div>`;
+      <span>${esc(r.data.due?date(r.data.due):r.data.estimatedDue?'Previsão '+date(r.data.estimatedDue)+' · não confirmado':r.data.dueText||'Vencimento a conferir')} · ${esc(status)}</span></div><strong>${money(r.data.amount)}</strong></div>`;
   }).join(''):'<div class="empty compact">Nenhuma parcela vinculada aos contratos desta ficha.</div>';
 
   const taskHtml=tasks.length?tasks.slice(0,10).map(r=>`
@@ -2570,7 +2570,7 @@ function openInsuranceDetail(insuranceId){
   `).join(''):'<div class="empty compact">Nenhuma cobertura detalhada cadastrada.</div>';
 
   const paymentHtml=payments.length?payments.map(r=>`
-    <div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')}</strong><span>${r.data.due?date(r.data.due):(r.data.dueText||'Sem vencimento')} · ${esc(r.data.paymentMethod||'Forma não informada')}</span></div><div class="row-end"><strong>${money(r.data.amount)}</strong><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span></div></div>
+    <div class="detail-row"><div><strong>Parcela ${esc(r.data.installment||'—')}</strong><span>${r.data.due?date(r.data.due):(r.data.estimatedDue?'Previsão '+date(r.data.estimatedDue)+' · confirmar':esc(r.data.dueText||'Sem vencimento'))} · ${esc(r.data.paymentMethod||'Forma não informada')}</span></div><div class="row-end"><strong>${money(r.data.amount)}</strong><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span></div></div>
   `).join(''):'<div class="empty compact">Nenhuma parcela vinculada.</div>';
 
   const commissionHtml=commissions.length?commissions.map(r=>`
