@@ -3,6 +3,13 @@ import {projectedMonthlyDates,explicitDueDay} from '../scripts/due_day_projectio
 assert.equal(explicitDueDay(['Pagamento\nVencimento: 5\nParcela']),5);
 assert.equal(explicitDueDay(['Pagamento\nVencimento: 29 Preço Total']),29);
 assert.equal(explicitDueDay(['Vencimento: 05/10/2026']),null,'Datas completas não são dia isolado');
+assert.equal(explicitDueDay(['Vencimento dia 05']),5);
+assert.equal(explicitDueDay(['Dia de vencimento: 10']),10);
+assert.equal(explicitDueDay(['Dia vencimento 20']),20);
+assert.equal(explicitDueDay(['Vencimento: dia 31']),31);
+assert.equal(explicitDueDay(['Melhor dia 05']),null,'Dia preferencial não é necessariamente vencimento');
+assert.equal(explicitDueDay(['Dia da vistoria: 5']),null,'Não confundir dia de outros eventos');
+assert.equal(explicitDueDay(['Vencimento dia 10/10/2026']),null,'Não confundir com data completa');
 assert.equal(explicitDueDay(['Vencimento: 05\nVencimento: 15']),null,'Dias contraditórios');
 assert.deepEqual(projectedMonthlyDates({dueDay:5,installmentCount:6,issueDate:'2026-10-01',startDate:'2026-10-10'}),
  ['2026-10-05','2026-11-05','2026-12-05','2027-01-05','2027-02-05','2027-03-05']);
