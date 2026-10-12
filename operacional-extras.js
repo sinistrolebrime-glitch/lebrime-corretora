@@ -196,8 +196,10 @@ function renderClientPayments(payments,contracts){
    return '<div class="op-payment-row"><div class="op-payment-title"><span>'+
     clean('Parcela '+(p.installment||'—')+' · '+(contract.number||'Seguro'))+'</span><span>'+
     clean(currency(p.amount))+'</span></div>'+
-    '<small>'+clean(contract.insurer||'Seguradora')+' · '+clean(p.due?normDate(p.due):
-      p.dueText||'Vencimento pendente')+'</small><small>'+clean(situation)+'</small></div>';
+    '<small>'+clean(contract.insurer||'Seguradora')+' · '+
+      clean(p.due?normDate(p.due):p.estimatedDue?
+        'Previsão '+normDate(p.estimatedDue)+' — conferir vencimento':p.dueText||'Vencimento pendente')+
+      '</small><small>'+clean(situation)+'</small></div>';
   }).join(''):'<p class="hint">Nenhuma parcela vinculada aos contratos deste cliente.</p>');
 }
 // Mantém a ficha existente e acrescenta documentos, sem abrir comissões.
