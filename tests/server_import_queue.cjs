@@ -4,7 +4,7 @@ const html=fs.readFileSync('index.html','utf8');
 const ui=fs.readFileSync('import-queue-monitor.js','utf8');
 const edge=fs.readFileSync('supabase/functions/lebrime-import-queue/index.ts','utf8');
 const migration=fs.readFileSync('supabase/migrations/20261012_durable_import_queue.sql','utf8');
-assert.match(html,/import-queue-monitor\.js\?v=20\.51/);
+assert.match(html,/import-queue-monitor\.js\?v=20\.52/);
 assert.match(ui,/lebrime_token_v1/);
 assert.match(ui,/serverQueueSubmit/);
 assert.match(ui,/Aguardando/);
