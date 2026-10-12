@@ -4,7 +4,9 @@ const fixtures=[
   ['Quadro com 3 parcelas',['Seguradora TESTE\nPlano de parcelamento\nParcela 1/3 10/11/2026 R$ 100,00\nParcela 2/3 10/12/2026 R$ 100,00\nParcela 3/3 10/01/2027 R$ 101,00'],30100,'verified'],
   ['Tabela sem prefixo',['Parcelas Vencimento Valor\n01 15/10/2026 1.000,00\n02 15/11/2026 1.250,00'],225000,'verified'],
   ['Sem evidência de parcela',['Vigência 10/10/2026 a 10/10/2027\nCobertura básica 1.000,00\nPrêmio total 1.000,00'],100000,'review'],
-  ['Prêmio divergente',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2100,'review'],
+  ['Prêmio divergente',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2101,'review'],
+  ['Diferença de R$1 aceita',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2100,'verified'],
+  ['Diferença de R$0,01 aceita',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2001,'verified'],
   ['Parcela repetida em página',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00','Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2000,'verified'],
   ['Duplicata contraditória',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n1/2 10/11/2026 R$ 10,00\n2/2 10/12/2026 R$ 10,00'],2000,'review'],
   ['Data impossível',['Parcelamento\n1/1 31/02/2026 R$ 10,00'],1000,'review'],
@@ -15,6 +17,13 @@ for(const [title,pages,premium,expected] of fixtures){
   const r=parseInstallmentSchedule(pages,{premium});
   assert.equal(r.status,expected,title+': '+r.reason);
 }
+const slight=parseInstallmentSchedule(fixtures[5][1],{premium:2001});
+assert.equal(slight.variance,-1);
+assert.equal(slight.toleranceApplied,true);
+assert.equal(slight.toleranceCents,1);
+const over=parseInstallmentSchedule(fixtures[3][1],{premium:2101});
+assert.equal(over.status,'review');
+
 const twoColumns=[
   'INFORMAÇÕES DE PAGAMENTO\nPARCELA VENCIMENTO VALOR (R$) PARCELA VENCIMENTO VALOR (R$)\n1 14/09/2026 8.149,60 4 20/12/2026 8.149,60\n2 20/10/2026 8.149,60 5 20/01/2027 8.149,60\n3 20/11/2026 8.149,60 6 20/02/2027 8.149,60',
   'PARCELA VENCIMENTO VALOR (R$) PARCELA VENCIMENTO VALOR (R$)\n7 20/03/2027 8.149,60 9 20/05/2027 8.149,60\n8 20/04/2027 8.149,60 10 20/06/2027 8.149,72'
