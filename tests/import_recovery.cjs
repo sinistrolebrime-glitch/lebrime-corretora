@@ -61,6 +61,9 @@ assert.ok(recovery);
 (async()=>{
  const sha='a'.repeat(64),fingerprint='b'.repeat(64);
  const file={name:'segurado.pdf',size:80,type:'application/pdf'};
+ assert.equal(await recovery.stageFile(file,sha,'c1'),false,'armazenamento local desligado por padrão');
+ assert.equal((await recovery.all()).length,0,'nenhum PDF guardado sem consentimento');
+ el('recoveryLocalConsent').checked=true;
  await recovery.stageFile(file,sha,'c1');
  assert.equal((await recovery.all()).length,1,'PDF guardado antes de consultar banco');
  el('newRenewalClient').value='c1';el('newRenewalPrevious').value='old';
