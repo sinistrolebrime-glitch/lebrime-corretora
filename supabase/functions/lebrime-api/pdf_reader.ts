@@ -62,7 +62,7 @@ function pageLines(items:any[]):string {
   }
   return rows.sort((a,b)=>b.y-a.y).map(r=>r.words.sort((a,b)=>a.x-b.x).map(x=>x.text).join(" ")).join("\n");
 }
-export async function extractPaymentPlan(db:any,document:any,bucket:string,premium:number,paymentMethod:string){
+export async function extractPaymentPlan(db:any,document:any,bucket:string,premium:number,paymentMethod:string,startDate='',issueDate='') {
   const {bytes,source}=await sourcePdf(db,document,bucket);
   const pdf=await pdfjsLib.getDocument({data:bytes,disableWorker:true,isEvalSupported:false}).promise;
   try{
@@ -73,7 +73,7 @@ export async function extractPaymentPlan(db:any,document:any,bucket:string,premi
       const content=await pg.getTextContent();
       pages.push(pageLines(content.items as any[]));
     }
-    const parsed=parseInstallmentSchedule(pages,{premium,paymentMethod});
+    const parsed=parseInstallmentSchedule(pages,{premium,paymentMethod,startDate,issueDate});
     return {...parsed,pdfPages:pdf.numPages,source};
   }finally{
     try{await pdf.destroy()}catch{}
@@ -99,12 +99,14 @@ export async function readProposalPreview(input:Uint8Array) {
   }
   const preview=previewProposalFromPages(pages);
   const premium=Number(preview.fields?.premium?.value||0);
-  const schedule=premium>0?parseInstallmentSchedule(pages,{premium,paymentMethod:""}):
+  const schedule=premium>0?parseInstallmentSchedule(pages,{premium,paymentMethod:"",startDate:String(preview.fields?.start?.value||'')}):
     {status:"review",reason:"Prêmio não identificado; parcelamento precisa de conferência.",plan:[],matchedPremium:false};
   const installments=Array.isArray(schedule.plan)?schedule.plan.slice(0,72).map((item:any)=>({
    installment:Number(item.installmentNo||0),
    amount:Number(item.amount||0),
    due:String(item.due||""),
+   estimatedDue:String(item.estimatedDue||""),
+   dueDay:Number(item.dueDay||0),
    sourcePage:Number(item.sourcePage||0)
   })):[];
   return {...preview,pdfPages:pdf.numPages,
