@@ -105,9 +105,18 @@ el('renewalNewForm').onsubmit=async e=>{
  const proposalId=uuid(),documentId=uuid(),stamp=now(),docType='Proposta';
  const key='clients/'+clientId+'/'+stamp.slice(0,4)+'/'+stamp.slice(5,7)+'/'+documentId+'-'+file.name.replace(/[^a-zA-Z0-9._-]/g,'-');
  locked=true;el('newRenewalSubmit').disabled=true;
- let uploaded=false,committed=false;
+ let uploaded=false,committed=false,checkpoint=false;
  try{
-  setMessage('Enviando PDF e criando uma nova vigência para este cliente...');
+  // Salvar antes de qualquer chamada de rede: a falha não perde o arquivo.
+  try{
+   if(globalThis.LebrimeImportRecovery){
+    await globalThis.LebrimeImportRecovery.stage({fingerprint:importFingerprint,sha:fileHash,file,clientId,previousId:prior?.id||''});
+    checkpoint=true;
+   }
+  }catch(checkpointError){
+   console.warn('Checkpoint local indisponível; mantenha o PDF original no Drive:',checkpointError);
+  }
+  setMessage('PDF conferido. Enviando o arquivo e criando nova vigência...');
   // Nunca confiar apenas na cópia em memória se outra pessoa acabou de importar a mesma proposta.
   await loadRecords();
   const newlyImported=portfolioRows().some(r=>r.data.clientId===clientId&&norm(r.data.insurer)===norm(insurer)&&
@@ -143,6 +152,11 @@ el('renewalNewForm').onsubmit=async e=>{
    else finance='Parcelamento em revisão: '+String(output.reason||'cronograma incompleto');
   }catch(err){finance='Parcelamento em revisão: '+String(err.message||err);}
   await loadRecords();clientOptions();
+  // Sem resposta confirmada do contrato E do documento, não descartar o checkpoint.
+  if(checkpoint){
+   const verified=await globalThis.LebrimeImportRecovery.complete(importFingerprint,proposalId,documentId);
+   if(!verified)throw new Error('A gravação foi enviada, mas ainda não foi possível confirmar contrato e PDF no banco. Use Verificar no sistema antes de reenviar.');
+  }
   document.dispatchEvent(new CustomEvent('lebrime-renewal-import-success',{
     detail:{clientId,proposalId,documentId,fileSha256:fileHash,importFingerprint}
   }));
@@ -155,7 +169,11 @@ el('renewalNewForm').onsubmit=async e=>{
   if(uploaded&&!committed)try{await api('storage-delete',{}, {key})}catch(cleanupError){
    console.warn('Arquivo não vinculado exige limpeza pela gestão:',documentId,cleanupError);
   }
-  setMessage((committed?'Contrato cadastrado, mas a conferência falhou: ':'Falha na importação (nenhum contrato antigo alterado): ')+String(err.message||err));
+  if(checkpoint)try{
+   await globalThis.LebrimeImportRecovery.failure(importFingerprint,err.message||err,committed||uploaded);
+  }catch(checkpointError){console.warn('Falha em anotar checkpoint:',checkpointError)}
+  setMessage((committed?'Gravação enviada; confirmação pendente no banco. Não reenvie sem verificar: ':
+   'Importação interrompida; PDF e dados mantidos na fila de recuperação deste navegador, quando disponível: ')+String(err.message||err));
  }finally{locked=false;el('newRenewalSubmit').disabled=false;}
 };
 const originalNavigate=navigate;
