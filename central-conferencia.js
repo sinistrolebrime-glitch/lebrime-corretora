@@ -56,8 +56,11 @@ function analyze(clients,contracts,documents,payments,asOf=today()){
  for(const p of payments){
   const d=p.data||{},cid=String(d.clientId||''),contractId=String(d.policyId||d.proposalId||'');
   if(d.status==='Cancelado'||d.status==='Pago'||validDate(d.due)||!clientById.has(cid)||!contractById.has(contractId))continue;
-  issues.due.push({clientId:cid,contractId,deadline:'',category:'Vencimento não documentado',
-   message:'Conferir no PDF, boleto ou fatura antes de cobrar',severity:2});
+  issues.due.push({clientId:cid,contractId,deadline:'',
+   category:validDate(d.estimatedDue)?'Vencimento projetado — confirmar':'Vencimento não documentado',
+   message:validDate(d.estimatedDue)?
+     'Previsão '+d.estimatedDue.split('-').reverse().join('/')+' pelo dia informado no PDF; mês/ano a confirmar, não cobrar':
+     'Conferir no PDF, boleto ou fatura antes de cobrar',severity:2});
  }
  issues.expired.sort((a,b)=>a.severity-b.severity||String(b.deadline).localeCompare(String(a.deadline)));
  for(const type of ['pdf','producer','plan'])issues[type].sort((a,b)=>
