@@ -17,7 +17,7 @@ const tabs=[
 ];
 function classifySection(section){
  const title=String(section.querySelector('h3')?.textContent||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- if(title.includes('contrato'))return 'history';
+ if(title.includes('contrato')||title.includes('bonus'))return 'history';
  if(title.includes('parcela'))return 'payments';
  if(title.includes('documento'))return 'documents';
  return 'operations';
