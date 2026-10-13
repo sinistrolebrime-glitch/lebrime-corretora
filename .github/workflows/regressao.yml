@@ -45,6 +45,7 @@ jobs:
       - run: node --check gerencial-ficha-abas.js
       - run: node tests/manager_client_tabs.cjs
       - run: node tests/endorsement_history.cjs
+      - run: node tests/bonus_origin_history.cjs
       - run: node --check qualidade-carteira.js
       - run: node tests/portfolio_quality.cjs
       - run: node tests/live_smoke.cjs
