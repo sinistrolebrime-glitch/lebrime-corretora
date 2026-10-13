@@ -13,4 +13,6 @@ assert.match(clientDetail,/data-bonus-client/,'Permitir abrir outra ficha');
 assert.match(clientDetail,/Histórico de bônus entre segurados/,'Exibir painel nas duas fichas');
 assert.match(rules,/Transferência de bônus entre pessoas e veículos distintos/);
 assert.match(rules,/não inventar prêmio/i);
+const clientTabs=fs.readFileSync('gerencial-ficha-abas.js','utf8');
+assert.match(clientTabs,/title\.includes\('bonus'\)/,'Histórico de bônus aparece na aba de vigências');
 console.log('PASS: vínculo histórico entre titulares, duas fichas, documento original e seguro novo.');
