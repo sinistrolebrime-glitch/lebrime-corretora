@@ -15,6 +15,15 @@
 - Proposta de seguro não deve ser declarada como apólice efetivamente emitida quando o documento não apresentar número ou confirmação de emissão.
 - Exemplo: Nazária Distribuidora de Produtos Farnaceuticos Ltda (filial CNPJ 07.224.991/0012-98), Porto 11-87252888, RC Expositor e Acidentes Pessoais, 18 a 24/10/2026.
 
+## Endosso de cancelamento — regra operacional
+- Endosso de **cancelamento a pedido do segurado** deve ser registrado como **movimentação do contrato existente**, nunca como nova proposta de venda, renovação ou prêmio positivo.
+- Buscar a apólice original por **CPF/CNPJ, seguradora, número de apólice, placa/chassi e vigência**. Preservar integralmente contrato, comissão e pagamentos históricos, inclusive eventuais parcelas já pagas.
+- Com a apólice correta identificada e a **data efetiva do cancelamento documentalmente comprovada**, registrar o evento e atualizar a situação da vigência afetada; bloquear apenas cobranças futuras cabíveis. O status do documento `Emitido` não resolve sozinho ambiguidades sobre a data efetiva.
+- Quando o documento informar **sem movimento de prêmio / R$ 0,00**, **não** gerar comissão, novo prêmio, parcelas ou crédito de devolução fictício. Eventuais estornos/restituições exigem prova financeira específica.
+- Se a apólice ou a ficha não puderem ser identificadas com segurança, salvar o PDF em repositório privado e abrir **tarefa de vinculação pendente**; não marcar a carteira como cancelada sem confirmação.
+- Endossos devem permanecer na ficha e no histórico de documentos do contrato ao qual se referem. Evitar duplicidades por apólice + tipo de endosso + origem/identificador do PDF.
+- Exemplo: Maria Dalva de Pinho Alencar, apólice Azul `09 2781937`, proposta de cancelamento `20-34059099`, Volvo XC60 placa `RSG3G12`, documento `Emitido` e movimento R$ 0,00. O arquivo cita período 13/10/2026 a 10/07/2027, mas não esclarece a data de efeito do cancelamento. Vínculo à apólice permaneceu pendente de localização.
+
 ## Cadastro e carteira
 - Cliente é único por CPF/CNPJ.
 - Propostas e apólices pertencem ao cliente e não devem criar cliente duplicado em renovações.
