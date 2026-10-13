@@ -24,6 +24,16 @@
 - Endossos devem permanecer na ficha e no histórico de documentos do contrato ao qual se referem. Evitar duplicidades por apólice + tipo de endosso + origem/identificador do PDF.
 - Exemplo: Maria Dalva de Pinho Alencar, apólice Azul `09 2781937`, proposta de cancelamento `20-34059099`, Volvo XC60 placa `RSG3G12`, documento `Emitido` e movimento R$ 0,00. O arquivo cita período 13/10/2026 a 10/07/2027, mas não esclarece a data de efeito do cancelamento. Vínculo à apólice permaneceu pendente de localização.
 
+## Transferência de bônus entre pessoas e veículos distintos — histórico cruzado (13/10/2026)
+- Quando uma nova proposta aproveitar o bônus de uma **apólice cancelada de outro CPF/CNPJ e/ou outro veículo**, tratar como **seguro novo vinculado à origem do bônus**, **não** como renovação do mesmo risco, troca de nome na apólice ou endosso de substituição.
+- Manter fichas de cliente separadas, veículos/chassis e coberturas separados, sem fundir carteira, produtor, prêmios ou comissão.
+- Registrar no contrato novo: segurado atual, proposta atual, status, vigência, bônus aproveitado e classe (se documentada), segurado de origem, número da apólice cancelada, veículo/chassi/placa anteriores e referência do endosso PDF privado.
+- Vincular a documentação de cancelamento **ao cliente titular original**; disponibilizar o mesmo documento no **histórico de origem de bônus** da ficha nova por referência ao documento existente, sem criar novo documento com o mesmo arquivo no Drive.
+- Exibir nas duas fichas uma linha histórica "Origem de bônus — apólice cancelada → Seguro novo" com botões para consultar documento original, proposta nova e outra ficha. Não contar essa relação como contrato extra, nova comissão ou parcela.
+- Quando a apólice antiga não constar no banco, não inventar prêmio, vigência antiga nem cadastro falso de contrato. Registrar o documento do cancelamento com pendência de vinculação da apólice e data efetiva, preservando a trilha documental.
+- A operação de cancelamento com prêmio R$ 0,00 **não gera parcelas nem comissão nova**. O seguro novo recebe suas próprias parcelas/comissão, conforme PDF.
+- Exemplo real: Maria Dalva de Pinho Alencar, Volvo XC60 placa RSG3G12, apólice 09 2781937, cancelamento solicitado e documento emitido. Nova proposta Azul de Carlos Henrique de Alencar Vieira 70935J-6422198296-0-3, Porsche Macan placa UJL0J02, 13/10/2026 a 13/10/2027, classe de bônus 9 oriunda da apólice cancelada (classe anterior 10). Nova proposta status "Transmitido", sem número de apólice nova no PDF. Data efetiva do cancelamento original ainda a confirmar.
+
 ## Cadastro e carteira
 - Cliente é único por CPF/CNPJ.
 - Propostas e apólices pertencem ao cliente e não devem criar cliente duplicado em renovações.
