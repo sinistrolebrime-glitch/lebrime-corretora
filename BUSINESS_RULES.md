@@ -7,6 +7,14 @@
 - Preservar a proteção contra duplicidade e o vínculo à renovação anterior; condições de aceitação e cobrança seguem a evidência documental. Parcelas não comprovadas continuam `Não cobrar`.
 - Exemplo real: Maurício Batista Paes Landim — proposta Porto Auto Sênior de 19/08/2026, status `Transmitido`, produtor Clóvis 35%, corretora Eólica.
 
+## Seguros Evento (regra de classificação)
+- Propostas da modalidade **Eventos** (ex.: feira, exposição, congresso e evento técnico) devem ser vinculadas ao **CNPJ do proponente**, na ficha empresarial e no ramo **Eventos**, separados de Automóvel/Frotas; **não gerar `insuredItem` de veículo**.
+- Registrar local do risco, período de montagem e desmontagem, dias efetivos do evento, número de participantes, modalidade do proponente e as coberturas/LMI individualizados.
+- O campo agregado `insuredValue` pode exibir a maior garantia individual **desde que identificada pela respectiva cobertura**, mas nunca somar automaticamente limites não cumulativos como se fossem um único capital assegurado.
+- Registrar prêmio, IOF, produtor/comissão e forma de pagamento do PDF. Não inventar vencimento de boleto; manter `Não cobrar` até confirmação adequada.
+- Proposta de seguro não deve ser declarada como apólice efetivamente emitida quando o documento não apresentar número ou confirmação de emissão.
+- Exemplo: Nazária Distribuidora de Produtos Farnaceuticos Ltda (filial CNPJ 07.224.991/0012-98), Porto 11-87252888, RC Expositor e Acidentes Pessoais, 18 a 24/10/2026.
+
 ## Cadastro e carteira
 - Cliente é único por CPF/CNPJ.
 - Propostas e apólices pertencem ao cliente e não devem criar cliente duplicado em renovações.
