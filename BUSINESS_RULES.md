@@ -217,6 +217,16 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - A navegação pela ficha do produtor para cliente ou contrato é somente consulta e não altera vínculos.
 
 
+## Identificação de veículos somente pelo chassi (regra permanente — 12/10/2026)
+- Em propostas de automóvel/frota é **normal** que um veículo venha apenas com **chassi**, sem placa. Isso **não é motivo para paralisar o lote ou criar um cliente/contrato duplicado**.
+- Para identificar o risco, conferir primeiro **CPF/CNPJ do segurado + chassi completo + vigência + seguradora + histórico contratual**. O chassi informado no documento novo deve coincidir exatamente com o chassi do item segurado no contrato anterior (17 caracteres quando aplicável); confirmar pelo PDF original ou cadastro de itens vinculados ao contrato anterior.
+- Quando a placa anterior estiver vazia, ausente ou como marcador (ex.: `AAVISAR`), o **chassi confirmado substitui a placa somente como evidência de vínculo**. A placa do novo documento pode ser registrada no novo contrato, mas **nunca inventar placa nem preencher retroativamente a do histórico**.
+- Se a nova proposta também vier **sem placa**, cadastrar como risco identificado por chassi, mantendo a placa desconhecida/pendente e sem usar código fictício; a regra deve ser suportada pelo motor de importação e pelos itens/riscos do sistema.
+- Se houver conflito de chassi, múltiplos riscos compatíveis, CPF/CNPJ divergente ou placa anterior válida incompatível, exigir revisão documentada. Nunca aceitar só semelhança de nome/modelo; troca real de veículo requer vínculo explícito e histórico separado.
+- Checar idempotência por **cliente + seguradora + proposta/apólice + vigência + chassi** quando não houver placa; manter contrato anterior e PDF intactos, com novas parcelas/comissão vinculadas à nova vigência.
+- Falha isolada de identificação deve ir para revisão, **sem travar os demais PDFs**. O caso real `VILMA MUTSUE TAKEUCHI AYRES`, Fiat Pulse chassi `9BD363ANPTYT36106`, tinha placa histórica `AAVISAR`, e a renovação de 2026 foi confirmada pelo chassi e cadastrada, preservando a ficha.
+- **Estado da implementação (12/10/2026):** a confirmação assistida pelo chassi foi usada nesse caso real. A aceitação automática de propostas sem placa no processador autenticado ainda requer implementação e teste; não afirmar que já está coberta automaticamente.
+
 ## Motor de importação contínua — chat + Drive + sistema (12/10/2026)
 - **O projeto LEBRIME nesta conversa é a base de coordenação.** PDFs chegam aqui ou pelo link do Drive; o Work é opcional para tarefas pesadas, nunca requisito geral.
 - **Uma ficha só está atualizada após gravação e consulta confirmadas no Supabase**, incluindo seguro/cliente corretos, nova vigência, produtor/comissão, documento e parcelas. PDF em Drive ou checkpoint não é cadastro.
