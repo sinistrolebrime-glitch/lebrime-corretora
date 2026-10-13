@@ -33,6 +33,63 @@ Deno.serve(async(req)=>{
  const action=new URL(req.url).searchParams.get("action")||"status";
  const body=await req.json().catch(()=>({}));
  try{
+  // Segunda via: propostas novas/sem apólice antiga, em fila isolada.
+  // Esta rota não aceita PDF bruto nem faz leitura automática não autenticada.
+  if(action==="assisted-enqueue"){
+   if(!body?.payload||!body?.source)return json({error:"Manifesto validado e arquivo privado obrigatórios"},400);
+   const batch=String(body.batch||"pendentes46-out2026");
+   const {data,error}=await db.rpc("lebrime_stage_assisted_import",{
+    p:body.payload,source:body.source,actor:{source:"lebrime-api",subject:"gestor-mutirao-importacao"},batch
+   });
+   if(error)return json({error:String(error.message||"Manifesto recusado").slice(0,220)},422);
+   return json(data,202);
+  }
+  if(action==="assisted-batch"){
+   const manifests=body?.manifests;
+   if(!Array.isArray(manifests)||manifests.length<1||manifests.length>10)
+    return json({error:"Envie de 1 a 10 manifestos conferidos por lote"},400);
+   const batch=String(body.batch||"pendentes46-out2026");
+   const entries=[];
+   // Falha individual isolada; nenhuma exceção abandona os próximos PDFs.
+   for(let i=0;i<manifests.length;i++){
+    const manifest=manifests[i];
+    if(!manifest||!manifest.payload||!manifest.source){
+     entries.push({index:i,ok:false,error:"Manifesto exige payload e source"});continue;
+    }
+    const {data,error}=await db.rpc("lebrime_stage_assisted_import",{
+      p:manifest.payload,source:manifest.source,
+      actor:{source:"lebrime-api",subject:"gestor-mutirao-importacao"},batch
+    });
+    entries.push(error?{index:i,ok:false,error:String(error.message||"Revisão exigida").slice(0,180)}:
+      {index:i,...data});
+   }
+   return json({ok:entries.every(x=>x.ok),processed:entries.length,items:entries},207);
+  }
+  if(action==="assisted-status"){
+   const {data:health,error:he}=await db.rpc("lebrime_assisted_import_health");
+   if(he)throw he;
+   const {data:items,error:le}=await db.from("lebrime_assisted_import_queue").select(
+     "id,batch_key,request_key,state,attempts,created_at,updated_at,processed_at,available_at,contract_id,client_id,document_id,last_error"
+   ).eq("batch_key","pendentes46-out2026").order("created_at",{ascending:false}).limit(75);
+   if(le)throw le;
+   return json({ok:true,health,items:items||[]});
+  }
+  if(action==="assisted-process"){
+   const {data,error}=await db.rpc("lebrime_process_assisted_import_queue",{max_jobs:5});
+   if(error)throw error;
+   return json(data);
+  }
+  if(action==="assisted-retry"){
+   const id=String(body?.id||"");
+   if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(id))return json({error:"Identificador inválido"},400);
+   const {data,error}=await db.from("lebrime_assisted_import_queue").update({
+     state:"queued",available_at:new Date().toISOString(),
+     last_error:null,last_sqlstate:null,updated_at:new Date().toISOString()
+   }).eq("id",id).eq("state","review").eq("batch_key","pendentes46-out2026").select("id,state").maybeSingle();
+   if(error)throw error;
+   if(!data)return json({error:"O item não está em revisão"},409);
+   return json({ok:true,item:data});
+  }
   if(action==="enqueue"){
    const payload=body?.payload,source=body?.source;
    if(!payload||!source)return json({error:"Proposta e origem do PDF são obrigatórias"},400);
