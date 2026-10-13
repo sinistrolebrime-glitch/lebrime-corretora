@@ -40,6 +40,8 @@ jobs:
       - run: node --check import-queue-monitor.js
       - run: node --experimental-strip-types --check supabase/functions/lebrime-import-queue/index.ts
       - run: node tests/server_import_queue.cjs
+      - run: node --check mutirao-46.js
+      - run: node tests/assisted_import_46.cjs
       - run: node --check central-conferencia.js
       - run: node tests/review_center.cjs
       - run: node --check gerencial-ficha-abas.js
