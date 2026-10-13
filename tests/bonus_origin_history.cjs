@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const ui=fs.readFileSync('script.js','utf8');
+const rules=fs.readFileSync('BUSINESS_RULES.md','utf8');
+const clientDetail=ui.slice(ui.indexOf('function renderClientDetail('),ui.indexOf('function openClientDetail('));
+assert.ok(clientDetail.length>2000,'Encontrar ficha detalhada');
+assert.match(clientDetail,/bonusOriginClientId/,'Rastrear origem pelo CPF de outro cliente');
+assert.match(clientDetail,/bonusOriginPolicyNumber/,'Mostrar apólice cancelada');
+assert.match(clientDetail,/bonusOriginCancellationDocumentId/,'Referenciar PDF original sem copiá-lo');
+assert.match(clientDetail,/data-bonus-source/,'Permitir abrir cancelamento');
+assert.match(clientDetail,/data-bonus-new/,'Permitir abrir seguro novo');
+assert.match(clientDetail,/data-bonus-client/,'Permitir abrir outra ficha');
+assert.match(clientDetail,/Histórico de bônus entre segurados/,'Exibir painel nas duas fichas');
+assert.match(rules,/Transferência de bônus entre pessoas e veículos distintos/);
+assert.match(rules,/não inventar prêmio/i);
+console.log('PASS: vínculo histórico entre titulares, duas fichas, documento original e seguro novo.');
