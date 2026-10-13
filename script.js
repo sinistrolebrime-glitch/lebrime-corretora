@@ -2370,6 +2370,44 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   const openClaims=claims.filter(r=>!['Pago','Encerrado','Negado'].includes(String(r.data.status||'')));
   const brokeragesForClient=clientBrokerageOptions(allInsurances);
 
+  // A transferência de bônus tem histórico entre CPFs; não equivale a renovação
+  // ou substituição de apólice, nem deve somar prêmio à ficha de origem.
+  const bonusHistoryRows=list('proposal').filter(r=>{
+    const b=r.data||{};
+    return b.historyGroupId&&b.bonusOriginClientId&&
+      (String(b.clientId||'')===String(clientId)||
+       String(b.bonusOriginClientId||'')===String(clientId));
+  });
+  const bonusHistoryHtml=bonusHistoryRows.map(r=>{
+    const b=r.data||{};
+    const destination=dataById(b.clientId)||{};
+    const origin=dataById(b.bonusOriginClientId)||{};
+    const originLabel=origin.name||b.bonusOriginHolderName||'Segurado anterior';
+    const destinationLabel=destination.name||'Novo segurado';
+    const otherClientId=String(b.clientId)===String(clientId)?b.bonusOriginClientId:b.clientId;
+    return `<article class="insurance-card">
+      <div class="insurance-card-head">
+        <div><span class="record-type">ORIGEM DE BÔNUS · HISTÓRICO ENTRE SEGURADOS</span>
+          <h4>Apólice anterior ${esc(b.bonusOriginPolicyNumber||'a confirmar')}</h4></div>
+        <span class="status-pill corporate-status">Vínculo documental</span>
+      </div>
+      <div class="insurance-card-grid">
+        <div><span>Segurada de origem</span><strong>${esc(originLabel)}</strong></div>
+        <div><span>Veículo cancelado</span><strong>${esc(b.bonusOriginVehicle||'—')} · ${esc(b.bonusOriginPlate||'—')}</strong></div>
+        <div><span>Segurado do novo contrato</span><strong>${esc(destinationLabel)}</strong></div>
+        <div><span>Novo veículo</span><strong>${esc(b.vehicle||'—')} · ${esc(b.plate||'—')}</strong></div>
+        <div><span>Proposta nova</span><strong>${esc(b.number||'—')}</strong></div>
+        <div><span>Classe do bônus</span><strong>${esc(b.bonusOriginClass??'—')} → ${esc(b.bonusClass??'—')}</strong></div>
+      </div>
+      <p class="muted">Bônus da apólice cancelada aproveitado em seguro novo, com CPF e veículo diferentes. A data efetiva do cancelamento original permanece a confirmar. As fichas e os valores financeiros são independentes.</p>
+      <div class="insurance-card-foot">
+        <button class="btn ghost small" data-bonus-source="${esc(b.bonusOriginCancellationDocumentId||'')}">Abrir endosso anterior</button>
+        <button class="btn primary small" data-bonus-new="${esc(r.id)}">Abrir proposta nova</button>
+        <button class="btn ghost small" data-bonus-client="${esc(otherClientId||'')}">Abrir outra ficha</button>
+      </div>
+    </article>`;
+  }).join('');
+
   const insuranceHtml=insurances.length?insurances.map((r,index)=>{
     const doc=primaryInsuranceDocument(r);
     const hasPdf=insuranceDocumentAvailable(r);
@@ -2492,6 +2530,11 @@ function renderClientDetail(clientId,brokerageFilter='all'){
       <div class="wide"><span>Endereço</span><strong>${esc([d.address,d.addressNumber,d.complement].filter(Boolean).join(', ')||'—')}</strong></div>
     </div>
 
+    ${bonusHistoryHtml?`<section class="detail-section">
+      <div class="section-title-row"><div><h3>Histórico de bônus entre segurados</h3>
+        <p>Origem da apólice cancelada, seguro novo e documentos, sem unir pessoas ou veículos.</p></div></div>
+      <div class="insurance-grid">${bonusHistoryHtml}</div></section>`:''}
+
     <section class="detail-section">
       <div class="section-title-row client-contract-heading">
         <div><h3>Contratos — histórico completo</h3><p>Todas as vigências, inclusive encerradas, futuras e em análise. O status da proposta não é confirmação de emissão. Histórico vinculado ao CPF/CNPJ e à corretora de cada contrato.</p></div>
@@ -2524,6 +2567,24 @@ function renderClientDetail(clientId,brokerageFilter='all'){
   document.querySelectorAll('[data-client-claim-policy]').forEach(b=>b.onclick=()=>{
     const policy=rowById(b.dataset.clientClaimPolicy);
     if(policy){$('#clientDialog').close();openInsuranceDetail(policy.id);}
+  });
+  document.querySelectorAll('[data-bonus-source]').forEach(b=>b.onclick=()=>{
+    const doc=rowById(b.dataset.bonusSource);
+    if(doc&&doc.kind==='document')openDocument(doc);
+  });
+  document.querySelectorAll('[data-bonus-new]').forEach(b=>b.onclick=()=>{
+    const insurance=rowById(b.dataset.bonusNew);
+    if(insurance&&['proposal','policy'].includes(insurance.kind)){
+      $('#clientDialog').close();
+      openInsuranceDetail(insurance.id);
+    }
+  });
+  document.querySelectorAll('[data-bonus-client]').forEach(b=>b.onclick=()=>{
+    const next=rowById(b.dataset.bonusClient);
+    if(next&&next.kind==='client'&&next.id!==clientId){
+      $('#clientDialog').close();
+      openClientDetail(next.id);
+    }
   });
   document.querySelectorAll('[data-client-open-doc]').forEach(b=>b.onclick=()=>openDocument(rowById(b.dataset.clientOpenDoc)));
   document.querySelectorAll('[data-client-open-insurance-pdf]').forEach(b=>b.onclick=()=>openInsuranceDocument(rowById(b.dataset.clientOpenInsurancePdf)));
