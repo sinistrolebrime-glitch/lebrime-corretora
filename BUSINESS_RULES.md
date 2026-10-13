@@ -1,5 +1,12 @@
 # Regras de negócio — Lebrime
 
+## Proposta com status "Transmitido" (regra permanente — 13/10/2026)
+- Quando o PDF de seguro apresentar status **"Transmitido"**, tratá-lo como **proposta emitida/transmitida apta a cadastro na carteira LEBRIME**, mesmo sem número de apólice informado.
+- Registrar o status original `Transmitido` e a situação comercial `Proposta emitida`; a proposta deve integrar a ficha do cliente com vigência, risco, prêmio, produtor, comissão, forma de pagamento, parcelas e PDF.
+- **Não declarar apólice efetivamente emitida nem inventar número de apólice** se o documento apresentar apenas transmissão de proposta. Manter o campo da apólice não informado e atualizar quando houver comprovação posterior.
+- Preservar a proteção contra duplicidade e o vínculo à renovação anterior; condições de aceitação e cobrança seguem a evidência documental. Parcelas não comprovadas continuam `Não cobrar`.
+- Exemplo real: Maurício Batista Paes Landim — proposta Porto Auto Sênior de 19/08/2026, status `Transmitido`, produtor Clóvis 35%, corretora Eólica.
+
 ## Cadastro e carteira
 - Cliente é único por CPF/CNPJ.
 - Propostas e apólices pertencem ao cliente e não devem criar cliente duplicado em renovações.
