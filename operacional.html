@@ -94,6 +94,25 @@ body:not(.op-authenticated) .app{display:none!important}
 .op-payment-row .op-payment-title{display:flex;justify-content:space-between;gap:10px;font-weight:700}
 .op-payment-row small{display:block;color:#617082;margin-top:4px}
 </style>
+<style>
+/* Abas de exportação — identidade uniforme entre administrativo e operacional */
+#operationalReports{margin:0 0 18px;padding:25px 30px;}
+.op-reports-head h2{margin:0 0 5px;color:#17283c;font-size:21px}
+.op-report-tabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid #e2e7ee;margin:16px 0;padding-bottom:10px}
+.op-report-tabs button{border:1px solid #dae0e8;background:white;color:#41546c;padding:10px 16px;border-radius:9px;cursor:pointer;font-weight:700}
+.op-report-tabs button.active{background:#fff8ed;color:#82570d;border-color:#ca9a40}
+.op-report-filters{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin:12px 0}
+.op-report-filters .field{min-width:170px;flex:1}
+.op-report-filters input,.op-report-filters select{width:100%;min-height:42px;border:1px solid #d6dee8;border-radius:9px;padding:8px}
+.op-report-filters .btn{min-height:42px}
+.op-report-scroll{max-width:100%;overflow-x:auto}
+.op-report-preview table{border-collapse:collapse;width:100%;min-width:540px}
+.op-report-preview th,.op-report-preview td{padding:10px;text-align:left;border-bottom:1px solid #e8eaf0}
+.op-report-restricted{border:1px solid #e4dccd;background:#fffcf5;border-radius:10px;padding:17px;width:100%;max-width:650px}
+.op-report-restricted p{line-height:1.5}
+#renewalPrintPdf.is-hidden,#operationalReports.is-hidden{display:none!important}
+@media(max-width:720px){#operationalReports{padding:16px}.op-report-filters .field{flex-basis:100%}}
+</style>
 </head>
 <body>
 <section id="operationalLogin" aria-label="Autenticação operacional">
@@ -118,6 +137,7 @@ body:not(.op-authenticated) .app{display:none!important}
  <button type="button" data-tab="apolices"><span class="ico">▤</span>Apólices e propostas</button>
  <button type="button" data-tab="renewals"><span class="ico">↻</span>Renovações</button>
  <button type="button" data-tab="payments"><span class="ico">▦</span>Parcelas</button>
+ <button type="button" data-tab="reports"><span class="ico">▤</span>Relatórios</button>
  
  </nav></div>
  <div class="sidebar-bottom"><b>Perfil operacional</b><span>Consulta de seguros, acompanhamento financeiro e registro de cobranças. Sem acesso a comissões.</span></div>
@@ -145,6 +165,7 @@ body:not(.op-authenticated) .app{display:none!important}
     </div>
     <div class="monitor-status" id="monitorStatus" aria-live="polite"></div>
   </section>
+  <section id="operationalReports" class="panel is-hidden" aria-label="Relatórios operacionais por abas"></section>
   <div class="info" role="note">Consulta à carteira LEBRIME. Este acesso apresenta dados operacionais sem comissões ou informações financeiras restritas.</div>
   <div class="results-head"><h2>Resultados da consulta</h2><span id="count" class="count">Aguardando pesquisa</span></div>
   <section class="panel table-wrap" aria-live="polite"><div id="results"><div class="empty"><b>Comece uma consulta</b>Pesquise por nome, documento ou placa para visualizar os dados da carteira.</div></div></section>
@@ -370,8 +391,10 @@ $('#monitorClear').onclick=()=>{$('#monitorText').value='';$('#monitorFilter').v
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>selectTab(b.dataset.tab));
 // A autenticação da área é executada por operacional-auth.js antes de liberar o painel.
 </script>
-<script src="operacional-auth.js?v=20.49"></script>
-<script src="operacional-extras.js?v=20.49"></script>
-<script src="operacional-financeiro.js?v=20.49"></script>
-<script src="operacional-renovacoes.js?v=20.49"></script>
+<script src="relatorios-pdf.js?v=20.59"></script>
+<script src="operacional-auth.js?v=20.59"></script>
+<script src="operacional-extras.js?v=20.59"></script>
+<script src="operacional-financeiro.js?v=20.59"></script>
+<script src="operacional-renovacoes.js?v=20.59"></script>
+<script src="operacional-relatorios.js?v=20.59"></script>
 </body></html>
