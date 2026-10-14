@@ -7,7 +7,7 @@
 const root=document.getElementById('importView');
 if(!root)return;
 const ENDPOINT='https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-import-queue';
-const BATCH='pendentes46-out2026',GOAL=46;
+const BATCH='pendentes46-out2026',GOAL=39;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const styles=document.createElement('style');
 styles.textContent='.mutirao-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:9px;margin:12px 0}'+
@@ -22,7 +22,7 @@ document.head.appendChild(styles);
 const section=document.createElement('section');
 section.id='lebrimeMutirao46';
 section.className='panel';
-section.innerHTML='<div class="section-title-row"><div><h2>Mutirão das 46 propostas pendentes</h2>'+
+section.innerHTML='<div class="section-title-row"><div><h2>Mutirão dos 39 PDFs recebidos</h2>'+
 '<p class="mutirao-help">Fila alternativa para clientes novos ou sem apólice anterior encontrada. O contrato só é marcado como concluído após validar CPF/CNPJ, duplicidades, prêmio, comissão, parcelas e PDF privado. Falha isolada vai para revisão e não impede os outros itens.</p></div></div>'+
 '<div id="mutiraoCounts" class="mutirao-grid" aria-live="polite"><div>Aguardando conferência do servidor</div></div>'+
 '<div class="queue-pick"><button type="button" class="btn ghost" id="mutiraoReload">Atualizar situação</button> '+
@@ -61,10 +61,15 @@ async function refresh(){
  try{
   const result=await call('assisted-status');
   state.result=result;
-  const counts=result.health?.counts||{},received=Object.values(counts).reduce((a,b)=>a+Number(b||0),0);
+  const counts=result.health?.counts||{};
+  const inv=result.inventory||{};
+  const received=Number(inv.received??0);
+  const completed=Number(inv.completed??0),review=Number(inv.review??0);
+  const deferred=Number(inv.deferred??0),pending=Number(inv.pending??0);
   const metrics=[
-   ['Recebidas',received],['Concluídas',Number(counts.done||0)],['Aguardando',Number(counts.queued||0)+Number(counts.retry||0)],
-   ['Em processamento',Number(counts.processing||0)],['Revisão',Number(counts.review||0)],['Ainda não recebidas',Math.max(0,GOAL-received)]
+   ['PDFs recebidos',received||GOAL],['Cadastradas no banco',completed],
+   ['Revisão documental',review],['Sem percentual',deferred],
+   ['Ainda sem tratamento',pending],['Na fila automática',Number(counts.queued||0)+Number(counts.retry||0)]
   ];
   el('mutiraoCounts').innerHTML=metrics.map(([title,value])=>
    '<div class="mutirao-stat"><strong>'+esc(value)+'</strong><span>'+esc(title)+'</span></div>').join('');
@@ -73,8 +78,8 @@ async function refresh(){
    '<tr><td>'+esc(item.request_key||'—')+'</td><td>'+esc(caption[item.state]||item.state)+'</td>'+
    '<td>'+esc(item.attempts||0)+'</td><td>'+esc(item.contract_id||'—')+'</td>'+
    '<td>'+esc(item.last_error||'—')+'</td></tr>').join(''):
-   '<tr><td colspan="5">Nenhum manifesto recebido nesta operação. Prontos para cadastrar as 46.</td></tr>';
-  info('Fila de novas propostas operacional. Renovações seguem na outra fila. O PDF deve ser salvo em Drive privado antes do manifesto.');
+   '<tr><td colspan="5">Os contratos cadastrados por importação assistida aparecem nos totais acima. A fila automática não contém novas solicitações.</td></tr>';
+  info('Inventário consolidado: '+completed+' cadastradas, '+review+' em revisão e '+deferred+' sem percentual; a fila de renovações segue independente.');
  }catch(error){info('Falha ao consultar a fila: '+String(error.message||error)+'. PDFs e contratos confirmados não serão alterados. Use a fila antiga ou o cadastro assistido por bloco.');}
  finally{state.updating=false}
 }
