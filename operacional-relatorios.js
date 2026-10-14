@@ -65,9 +65,18 @@ async function renewalData(fromAgenda=false){
  const window=RULES.monthWindow(period);
  const index=await globalThis.lebrimeOperationalIndex();
  const rows=RULES.rowsFor(index,period);
+ // Itens de risco já estão disponíveis no índice operacional, sem comissões.
+ // Recuperar a placa vinculada apenas quando o contrato não a contém.
+ const plateByContract=new Map();
+ for(const item of index.items||[]){
+   const contractId=String(item.contractId||"");
+   const plate=String(item.plate||"").trim();
+   if(contractId&&plate&&!plateByContract.has(contractId))plateByContract.set(contractId,plate);
+ }
  const key=fromAgenda?byId('monitorFilter')?.value||'all':byId('opReportRenewalStatus')?.value||'all';
  const needle=fromAgenda?byId('monitorText')?.value||'':byId('opReportSearch')?.value||'';
- return {period,window,rows:rows.filter(r=>RULES.accepted(r,key)&&matching(r,needle))};
+ return {period,window,rows:rows.filter(r=>RULES.accepted(r,key)&&matching(r,needle))
+   .map(r=>({...r,plate:r.plate||plateByContract.get(r.id)||""}))};
 }
 const renewalPdf=async(fromAgenda=false)=>{
  const win=beginPdf();
@@ -79,8 +88,12 @@ const renewalPdf=async(fromAgenda=false)=>{
    title:'Relatório de Renovações',
    subtitle:'Agenda mensal de vencimentos — área operacional',
    period:dateRef+' · '+date(window.from)+' a '+date(window.to),
-   columns:['Segurado','Contrato','Seguradora','Ramo','Placa','Vencimento','Situação'],
-   rows:rows.map(r=>[r.clientName,r.number||'—',r.insurer||'—',r.branch||'—',r.plate||'—',date(r.end),r.status||'—']),
+   columns:['Segurado','Produtor','Contrato','Seguradora','Ramo','Placa','Vencimento'],
+   rows:rows.map(r=>[
+     r.clientName,
+     r.producerName||'A conferir',
+     r.number||'—',r.insurer||'—',r.branch||'—',r.plate||'—',date(r.end)
+   ]),
    summary:[{label:'Contratos no filtro',value:rows.length},
     {label:'Vencimentos no mês',value:date(window.from)+' a '+date(window.to)}],
    note:'A situação reflete as vigências registradas na carteira. Contrato vencido não comprova ausência de renovação.'
