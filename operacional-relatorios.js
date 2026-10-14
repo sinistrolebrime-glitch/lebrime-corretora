@@ -32,11 +32,28 @@ PANEL.innerHTML='<div class="op-reports-head"><div><h2>Relatórios operacionais<
  '<p id="opReportStatus" class="monitor-status" aria-live="polite"></p>'+
  '<div id="opReportPreview" class="op-report-preview"></div>';
 const filterArea=byId('opReportFilters'),preview=byId('opReportPreview'),status=byId('opReportStatus');
-const openPdf=opts=>{
- if(!isAuthenticated())return status.textContent='Entre novamente para gerar relatórios.';
- if(!opts.rows.length)return status.textContent='Nenhum registro correspondente ao filtro selecionado.';
- if(!REPORTS?.open)return status.textContent='Modelo de PDF indisponível. Atualize a página.';
- REPORTS.open(opts);
+// Abre a janela ANTES das consultas assíncronas, evitando bloqueio de pop-up.
+const beginPdf=()=>{
+ if(!isAuthenticated()){status.textContent='Entre novamente para gerar relatórios.';return null}
+ const win=window.open('','_blank');
+ if(!win){status.textContent='Permita pop-ups do LEBRIME para gerar PDF.';return null}
+ win.document.open();
+ win.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>LEBRIME — preparando relatório</title></head><body style="font:15px Arial,sans-serif;padding:35px"><strong>LEBRIME CORRETORA DE SEGUROS</strong><p>Preparando dados para a impressão. Aguarde...</p></body></html>');
+ win.document.close();
+ return win;
+};
+const failPdf=(win,error)=>{
+ status.textContent=String(error);
+ if(win&&!win.closed){
+  win.document.open();
+  win.document.write('<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>LEBRIME — relatório indisponível</title><body style="font:15px Arial,sans-serif;padding:35px"><strong>Não foi possível gerar o relatório.</strong><p>Confira a mensagem na tela do LEBRIME e tente novamente.</p></body>');
+  win.document.close();
+ }
+};
+const openPdf=(opts,win)=>{
+ if(!opts.rows.length){status.textContent='Nenhum registro correspondente ao filtro selecionado.';win?.close();return}
+ if(!REPORTS?.open){failPdf(win,'Modelo de PDF indisponível. Atualize a página.');return}
+ REPORTS.open({...opts,targetWindow:win});
 };
 const matching=(row,needle)=>!needle||fold([
  row.clientName,row.number,row.insurer,row.branch,row.plate,row.status,row.end,
@@ -53,6 +70,8 @@ async function renewalData(fromAgenda=false){
  return {period,window,rows:rows.filter(r=>RULES.accepted(r,key)&&matching(r,needle))};
 }
 const renewalPdf=async(fromAgenda=false)=>{
+ const win=beginPdf();
+ if(!win)return;
  try{
   const {period,window,rows}=await renewalData(fromAgenda);
   const dateRef=monthName(period);
@@ -65,8 +84,8 @@ const renewalPdf=async(fromAgenda=false)=>{
    summary:[{label:'Contratos no filtro',value:rows.length},
     {label:'Vencimentos no mês',value:date(window.from)+' a '+date(window.to)}],
    note:'A situação reflete as vigências registradas na carteira. Contrato vencido não comprova ausência de renovação.'
-  });
- }catch(e){status.textContent='Não foi possível gerar o relatório: '+String(e.message||e)}
+  },win);
+ }catch(e){failPdf(win,'Não foi possível gerar o relatório: '+String(e.message||e))}
 };
 // A mesma fila autenticada da Central de Parcelas, sem expor comissões.
 const finance=()=>globalThis.LebrimeOperationalPaymentsReport;
@@ -85,6 +104,8 @@ const paymentPreview=async()=>{
 const paymentPdf=async(fromCentral=false)=>{
  const btn=fromCentral?byId('paymentPrintPdf'):byId('opReportPdf');
  if(btn?.disabled)return;
+ const win=beginPdf();
+ if(!win)return;
  if(btn)btn.disabled=true;
  try{
   if(!isAuthenticated())throw Error('Faça login na área operacional.');
@@ -126,10 +147,10 @@ const paymentPdf=async(fromCentral=false)=>{
     {label:'Total listado',value:amount(rows.reduce((acc,row)=>acc+Number(row.amount||0),0))},
     {label:'Filtro',value:label}],
    note:'Relatório de acompanhamento. Valores sem data comprovada ou marcados como Não cobrar não representam dívida vencida confirmada. Nenhuma cobrança é enviada automaticamente.'
-  });
+  },win);
   status.textContent='PDF preparado com '+expected+' parcela(s) do filtro '+label+'.';
  }catch(e){
-  status.textContent='Não foi possível gerar o PDF de parcelas: '+String(e.message||e);
+  failPdf(win,'Não foi possível gerar o PDF de parcelas: '+String(e.message||e));
  }finally{if(btn)btn.disabled=false}
 };
 const previewRows=(cols,rows,limit=10)=>{
