@@ -21,8 +21,9 @@ const menu=[
 const NAV_GROUPS=[
   ['Executivo',['overview']],
   ['Carteira',['client','producer','insurance','renewal']],
-  ['Financeiro',['payment','commission']],
-  ['Operação',['claim','task','document','imports']],
+  ['Financeiro',['payment']],
+  ['Relatórios',['renewal','task','commission']],
+  ['Operação',['claim','document','imports']],
   ['Integrações',['integrations']]
 ];
 
@@ -1598,6 +1599,14 @@ function printTaskReport(){
   });
 }
 
+function reportTabsHtml(active){
+  const views=[['renewal','Renovações'],['task','Pendências'],['commission','Comissões']];
+  return '<nav class="lebrime-report-tabs" aria-label="Abas de relatórios">'+
+    views.map(([id,title])=>'<button type="button" class="lebrime-report-tab '+(id===active?'active':'')+
+      '" data-report-tab="'+id+'" aria-current="'+(id===active?'page':'false')+'">'+title+'</button>').join('')+
+    '</nav>';
+}
+
 function renderList(){
   const c=config[current];if(!c)return;
   let rows;
@@ -1677,6 +1686,9 @@ function renderList(){
       </div>`;
   }else $('#filters').innerHTML='';
 
+  if(['renewal','task','commission'].includes(current))
+    $('#filters').insertAdjacentHTML('afterbegin',reportTabsHtml(current));
+
   $('#tableHead').innerHTML='<tr>'+c.columns.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'<th></th></tr>';
   $('#tableBody').innerHTML=rows.length?rows.map(r=>{
     const cells=c.columns.map((x,i)=>{
@@ -1754,6 +1766,7 @@ function renderList(){
   document.querySelectorAll('[data-linked-client]').forEach(b=>b.onclick=()=>openClientDetail(b.dataset.linkedClient));
   document.querySelectorAll('[data-renewal-track]').forEach(b=>b.onclick=()=>openRenewalTracker(b.dataset.renewalTrack));
   document.querySelectorAll('[data-renewal-edit]').forEach(b=>b.onclick=()=>editInsuranceFromRenewal(b.dataset.renewalEdit));
+  document.querySelectorAll('[data-report-tab]').forEach(btn=>btn.onclick=()=>navigate(btn.dataset.reportTab));
   document.querySelectorAll('[data-renew-filter]').forEach(el=>el.onchange=()=>{
     renewalFilters[el.dataset.renewFilter]=el.value;
     renderList();
