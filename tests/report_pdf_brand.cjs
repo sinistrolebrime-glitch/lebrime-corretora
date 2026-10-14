@@ -20,7 +20,9 @@ for(const bind of ['onclick=printRenewalMirror','onclick=printCommissionReport',
 let opened=null;
 const ctx={URL,Date,Intl,Promise,console,setTimeout,clearTimeout,document:{baseURI:'https://sinistrolebrime-glitch.github.io/lebrime-corretora/'},window:{open:()=>{
   const doc={html:'',open(){},close(){},write(s){this.html=s},fonts:{ready:Promise.resolve()},
-    querySelector(q){if(q==='.identity img')return {complete:true,naturalWidth:65};return null}};
+    querySelector(q){if(q==='.identity img')return {complete:true,naturalWidth:65};return null},
+    querySelectorAll(q){return q==='.report-brand-image'?[
+      {complete:true,naturalWidth:65},{complete:true,naturalWidth:490}]:[]}};
   opened={document:doc,closed:false,focus(){},print(){this.printed=true}};
   return opened;
 }},alert(){throw Error('Popup unexpectedly blocked')}};
@@ -36,6 +38,14 @@ assert.match(html,/Relatório de Pendências/);
 assert.match(html,/assets\/logo-lebrime-transparente\.svg/);
 assert.match(html,/Salv(ar|ar como) PDF/i);
 assert.match(html,/A4 landscape/);
+assert.match(html,/class="report-watermark"/);
+assert.match(html,/position:fixed/);
+assert.match(html,/opacity:\.065/);
+assert.match(html,/class="report-brand-image"/);
+assert.equal((html.match(/class="report-brand-image"/g)||[]).length,2,
+ 'Logo aparece no cabeçalho e como marca d\'água com transparência');
+assert.doesNotMatch(html,/<img[^>]*src="[^"]*\.png"[^>]*class="report-brand-image"/);
+
 assert.match(html,/thead\{display:table-header-group/);
 assert.match(html,/break-inside:avoid/);
 assert.ok(!html.includes('<script>alert(1)</script>'),'Não inserir HTML de usuário no PDF');
