@@ -1463,7 +1463,7 @@ function renewalFilterHtml(rows){
       <div class="renewal-filter-actions">
         <button type="button" class="btn ghost small" id="renewalClearFilters">Limpar filtros</button>
         <button type="button" class="btn ghost small" id="renewalExportCsv">Exportar Excel (CSV)</button>
-        <button type="button" class="btn primary small" id="renewalPrintMirror">Gerar espelho</button>
+        <button type="button" class="btn primary small" id="renewalPrintMirror">Gerar PDF</button>
       </div>
     </div>`;
 }
@@ -1518,25 +1518,84 @@ function exportRenewalsCsv(){
 function printRenewalMirror(){
   const rows=filteredRenewalRows();
   if(!rows.length){alert('Nenhuma renovação encontrada para os filtros selecionados.');return;}
-  const period=[renewalFilters.dateFrom?date(renewalFilters.dateFrom):'',renewalFilters.dateTo?date(renewalFilters.dateTo):''].filter(Boolean).join(' a ')||'Todos os vencimentos';
-  const win=window.open('','_blank');
-  if(!win){alert('O navegador bloqueou a abertura do espelho. Permita pop-ups para este sistema.');return;}
-  const body=rows.map(r=>`<tr>
-    <td>${esc(nameById(r.data.clientId))}</td>
-    <td>${esc(r.data.number||'—')}</td>
-    <td>${esc(r.data.insurer||'—')}</td>
-    <td>${esc(r.data.branch||'—')}</td>
-    <td>${esc(producerLabelOf(r))}</td>
-    <td>${esc(String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · '))}</td>
-    <td>${date(r.data.end)}</td>
-    <td>${esc(renewalStatus(r))}</td>
-  </tr>`).join('');
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Espelho de Renovações</title>
-    <style>body{font-family:Arial,sans-serif;color:#162235;padding:28px}h1{font-size:22px;margin:0}p{color:#5f6b7a}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:11px}th,td{border:1px solid #d9dee7;padding:7px;text-align:left}th{background:#f4f6f8}.head{display:flex;justify-content:space-between;gap:24px}.brand{font-weight:700;letter-spacing:.08em}</style>
-    </head><body><div class="head"><div><div class="brand">LEBRIME CORRETORA DE SEGUROS</div><h1>Espelho de Renovações</h1><p>Período: ${esc(period)} · ${rows.length} registro(s)</p></div><div>Gerado em ${date(today())}</div></div>
-    <table><thead><tr><th>Cliente</th><th>Contrato</th><th>Seguradora</th><th>Ramo</th><th>Produtor</th><th>Corretora</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>${body}</tbody></table>
-    <script>window.onload=()=>window.print()<\/script></body></html>`);
-  win.document.close();
+  const period=[renewalFilters.dateFrom?date(renewalFilters.dateFrom):'',
+    renewalFilters.dateTo?date(renewalFilters.dateTo):''].filter(Boolean).join(' a ')||'Todos os vencimentos';
+  globalThis.LebrimeReports.open({
+    title:'Relatório de Renovações',
+    subtitle:'Espelho da carteira por vencimento · filtrado conforme seleção do portal',
+    period,
+    columns:['Segurado','Contrato','Seguradora','Ramo','Produtor','Corretora','Vencimento','Situação'],
+    rows:rows.map(r=>[
+      nameById(r.data.clientId),r.data.number||'—',r.data.insurer||'—',
+      r.data.branch||'—',producerLabelOf(r),
+      String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · '),
+      date(r.data.end),renewalStatus(r)
+    ]),
+    summary:[{label:'Renovações no filtro',value:rows.length},
+      {label:'Prêmio total dos contratos',value:money(rows.reduce((s,r)=>s+Number(r.data.premium||0),0))}],
+    note:'O relatório utiliza os filtros ativos. Vigência encerrada não significa, isoladamente, que o cliente deixou de renovar.'
+  });
+}
+
+function printCommissionReport(){
+  let rows=applyCommissionFilters(effectiveCommissionRows());
+  const q=searchKey($('#searchInput')?.value||'');
+  if(q)rows=rows.filter(r=>genericSearchText(r).includes(q));
+  if(!rows.length){alert('Nenhuma comissão encontrada para os filtros selecionados.');return;}
+  const amount=field=>rows.reduce((sum,r)=>sum+Number(r.data[field]||0),0);
+  globalThis.LebrimeReports.open({
+    title:'Relatório de Comissões',
+    subtitle:'Comissões brutas, taxas e repasses por proposta / apólice',
+    period:[commissionFilters.receivedFrom,commissionFilters.receivedTo].filter(Boolean).join(' a ')||
+      'Todos os recebimentos selecionados',
+    columns:['Segurado','Contrato','Produtor','Corretora','Seguradora','Bruta',
+      'Taxa FF','Repasse produtor','Taxa Lebrime','Situação'],
+    rows:rows.map(r=>{
+      const insurance=contractForRow(r);
+      return [
+        insurance?nameById(insurance.data.clientId):'—',
+        insurance?.data?.number||'—',
+        nameById(r.data.producerId),
+        insurance?brokerageLabelOf(insurance):'—',
+        insurance?.data?.insurer||'—',
+        money(r.data.expected||0),money(r.data.ffFee||0),
+        money(r.data.producerExpected||0),money(r.data.lebrimeNet||r.data.lebrimeFee||0),
+        r.data.status||'Prevista'
+      ];
+    }),
+    summary:[
+      {label:'Comissões no filtro',value:rows.length},
+      {label:'Comissão bruta',value:money(amount('expected'))},
+      {label:'Taxa FF',value:money(amount('ffFee'))},
+      {label:'Repasse a produtores',value:money(amount('producerExpected'))},
+      {label:'Taxa Lebrime efetiva',value:money(rows.reduce((s,r)=>s+Number(r.data.lebrimeNet||0),0))}
+    ],
+    note:'Valores conforme regras de comissionamento do LEBRIME. Percentuais calculados sobre comissão cheia; a taxa FF não representa receita da Lebrime.'
+  });
+}
+
+function printTaskReport(){
+  let rows=applyTaskFilters([...list('task')]);
+  const q=searchKey($('#searchInput')?.value||'');
+  if(q)rows=rows.filter(r=>genericSearchText(r).includes(q));
+  if(!rows.length){alert('Nenhuma pendência encontrada para os filtros selecionados.');return;}
+  const open=rows.filter(r=>!['Concluído','Concluída','Regularizado'].includes(String(r.data.status||'')));
+  const overdue=open.filter(r=>r.data.due&&r.data.due<today());
+  globalThis.LebrimeReports.open({
+    title:'Relatório de Pendências',
+    subtitle:'Acompanhamento de atividades, prazos e responsáveis',
+    period:[taskFilters.dueFrom,taskFilters.dueTo].filter(Boolean).join(' a ')||
+      'Todos os prazos selecionados',
+    columns:['Pendência','Cliente','Contrato','Responsável','Prazo','Origem','Destino','Situação'],
+    rows:rows.map(r=>[
+      r.data.title||'—',nameById(r.data.clientId),nameById(r.data.policyId||r.data.proposalId),
+      r.data.responsible||'—',r.data.due?date(r.data.due):'Não informado',
+      r.data.source||'Manual',r.data.destination||'—',r.data.status||'Pendente'
+    ]),
+    summary:[{label:'Pendências no filtro',value:rows.length},
+      {label:'Abertas',value:open.length},{label:'Com prazo vencido',value:overdue.length}],
+    note:'Pendência de informação ou prazo vencido não comprova inadimplência nem cancelamento. Conferir o processo correspondente.'
+  });
 }
 
 function renderList(){
@@ -1708,6 +1767,10 @@ function renderList(){
   if(exportRenewal)exportRenewal.onclick=exportRenewalsCsv;
   const printRenewal=$('#renewalPrintMirror');
   if(printRenewal)printRenewal.onclick=printRenewalMirror;
+  const printCommission=$('#commissionPrintPdf');
+  if(printCommission)printCommission.onclick=printCommissionReport;
+  const printTasks=$('#taskPrintPdf');
+  if(printTasks)printTasks.onclick=printTaskReport;
 
   document.querySelectorAll('[data-payment-filter]').forEach(el=>el.onchange=()=>{
     paymentFilters[el.dataset.paymentFilter]=el.value;renderList();
@@ -1839,6 +1902,7 @@ function commissionFilterHtml(rows){
       </div>
       <div class="finance-filter-actions">
         <button type="button" class="btn ghost small" id="commissionClearFilters">Limpar filtros</button>
+        <button type="button" class="btn primary small" id="commissionPrintPdf">Gerar PDF</button>
       </div>
     </div>`;
 }
@@ -1911,6 +1975,7 @@ function taskFilterHtml(rows){
       </div>
       <div class="finance-filter-actions">
         <button type="button" class="btn ghost small" id="taskClearFilters">Limpar filtros</button>
+        <button type="button" class="btn primary small" id="taskPrintPdf">Gerar PDF</button>
       </div>
     </div>`;
 }
