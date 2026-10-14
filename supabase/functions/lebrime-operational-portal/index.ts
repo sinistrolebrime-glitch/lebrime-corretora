@@ -56,7 +56,7 @@ Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return json({error:"Método não permitido."},405);
  if(await roleOf(req)!=="operacional")return json({error:"Sessão operacional inválida."},401);
  const action=new URL(req.url).searchParams.get("action")||"";
- if(!["index","client","file"].includes(action))return json({error:"Ação indisponível."},404);
+ if(!["index","client","file","tasks"].includes(action))return json({error:"Ação indisponível."},404);
  const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   {auth:{persistSession:false,autoRefreshToken:false}});
  try{
@@ -73,6 +73,23 @@ Deno.serve(async(req:Request)=>{
       chassi:String(r.data?.chassi||"")
     }))
    });
+  }
+  if(action==="tasks"){
+   // Lista sanitizada: somente pendências operacionais, sem comissão, prêmio
+   // ou notas internas. Sessão operacional validada antes de chegar aqui.
+   const records=await queryAll(db,["task","client"]);
+   const clients=new Map(records.filter((r:any)=>r.kind==="client")
+     .map((r:any)=>[r.id,String(r.data?.name||"Segurado")]));
+   return json({rows:records.filter((r:any)=>r.kind==="task").map((r:any)=>{
+     const d=r.data||{},clientId=String(d.clientId||"");
+     return {id:r.id,clientName:clients.get(clientId)||"Sem cliente vinculado",
+       title:String(d.title||"Pendência").slice(0,180),
+       due:String(d.due||"").slice(0,10),status:String(d.status||"Pendente").slice(0,80),
+       responsible:String(d.responsible||"").slice(0,90),
+       source:String(d.source||"Manual").slice(0,90),
+       destination:String(d.destination||"").slice(0,90),
+       contractNumber:String(d.policyNumber||d.proposalNumber||"").slice(0,80)};
+   })});
   }
   if(action==="client"){
    const id=String(input.clientId||"");
