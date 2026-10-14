@@ -1521,16 +1521,23 @@ function printRenewalMirror(){
   if(!rows.length){alert('Nenhuma renovação encontrada para os filtros selecionados.');return;}
   const period=[renewalFilters.dateFrom?date(renewalFilters.dateFrom):'',
     renewalFilters.dateTo?date(renewalFilters.dateTo):''].filter(Boolean).join(' a ')||'Todos os vencimentos';
+  const plateByContract=new Map();
+  for(const item of list('insuredItem')){
+    const parent=String(item.data?.policyId||item.data?.proposalId||'');
+    const plate=String(item.data?.plate||item.data?.vehiclePlate||'').trim();
+    if(parent&&plate&&!plateByContract.has(parent))plateByContract.set(parent,plate);
+  }
   globalThis.LebrimeReports.open({
     title:'Relatório de Renovações',
     subtitle:'Espelho da carteira por vencimento · filtrado conforme seleção do portal',
     period,
-    columns:['Segurado','Contrato','Seguradora','Ramo','Produtor','Corretora','Vencimento','Situação'],
+    columns:['Segurado','Produtor','Contrato','Seguradora','Ramo','Placa','Vencimento'],
     rows:rows.map(r=>[
-      nameById(r.data.clientId),r.data.number||'—',r.data.insurer||'—',
-      r.data.branch||'—',producerLabelOf(r),
-      String(r.data.brokerages||r.data.brokerage||'—').replace(/\|/g,' · '),
-      date(r.data.end),renewalStatus(r)
+      nameById(r.data.clientId),
+      producerLabelOf(r)==='—'?String(r.data.producerName||'—'):producerLabelOf(r),
+      r.data.number||'—',r.data.insurer||'—',r.data.branch||'—',
+      r.data.plate||r.data.vehiclePlate||plateByContract.get(r.id)||'—',
+      date(r.data.end)
     ]),
     summary:[{label:'Renovações no filtro',value:rows.length},
       {label:'Prêmio total dos contratos',value:money(rows.reduce((s,r)=>s+Number(r.data.premium||0),0))}],
