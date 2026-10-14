@@ -34,11 +34,16 @@ async function queryAll(db:any,kinds:string[]){
  }
  return result;
 }
-function contractPreview(c:any){
- const d=c.data||{};
+function contractPreview(c:any,producerNames:Map<string,string>){
+ const d=c.data||{},producerId=String(d.producerId||"");
+ // Somente o NOME do produtor: nunca enviar percentual, prêmio,
+ // taxas FF, repasse ou comissão ao perfil operacional.
+ const producer=producerNames.get(producerId)||
+   String(d.producerName||"").trim();
  return {id:c.id,clientId:String(d.clientId||""),kind:c.kind,
   number:String(d.number||""),insurer:String(d.insurer||""),
   branch:String(d.branch||""),plate:String(d.plate||d.vehiclePlate||""),
+  producerName:producer.slice(0,100),
   start:String(d.start||""),end:String(d.end||""),status:String(d.status||"")};
 }
 function safeDocument(doc:any,allow:Set<string>){
@@ -62,11 +67,16 @@ Deno.serve(async(req:Request)=>{
  try{
   const input=await req.json().catch(()=>({}));
   if(action==="index"){
-   const all=await queryAll(db,["client","proposal","policy","insuredItem"]);
+   const all=await queryAll(db,["client","proposal","policy","insuredItem","producer"]);
+   const producerNames=new Map<string,string>(
+     all.filter((r:any)=>r.kind==="producer").map((r:any)=>[
+       r.id,String(r.data?.name||"").trim().slice(0,100)
+     ]));
    return json({
     clients:all.filter(r=>r.kind==="client").map(r=>({id:r.id,
       name:String(r.data?.name||""),document:String(r.data?.document||"")})),
-    contracts:all.filter(r=>r.kind==="policy"||r.kind==="proposal").map(contractPreview),
+    contracts:all.filter(r=>r.kind==="policy"||r.kind==="proposal")
+      .map((row:any)=>contractPreview(row,producerNames)),
     items:all.filter(r=>r.kind==="insuredItem").map(r=>({
       contractId:String(r.data?.policyId||r.data?.proposalId||""),
       plate:String(r.data?.plate||""),name:String(r.data?.name||""),
@@ -91,7 +101,7 @@ Deno.serve(async(req:Request)=>{
    const documents=(docs||[]).map((r:any)=>safeDocument(r,allowed)).filter(Boolean);
    return json({client:{id,name:String(client.data?.name||""),document:String(client.data?.document||""),
      phone:String(client.data?.phone||""),mobile:String(client.data?.mobile||"")},
-     contracts:(contracts||[]).map(contractPreview),documents,
+     contracts:(contracts||[]).map((row:any)=>contractPreview(row,new Map())),documents,
      endorsements:(endRows||[])
       .filter(e=>allowed.has(String(e.data?.parentInsuranceId||e.data?.proposalId||"")))
       .map(e=>({id:e.id,contractId:String(e.data?.parentInsuranceId||e.data?.proposalId||""),
