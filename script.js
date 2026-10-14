@@ -1559,7 +1559,7 @@ function printCommissionReport(){
         insurance?brokerageLabelOf(insurance):'—',
         insurance?.data?.insurer||'—',
         money(r.data.expected||0),money(r.data.ffFee||0),
-        money(r.data.producerExpected||0),money(r.data.lebrimeNet||r.data.lebrimeFee||0),
+        money(r.data.producerExpected||0),money(r.data.lebrimeNet??r.data.lebrimeFee??0),
         r.data.status||'Prevista'
       ];
     }),
