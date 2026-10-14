@@ -81,7 +81,7 @@
  });
  const open=options=>{
    if(!Array.isArray(options?.columns)||!options.columns.length)throw new Error('Informe colunas do relatório.');
-   const win=window.open('','_blank');
+   const win=options?.targetWindow && !options.targetWindow.closed ? options.targetWindow : window.open('','_blank');
    if(!win){alert('Permita janelas pop-up para gerar o PDF do relatório.');return false}
    const html=render(options);
    win.document.open();win.document.write(html);win.document.close();
