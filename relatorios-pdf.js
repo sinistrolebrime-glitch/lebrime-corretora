@@ -28,7 +28,7 @@
     /* Watermark is a real transparent SVG element, not a print-background image.
        Fixed positioning repeats the emblem on every page in Chromium print/PDF. */
     .report-watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-      width:130mm;height:130mm;opacity:.065;pointer-events:none;z-index:0}
+      width:198mm;height:198mm;opacity:.18;pointer-events:none;z-index:0}
     .report-watermark img{display:block;width:100%;height:100%;object-fit:contain;background:transparent}
     .report-header,main,footer{position:relative;z-index:1}
     .report-header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:2px solid #CE9900;padding-bottom:12px}
