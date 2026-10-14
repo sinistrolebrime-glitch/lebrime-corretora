@@ -20,7 +20,7 @@ const menu=[
 
 const NAV_GROUPS=[
   ['Executivo',['overview']],
-  ['Carteira',['client','producer','insurance','renewal']],
+  ['Carteira',['client','producer','insurance']],
   ['Financeiro',['payment']],
   ['Relatórios',['renewal','task','commission']],
   ['Operação',['claim','document','imports']],
