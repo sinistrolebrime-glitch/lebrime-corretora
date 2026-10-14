@@ -213,4 +213,12 @@
    $('#monitorClear').onclick=()=>{state={filter:'review',page:0,search:'',data:null,loading:false};reload();};
    reload();
  };
+ // Interface de consulta somente-leitura usada nos relatórios operacionais.
+ // Aplica os mesmos filtros e controles de autenticação da central de parcelas.
+ globalThis.LebrimeOperationalPaymentsReport=Object.freeze({
+   filters:Object.freeze({...STATUS}),
+   current:()=>({filter:state.filter,search:state.search}),
+   page:(filter,search,page)=>financeApi('queue',{filter,search,page})
+ });
+
 })();
