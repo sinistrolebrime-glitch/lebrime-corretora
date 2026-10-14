@@ -1,4 +1,4 @@
-/* LEBRIME — Relatórios operacionais com abas; comissão restrita ao perfil gestor.
+/* LEBRIME — Relatórios operacionais: renovações e pendências de parcelas.
  * Exportação por impressão nativa / Salvar como PDF com logo transparente.
  * Nenhuma alteração de dados. Não revelar comissões pela API operacional.
  */
@@ -12,7 +12,7 @@ const RULES=globalThis.LebrimeRenewalMonthRules;
 const REPORTS=globalThis.LebrimeReports;
 const PANEL=byId('operationalReports');
 if(!PANEL||!RULES||!REPORTS)return;
-let section='renewals', tasksCache=null, loadingTask=null, attempt=0;
+let section='renewals', attempt=0;
 const monthName=m=>{
  const [year,month]=m.split('-').map(Number);
  return new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'})
@@ -22,7 +22,7 @@ const monthValue=()=>byId('opReportMonth')?.value||byId('renewalMonthInput')?.va
  new Date(Date.now()-3*3600000).toISOString().slice(0,7);
 const isAuthenticated=()=>document.body.classList.contains('op-authenticated');
 const buttons=[
- ['renewals','Renovações'],['tasks','Pendências'],['commission','Comissões']
+ ['renewals','Renovações'],['payments','Pendências de parcelas']
 ];
 PANEL.innerHTML='<div class="op-reports-head"><div><h2>Relatórios operacionais</h2>'+
  '<p class="hint">Selecione uma aba. A exportação usa a logo institucional transparente e os filtros escolhidos.</p></div></div>'+
@@ -68,48 +68,69 @@ const renewalPdf=async(fromAgenda=false)=>{
   });
  }catch(e){status.textContent='Não foi possível gerar o relatório: '+String(e.message||e)}
 };
-async function loadTasks(force=false){
- if(!isAuthenticated())throw Error('Entre para consultar pendências.');
- if(force)tasksCache=null;
- if(tasksCache)return tasksCache;
- if(!loadingTask)loadingTask=(async()=>{
-  const token=localStorage.getItem('lebrime_token_v1')||'';
-  if(!token)throw Error('Sessão não encontrada.');
-  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),20000);
-  try{
-   const res=await fetch(
-    'https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-operational-portal?action=tasks',
-    {method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token},
-     body:'{}',cache:'no-store',signal:ctrl.signal});
-   if(!res.ok)throw Error(res.status===401?'Sessão operacional inválida.':'Pendências indisponíveis.');
-   const data=await res.json();
-   if(!Array.isArray(data.rows))throw Error('Resposta de pendências inválida.');
-   tasksCache=data.rows;
-   return tasksCache;
-  }finally{clearTimeout(timer);loadingTask=null}
- })();
- return loadingTask;
-}
-function taskRows(rows){
- const f=byId('opReportTaskStatus')?.value||'open';
- const term=byId('opReportSearch')?.value||'';
- const closed=r=>/^(conclu[ií]d[ao]|regularizado)$/i.test(escText(r.status).trim());
- return rows.filter(r=>(f==='all'||(f==='open'?!closed(r):closed(r)))&&matching(r,term));
-}
-const taskPdf=async()=>{
+// A mesma fila autenticada da Central de Parcelas, sem expor comissões.
+const finance=()=>globalThis.LebrimeOperationalPaymentsReport;
+const amount=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0)/100);
+const filterOf=(central=false)=>central?(finance()?.current()?.filter||'review'):
+ (byId('opReportPaymentStatus')?.value||'review');
+const searchOf=(central=false)=>central?(finance()?.current()?.search||''):
+ (byId('opReportSearch')?.value||'');
+const paymentPreview=async()=>{
+ const api=finance();
+ if(!api)throw Error('Central de parcelas indisponível.');
+ const page=await api.page(filterOf(),searchOf(),0);
+ if(!Array.isArray(page.rows))throw Error('Resposta inválida do financeiro.');
+ return page;
+};
+const paymentPdf=async(fromCentral=false)=>{
+ const btn=fromCentral?byId('paymentPrintPdf'):byId('opReportPdf');
+ if(btn?.disabled)return;
+ if(btn)btn.disabled=true;
  try{
-  const rows=taskRows(await loadTasks());
-  const open=rows.filter(r=>!/^(conclu[ií]d[ao]|regularizado)$/i.test(escText(r.status).trim()));
+  if(!isAuthenticated())throw Error('Faça login na área operacional.');
+  const api=finance();
+  if(!api)throw Error('Central de parcelas indisponível.');
+  const filter=filterOf(fromCentral),search=searchOf(fromCentral);
+  const first=await api.page(filter,search,0);
+  const expected=Number(first.total),pages=Number(first.pages);
+  if(!Number.isSafeInteger(expected)||expected<0||
+     !Number.isSafeInteger(pages)||pages<1||pages>334)
+    throw Error('Relatório muito grande ou total inválido. Refine o filtro.');
+  if(!Array.isArray(first.rows))throw Error('Primeira página indisponível.');
+  const rows=[...first.rows];
+  // Todos os registros do filtro, inclusive além da paginação exibida na tela.
+  for(let page=1;page<pages;page++){
+    const next=await api.page(filter,search,page);
+    if(next.total!==expected||next.filter!==first.filter||next.page!==page||
+       !Array.isArray(next.rows))
+      throw Error('A carteira mudou durante a consulta. Atualize e tente novamente.');
+    rows.push(...next.rows);
+  }
+  if(rows.length!==expected||new Set(rows.map(r=>r.id)).size!==rows.length)
+    throw Error('Não foi possível conferir todas as parcelas do filtro. Atualize e tente novamente.');
+  const label=api.filters[filter]||filter;
   openPdf({
-   title:'Relatório de Pendências',subtitle:'Acompanhamento operacional da carteira',
-   period:byId('opReportTaskStatus')?.value==='all'?'Todas as situações':'Situação filtrada',
-   columns:['Pendência','Segurado','Contrato','Responsável','Prazo','Origem','Destino','Situação'],
-   rows:rows.map(r=>[r.title,r.clientName,r.contractNumber||'—',r.responsible||'—',
-     date(r.due),r.source,r.destination||'—',r.status]),
-   summary:[{label:'Pendências no filtro',value:rows.length},{label:'Em aberto',value:open.length}],
-   note:'Relatório operacional sem informações de comissão. Itens pendentes exigem conferência documental.'
+   title:'Relatório de Pendências de Parcelas',
+   subtitle:'Conferências, vencimentos e acompanhamento financeiro operacional',
+   period:label+(search?' · Pesquisa: '+search:''),
+   columns:['Segurado','Contrato / seguradora','Parcela','Vencimento','Valor','Situação','Ação de acompanhamento'],
+   rows:rows.map(row=>[
+    row.clientName||'—',
+    [row.contractNumber,row.insurer].filter(Boolean).join(' · ')||'—',
+    row.installment||'—',
+    date(row.due)==='—'?(row.dueText||'A conferir'):date(row.due),
+    amount(row.amount),row.label||row.status||'Pendente',
+    row.collectionStatus||'Acompanhar'
+   ]),
+   summary:[{label:'Parcelas no filtro',value:expected},
+    {label:'Total listado',value:amount(rows.reduce((acc,row)=>acc+Number(row.amount||0),0))},
+    {label:'Filtro',value:label}],
+   note:'Relatório de acompanhamento. Valores sem data comprovada ou marcados como Não cobrar não representam dívida vencida confirmada. Nenhuma cobrança é enviada automaticamente.'
   });
- }catch(e){status.textContent='Não foi possível gerar PDF de pendências: '+String(e.message||e)}
+  status.textContent='PDF preparado com '+expected+' parcela(s) do filtro '+label+'.';
+ }catch(e){
+  status.textContent='Não foi possível gerar o PDF de parcelas: '+String(e.message||e);
+ }finally{if(btn)btn.disabled=false}
 };
 const previewRows=(cols,rows,limit=10)=>{
  if(!rows.length)return '<p class="hint">Não há itens no filtro.</p>';
@@ -118,7 +139,7 @@ const previewRows=(cols,rows,limit=10)=>{
   '</tbody></table></div><p class="hint">Prévia dos primeiros '+Math.min(rows.length,limit)+' de '+rows.length+' registros. O PDF contém todos os itens filtrados.</p>';
 };
 async function renderPreview(){
- const seq=++attempt;if(section==='commission')return;
+ const seq=++attempt;
  status.textContent='Consultando dados autenticados...';
  try{
   if(section==='renewals'){
@@ -126,11 +147,12 @@ async function renderPreview(){
    if(seq!==attempt||section!=='renewals')return;
    preview.innerHTML=previewRows(['Segurado','Contrato','Vencimento'],rows.map(r=>[r.clientName,r.number,date(r.end)]));
    status.textContent=rows.length+' renovação(ões) no filtro · '+monthName(period)+'.';
-  }else{
-   const rows=taskRows(await loadTasks());
-   if(seq!==attempt||section!=='tasks')return;
-   preview.innerHTML=previewRows(['Pendência','Segurado','Prazo'],rows.map(r=>[r.title,r.clientName,date(r.due)]));
-   status.textContent=rows.length+' pendência(s) no filtro. Somente dados operacionais.';
+  }else if(section==='payments'){
+   const result=await paymentPreview();
+   if(seq!==attempt||section!=='payments')return;
+   preview.innerHTML=previewRows(['Segurado','Contrato','Vencimento','Valor','Situação'],
+    result.rows.map(r=>[r.clientName,r.contractNumber,date(r.due),amount(r.amount),r.label]));
+   status.textContent=result.total+' parcela(s) no filtro. O PDF inclui todas as páginas, não só esta prévia.';
   }
  }catch(e){if(seq===attempt)status.textContent='Falha na consulta: '+String(e.message||e)}
 }
@@ -150,21 +172,20 @@ function showSection(next){
    '<div class="field"><label for="opReportSearch">Cliente ou contrato</label><input type="search" id="opReportSearch" placeholder="Pesquisar"></div>'+
    '<button type="button" class="btn primary" id="opReportPdf">Gerar PDF de Renovações</button>';
   byId('opReportPdf').onclick=()=>renewalPdf();
- }else if(next==='tasks'){
-  filterArea.innerHTML='<div class="field"><label for="opReportTaskStatus">Situação</label>'+
-   '<select id="opReportTaskStatus"><option value="open">Em aberto</option><option value="all">Todas</option><option value="closed">Concluídas</option></select></div>'+
-   '<div class="field"><label for="opReportSearch">Pendência ou segurado</label><input type="search" id="opReportSearch" placeholder="Pesquisar"></div>'+
-   '<button type="button" class="btn primary" id="opReportPdf">Gerar PDF de Pendências</button>'+
-   '<button type="button" class="btn" id="opReportRefresh">Atualizar</button>';
-  byId('opReportPdf').onclick=()=>taskPdf();
-  byId('opReportRefresh').onclick=()=>{tasksCache=null;renderPreview()};
- }else{
-  filterArea.innerHTML='<div class="op-report-restricted"><strong>Comissões — acesso administrativo</strong>'+
-   '<p>A área operacional não recebe valores de comissões ou repasses. O relatório completo está disponível para gestores autenticados no portal Administrativo.</p>'+
-   '<a class="btn primary" href="index.html?v=20.59" target="_blank" rel="noopener noreferrer">Abrir Administrativo</a></div>';
-  status.textContent='Restrito: nenhuma comissão é transmitida à sessão operacional.';
-  return;
+ }else if(next==='payments'){
+  const opts=Object.entries(finance()?.filters||{
+   review:'Conferir PDFs / vencimentos',attention:'Prioridades',late:'Vencidas sem confirmação',
+   week:'Próximos 7 dias',month:'Próximos 30 dias',blocked:'Não cobrar / previsão',all:'Todas as parcelas'
+  }).filter(([key])=>key!=='paid');
+  filterArea.innerHTML='<div class="field"><label for="opReportPaymentStatus">Pendências de parcelas</label>'+
+   '<select id="opReportPaymentStatus">'+opts.map(([key,label])=>
+    '<option value="'+esc(key)+'">'+esc(label)+'</option>').join('')+'</select></div>'+
+   '<div class="field"><label for="opReportSearch">Cliente ou contrato</label>'+
+   '<input type="search" id="opReportSearch" placeholder="Pesquisar"></div>'+
+   '<button type="button" class="btn primary" id="opReportPdf">Gerar PDF de Pendências de Parcelas</button>';
+  byId('opReportPdf').onclick=()=>paymentPdf();
  }
+
  filterArea.querySelectorAll('select,input').forEach(el=>el.addEventListener('change',renderPreview));
  byId('opReportSearch')?.addEventListener('input',renderPreview);
  renderPreview();
@@ -174,13 +195,14 @@ const oldSelect=selectTab;
 selectTab=function(mode){
  PANEL.classList.toggle('is-hidden',mode!=='reports');
  const button=byId('renewalPrintPdf');if(button)button.classList.toggle('is-hidden',mode!=='renewals');
+ const paymentButton=byId('paymentPrintPdf');if(paymentButton)paymentButton.classList.toggle('is-hidden',mode!=='payments');
  if(mode!=='reports')return oldSelect(mode);
  currentTab='reports';
  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab==='reports'));
  document.querySelector('.searchpanel:not(#monitorPanel)')?.classList.add('is-hidden');
  byId('monitorPanel').classList.add('is-hidden');
  byId('pageHeading').textContent='Relatórios por abas';
- byId('pageSubheading').textContent='Renovações e pendências exportadas com a identidade visual LEBRIME. Comissões exigem acesso administrativo.';
+ byId('pageSubheading').textContent='Renovações e pendências de parcelas exportadas com a identidade visual LEBRIME.';
  byId('results').innerHTML='<div class="empty"><b>Relatórios operacionais</b>Use as abas acima para consultar ou gerar PDF.</div>';
  byId('count').textContent='Relatórios';
  showSection(section);
@@ -193,5 +215,13 @@ if(action){
  print.onclick=()=>renewalPdf(true);
  action.insertAdjacentElement('afterend',print);
 }
-document.addEventListener('lebrime-operacional-logout',()=>{tasksCache=null;attempt++;PANEL.classList.add('is-hidden')});
+const paymentButton=document.createElement('button');
+paymentButton.id='paymentPrintPdf';paymentButton.type='button';
+paymentButton.className='btn primary is-hidden';
+paymentButton.textContent='Gerar PDF de Pendências';
+paymentButton.onclick=()=>paymentPdf(true);
+byId('monitorRefresh')?.insertAdjacentElement('afterend',paymentButton);
+document.addEventListener('lebrime-operacional-logout',()=>{
+ attempt++;PANEL.classList.add('is-hidden');
+});
 })();
