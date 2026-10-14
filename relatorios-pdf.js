@@ -25,6 +25,12 @@
     *{box-sizing:border-box}
     html,body{margin:0;padding:0;background:#fff;color:#172438}
     body{font:10pt "Segoe UI",Arial,sans-serif;padding:13mm 12mm 12mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    /* Watermark is a real transparent SVG element, not a print-background image.
+       Fixed positioning repeats the emblem on every page in Chromium print/PDF. */
+    .report-watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:130mm;height:130mm;opacity:.065;pointer-events:none;z-index:0}
+    .report-watermark img{display:block;width:100%;height:100%;object-fit:contain;background:transparent}
+    .report-header,main,footer{position:relative;z-index:1}
     .report-header{display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:2px solid #CE9900;padding-bottom:12px}
     .identity{display:flex;align-items:center;gap:13px;min-width:0}
     .identity img{display:block;width:65px;height:60px;object-fit:contain;flex:none;background:transparent}
@@ -54,8 +60,11 @@
     @page{size:A4 landscape;margin:11mm}
     @media print{body{padding:0}.report-header{padding-top:0}.screen-hint{display:none}.metric{break-inside:avoid}}
    </style></head><body>
+   <div class="report-watermark" aria-hidden="true">
+     <img class="report-brand-image" src="${esc(REPORT_LOGO)}" alt="" width="490" height="490">
+   </div>
    <header class="report-header">
-    <div class="identity"><img src="${esc(REPORT_LOGO)}" alt="Logo Lebrime" width="65" height="60">
+    <div class="identity"><img class="report-brand-image" src="${esc(REPORT_LOGO)}" alt="Logo Lebrime" width="65" height="60">
      <div><div class="company">LEBRIME CORRETORA DE SEGUROS</div>
        <div class="company-caption">Gestão de carteira e relatórios</div></div>
     </div>
@@ -86,8 +95,8 @@
    const html=render(options);
    win.document.open();win.document.write(html);win.document.close();
    (async()=>{
-     const img=win.document.querySelector('.identity img');
-     const loaded=await waitImage(img);
+     const imgs=Array.from(win.document.querySelectorAll('.report-brand-image'));
+     const loaded=imgs.length===2 && (await Promise.all(imgs.map(waitImage))).every(Boolean);
      if(!loaded){
        // Não imprimir silenciosamente sem a identidade institucional.
        const hint=win.document.querySelector('.screen-hint');
