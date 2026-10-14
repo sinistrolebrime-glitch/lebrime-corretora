@@ -35,6 +35,13 @@ assert.match(operational,/RULES\.rowsFor/);
 assert.match(operational,/RULES\.accepted/);
 assert.match(operational,/globalThis\.lebrimeOperationalIndex\(\)/);
 assert.match(operational,/Relatório de Renovações/);
+assert.match(operational,/columns:\['Segurado','Produtor','Contrato','Seguradora','Ramo','Placa','Vencimento'\]/);
+assert.match(operational,/r\.producerName\|\|'A conferir'/);
+assert.match(operational,/plateByContract/);
+assert.doesNotMatch(operational,/columns:\['Segurado','Contrato','Seguradora','Ramo','Placa','Vencimento','Situação'\]/);
+assert.match(admin,/columns:\['Segurado','Produtor','Contrato','Seguradora','Ramo','Placa','Vencimento'\]/);
+assert.match(admin,/plateByContract/);
+
 assert.match(operational,/Relatório de Pendências de Parcelas/);
 assert.match(operational,/const next=await api\.page\(filter,search,page\)/);
 assert.match(operational,/rows\.length!==expected/);
@@ -44,6 +51,13 @@ assert.match(finance,/page:\(filter,search,page\)=>financeApi\('queue',\{filter,
 assert.doesNotMatch(operational,/action=tasks/);
 assert.doesNotMatch(operational,/commissionPercent|expectedCommission|ffFee|producerExpected/);
 assert.match(endpoint,/if\(await roleOf\(req\)!=="operacional"\)/);
+assert.match(endpoint,/producerName:producer\.slice\(0,100\)/);
+assert.match(endpoint,/\["client","proposal","policy","insuredItem","producer"\]/);
+assert.match(endpoint,/const producerNames=new Map/);
+assert.match(endpoint,/contractPreview\(row,producerNames\)/);
+const preview=endpoint.slice(endpoint.indexOf('function contractPreview'),endpoint.indexOf('function safeDocument'));
+assert.doesNotMatch(preview, /commissionPercent|producerExpected|ffFee|netPremium|commissionId/);
+
 assert.match(endpoint,/\["index","client","file"\]/);
 assert.doesNotMatch(endpoint,/if\(action==="tasks"\)/);
 assert.match(renewal,/const rowsFor=/);
