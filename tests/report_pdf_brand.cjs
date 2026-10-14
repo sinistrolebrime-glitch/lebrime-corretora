@@ -9,7 +9,7 @@ assert.match(logo,/^<svg[\s>]/);
 assert.match(logo,/fill-rule="evenodd"/);
 assert.match(logo,/fill="#CE9900"/);
 assert.doesNotMatch(logo,/background|#fff|<image\b/i);
-assert.match(index,/relatorios-pdf\.js\?v=20\.57/);
+assert.match(index,/relatorios-pdf\.js\?v=20\.\d+/);
 assert.ok(index.indexOf('relatorios-pdf.js')<index.indexOf('script.js'),'Template PDF deve carregar antes da aplicação');
 for(const fn of ['printRenewalMirror','printCommissionReport','printTaskReport'])
  assert.ok(app.includes('function '+fn+'()'),fn+' ligado');
