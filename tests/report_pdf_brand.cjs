@@ -40,7 +40,8 @@ assert.match(html,/Salv(ar|ar como) PDF/i);
 assert.match(html,/A4 landscape/);
 assert.match(html,/class="report-watermark"/);
 assert.match(html,/position:fixed/);
-assert.match(html,/opacity:\.065/);
+assert.match(html,/opacity:\.18/);
+assert.match(html,/width:198mm;height:198mm/);
 assert.match(html,/class="report-brand-image"/);
 assert.equal((html.match(/class="report-brand-image"/g)||[]).length,2,
  'Logo aparece no cabeçalho e como marca d\'água com transparência');
