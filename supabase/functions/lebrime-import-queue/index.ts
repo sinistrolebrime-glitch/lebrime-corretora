@@ -72,7 +72,25 @@ Deno.serve(async(req)=>{
      "id,batch_key,request_key,state,attempts,created_at,updated_at,processed_at,available_at,contract_id,client_id,document_id,last_error"
    ).eq("batch_key","pendentes46-out2026").order("created_at",{ascending:false}).limit(75);
    if(le)throw le;
-   return json({ok:true,health,items:items||[]});
+   // Inventário consolidado é a fonte de verdade dos cadastros fora da fila
+   // (via SQL autenticado). Não retornar dados pessoais nem links dos PDFs.
+   const {data:checkpoint,error:ce}=await db.from("records").select("data")
+     .eq("id","lebrime-mutirao-46-inventario-propostas")
+     .eq("kind","system_checkpoint").maybeSingle();
+   if(ce)throw ce;
+   const docs=Array.isArray(checkpoint?.data?.files)?checkpoint.data.files:[];
+   const statuses=docs.map((f:any)=>String(f?.status||""));
+   const completed=statuses.filter((s:string)=>s==="cadastrado_validado_no_supabase").length;
+   const deferred=statuses.filter((s:string)=>s==="adiado_sem_percentual_por_orientacao").length;
+   const review=statuses.filter((s:string)=>
+     s==="revisao_pdf_sem_texto"||s==="revisao_parcelas_nao_discriminadas"||
+     s==="endosso_cancelamento_documentado_pendente_vinculo").length;
+   const inventory={
+     received:docs.length,completed,deferred,review,
+     pending:Math.max(0,docs.length-completed-deferred-review),
+     originalGoal:46
+   };
+   return json({ok:true,health,items:items||[],inventory});
   }
   if(action==="assisted-process"){
    const {data,error}=await db.rpc("lebrime_process_assisted_import_queue",{max_jobs:5});
