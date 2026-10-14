@@ -3185,3 +3185,10 @@ html[data-theme="light"] dialog{
 .dashboard-fipe-actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
 .dashboard-fipe-actions small{font-size:11px;line-height:1.4}
 @media(max-width:680px){.dashboard-fipe-actions{align-items:flex-start;text-align:left}}
+
+/* v20.59 — abas institucionais de relatórios no módulo administrativo */
+.lebrime-report-tabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-basis:100%;width:100%;border-bottom:1px solid #e0e4eb;padding:0 0 12px;margin:0 0 14px}
+.lebrime-report-tab{padding:10px 18px;border-radius:9px;border:1px solid #dfe3e9;background:#fff;color:#354862;font-size:13px;font-weight:750;cursor:pointer;transition:background .12s,border .12s}
+.lebrime-report-tab.active{color:#88600e;background:#fff7e8;border-color:#cb9c45}
+.lebrime-report-tab:hover{background:#f7f6f2}
+@media(max-width:700px){.lebrime-report-tabs{gap:5px}.lebrime-report-tab{flex:1;min-width:96px;text-align:center;padding:10px 8px}}
