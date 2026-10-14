@@ -22,7 +22,12 @@ assert.match(api,/role!=="gestor"/);
 for(const action of ['assisted-enqueue','assisted-batch','assisted-status','assisted-process','assisted-retry'])
  assert.ok(api.includes('action==="'+action+'"'), 'Missing route: '+action);
 assert.match(api,/manifests\.length>10/);
-assert.match(ui,/GOAL=46/);
+assert.match(ui,/GOAL=39/);
+assert.match(api,/lebrime-mutirao-46-inventario-propostas/);
+assert.match(api,/return json\(\{ok:true,health,items:items\|\|\[\],inventory\}\)/);
+assert.match(ui,/result\.inventory/);
+assert.match(ui,/Cadastradas no banco/);
+assert.match(ui,/Sem percentual/);
 assert.match(ui,/assisted-batch/);
 assert.match(ui,/assisted-process/);
 assert.match(ui,/assisted-status/);
