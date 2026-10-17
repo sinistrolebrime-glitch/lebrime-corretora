@@ -58,16 +58,16 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 ### FF Apolinário / Homeni / Eólica
 - Taxa FF = 30% da comissão bruta e é custo da Lebrime.
 - O produtor comum não paga a Taxa FF e continua recebendo 60% da comissão bruta total.
-- Demais produtores: produtor 60%; Taxa Lebrime 40%; Taxa FF 30%; líquido efetivo Lebrime 10%.
+- Demais produtores: produtor 60%; Taxa FF 30%; Taxa Lebrime efetiva 10% da comissão bruta. A parcela bruta de 40% atribuída à Lebrime antes da taxa FF não deve ser lançada como lucro final.
 - Leandro: recebe 70% da comissão bruta; Taxa FF 30%; Taxa Lebrime 0%.
 
-## Tolerância para diferenças financeiras de até R$ 1,00 (regra permanente — 12/10/2026)
-- Aceitar diferenças monetárias absolutas de **até 100 centavos (R$ 1,00 inclusive)**, tanto nas importações novas quanto na revisão das antigas, quando houver evidência documental dos valores comparados.
+## Tolerância para diferenças financeiras de até R$ 10,00 (atualização vigente — 17/10/2026)
+- Aceitar diferenças monetárias absolutas de **até 1.000 centavos (R$ 10,00 inclusive)**, tanto nas importações novas quanto na revisão das antigas, quando houver evidência documental dos valores comparados.
 - Exemplos: prêmio líquido repetido com arredondamento nas páginas do PDF; total de parcelas **individualmente comprovadas** versus prêmio total indicado.
 - Preservar **sem alteração** todos os valores originais (prêmio líquido, prêmio total, IOF, comissão e cada parcela), documentos e evidências. Registrar variação em centavos, fonte e classificação `Diferença aceita por tolerância`.
 - **Não** criar compensação artificial, reajustar última parcela, inventar vencimentos nem considerar pago/autorizar cobrança por causa da tolerância.
-- Se faltar valor individual de parcela, data, aceitação do risco, identificação do cliente/contrato, documento ou qualquer outra evidência necessária, a pendência específica permanece, mesmo que a diferença nominal seja de até R$ 1,00.
-- Diferença superior a R$ 1,00 exige revisão. Não aplicar esta tolerância a divergências percentuais de comissão, de vínculo, identidade ou valores de naturezas diferentes.
+- Se faltar valor individual de parcela, data, aceitação do risco, identificação do cliente/contrato, documento ou qualquer outra evidência necessária, a pendência específica permanece, mesmo que a diferença nominal seja de até R$ 10,00.
+- Diferença superior a R$ 10,00 exige revisão. Não aplicar esta tolerância a divergências percentuais de comissão, de vínculo, identidade ou valores de naturezas diferentes.
 - Em conflito entre resumo e quadro de pagamento do mesmo contrato, manter o valor usado no cálculo original já documentado e anotar a variante, sem trocar a base de comissão automaticamente.
 
 ## Proposta ou apólice importada
@@ -76,14 +76,14 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 - Status da comissão = `Recebida`.
 - Data de recebimento = data da importação do documento.
 - Origem do recebimento = `Importação da proposta` ou `Importação da apólice`.
-- A importação não marca automaticamente a comissão como paga ao produtor.
+- **Pendência de conciliação entre regra gerencial e execução:** pela orientação mais recente da direção, a proposta já importada deve aparecer como repasse ao produtor considerado pago; porém o campo técnico `transferPaid` continua `false` na carteira histórica. Não simular transferência bancária nem alterar pagamentos em massa sem auditoria específica. Distinguir `pago por regra operacional de importação` de `transferência bancária comprovada` na interface, e corrigir a implementação após validar os saldos.
 
 ## Lucro realizado
 - Lucro realizado = comissão efetivamente recebida pela Lebrime menos comissão efetivamente paga ao produtor.
 - Taxa FF e Taxa Lebrime ficam discriminadas em colunas próprias para análise da operação.
 
 ## Parcelas e migração
-- Parcelas anteriores ao mês inicial da implantação podem ser marcadas como `Paga — Migração`.
+- Parcelas anteriores ao mês inicial da implantação **não podem ser marcadas automaticamente como pagas apenas pela data**. Sem confirmação documentada ou conciliação de migração auditada, classificar como `Conferir migração`, bloqueando cobranças. `Paga — Migração` é marcador técnico distinto de prova bancária.
 - Parcelas ligadas a propostas são previsão financeira, não cobrança efetiva de apólice.
 
 ## Documentos
@@ -268,7 +268,7 @@ A integração da Porto deve funcionar como fonte automática de dados e auditor
 - A API `lebrime-import-queue` exige sessão **gestor**, verificada no servidor. Não expor chave de serviço, banco ou PDFs em endpoints públicos; funções SQL da fila são restritas a funções privilegiadas, com RLS habilitado.
 - Os estados são **queued**, **processing**, **retry**, **review** e **done**. Itens em `review` não são ignorados nem aprovados automaticamente. O histórico original e os anexos não devem ser sobrescritos.
 - A rotina autenticada exige confirmação do **mesmo veículo do contrato anterior**. Quando houver troca de veículo, mudança de risco, produtor não comprovado ou qualquer identidade ambígua, colocar em revisão e cadastrar somente após vínculo correto ser confirmado.
-- **Cobranças**: nunca inferir datas ou valores; itens com vencimento não comprovado ficam **Não cobrar**. A tolerância financeira de R$ 1,00 não permite completar parcelas desconhecidas.
+- **Cobranças**: nunca inferir datas ou valores; itens com vencimento não comprovado ficam **Não cobrar**. A tolerância financeira de R$ 10,00 não permite completar parcelas desconhecidas.
 - Falha do conector no chat não autoriza outro canal a contornar segurança. Se a proposta já está na fila do servidor, o processamento continua; se ainda não entrou, usar o fluxo autenticado de entrada/manifesto no portal ou preservar PDF/checkpoint até o envio regular.
 - O agendador trata trabalhos já preparados; **não acessa automaticamente PDFs privados do Google Drive nem opera o ChatGPT durante a ausência da conversa**. A integração automática entre Drive e servidor exige configuração explícita de acesso próprio. Nem mesmo um serviço agendado elimina todas as indisponibilidades; monitorar e alertar falhas.
 - Acompanhamento pela seção **Arquivos → Importações contínuas**, incluindo revisão humana, evitando duplicidade de cliente e período.
