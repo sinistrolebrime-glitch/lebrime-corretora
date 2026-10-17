@@ -1,5 +1,8 @@
 # Regras de negócio — Parcelamento e cobranças (LEBRIME)
 
+> **ATUALIZAÇÃO VIGENTE (17/10/2026):** a tolerância de conciliação financeira passa a ser **R$ 10,00 (1.000 centavos)**; referências de R$ 1,00 adiante são históricas e estão superadas. Parcelas com vencimento anterior à implantação não são pagas automaticamente sem auditoria; preservar bloqueios de cobrança, dados originais e ausência de vencimento confirmado. Serviço financeiro de produção atualizado nas versões lebrime-api v33 e lebrime-finance-operational v6.
+
+
 Versão inicial: 2026-10-10. Estas regras são obrigatórias para novas importações e reprocessamentos.
 
 ## Importação e integridade
