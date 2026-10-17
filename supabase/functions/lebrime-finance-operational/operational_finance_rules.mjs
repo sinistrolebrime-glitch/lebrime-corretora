@@ -28,7 +28,8 @@ export const stateOf=(p,contract,importedIds,day=localToday())=>{
   if(!contract)return 'review_link';
   if(contract.kind!=='policy'&&!(contract.kind==='proposal'&&importedIds.has(contract.id)))return 'forecast';
   const difference=planDifference(contract);
-  if(difference!==null&&difference!==0)return 'review_plan';
+  // Tolerância LEBRIME: diferença entre parcelas e prêmio de até R$ 10,00 inclusive.
+  if(difference!==null&&Math.abs(difference)>1000)return 'review_plan';
   if(!Number.isSafeInteger(Number(d.amount))||Number(d.amount)<=0)return 'review_amount';
   if(!validDue(d.due))return 'review_due';
   if(d.due.slice(0,7)<CUTOFF_MONTH)return 'review_migration';
