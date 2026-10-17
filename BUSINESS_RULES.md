@@ -76,7 +76,7 @@ Base: **Comissão bruta = Prêmio Líquido × percentual de comissão da propost
 - Status da comissão = `Recebida`.
 - Data de recebimento = data da importação do documento.
 - Origem do recebimento = `Importação da proposta` ou `Importação da apólice`.
-- **Pendência de conciliação entre regra gerencial e execução:** pela orientação mais recente da direção, a proposta já importada deve aparecer como repasse ao produtor considerado pago; porém o campo técnico `transferPaid` continua `false` na carteira histórica. Não simular transferência bancária nem alterar pagamentos em massa sem auditoria específica. Distinguir `pago por regra operacional de importação` de `transferência bancária comprovada` na interface, e corrigir a implementação após validar os saldos.
+- **Pendência de conciliação entre regra gerencial e execução:** pela orientação mais recente da direção, a proposta já importada deve aparecer como repasse ao produtor considerado pago; porém o campo técnico `transferPaid` continua zerado (valor monetário de repasse) na maior parte da carteira histórica. Não simular transferência bancária nem alterar pagamentos em massa sem auditoria específica. Distinguir `pago por regra operacional de importação` de `transferência bancária comprovada` na interface, e corrigir a implementação após validar os saldos.
 
 ## Lucro realizado
 - Lucro realizado = comissão efetivamente recebida pela Lebrime menos comissão efetivamente paga ao produtor.
