@@ -14,6 +14,10 @@ assert.equal(stage(p('2026-10-10',{status:'Pago'})),'review_paid_evidence');
 assert.equal(stage(p('2026-10-10',{status:'Pago',paymentEvidence:'Comprovante da seguradora'})),'paid');
 const offByCents={...policy,data:{premium:10001,installmentPlan:[{amount:10000,due:'2026-10-11'}]}};
 assert.equal(stage(p('2026-10-11'),offByCents),'upcoming');
+const within={...policy,data:{premium:11000,installmentPlan:[{amount:10000}]}};
+assert.equal(stage(p('2026-10-11'),within),'upcoming');
+const over={...policy,data:{premium:11001,installmentPlan:[{amount:10000}]}};
+assert.equal(stage(p('2026-10-11'),over),'review_plan');
 assert.equal(includeByFilter({stage:'review_plan',due:'2026-10-11'},'review',day),true);
 assert.equal(includeByFilter({stage:'review_plan',due:'2026-10-11'},'attention',day),false);
 
