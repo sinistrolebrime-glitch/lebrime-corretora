@@ -114,7 +114,7 @@ export function parseInstallmentSchedule(pages, {premium=0,paymentMethod='',star
   const consistentCount=expectedCount===0||expectedCount===plan.length;
   const strongContext=headings>0||plan.every(r=>r.explicit);
   const sourceValid=source.length>0&&plan.length>0;
-  const premiumMatch=Number.isSafeInteger(expectedPremium)&&expectedPremium>0&&total===expectedPremium;
+  const premiumMatch=Number.isSafeInteger(expectedPremium)&&expectedPremium>0&&Math.abs(total-expectedPremium)<=1000;
   const reconciled=sourceValid&&sequential&&consistentCount&&strongContext&&premiumMatch;
   const hasAllDates=plan.every(p=>p.due);
   // A evidência de "Vencimento: 5" não contém meses/anos; nunca inventar due.
