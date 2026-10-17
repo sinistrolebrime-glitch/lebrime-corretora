@@ -41,9 +41,14 @@ const offByOne={...policy,data:{...policy.data,premium:10001,installmentPlan:[{a
 assert.equal(F.planDifference(offByOne),-1);
 assert.equal(F.stage(payment('reconcile',offByOne),offByOne,imported,cutoff,current),'A vencer');
 assert.equal(F.actionable(payment('reconcile',offByOne),offByOne,imported,cutoff,current),true);
-const offByReal={...policy,data:{...policy.data,premium:10100,installmentPlan:[{amount:10000,due:'2026-10-12'}],installmentCount:1}};
+// Tolerância operacional: até R$ 10,00 positivos ou negativos, inclusive.
+const offByReal={...policy,data:{...policy.data,premium:11000,installmentPlan:[{amount:10000,due:'2026-10-12'}],installmentCount:1}};
+assert.equal(F.planDifference(offByReal),-1000);
 assert.equal(F.stage(payment('limit',offByReal),offByReal,imported,cutoff,current),'A vencer');
-const aboveLimit={...policy,data:{...policy.data,premium:10101,installmentPlan:[{amount:10000,due:'2026-10-12'}],installmentCount:1}};
+const overPaid={...policy,data:{...policy.data,premium:10000,installmentPlan:[{amount:11000,due:'2026-10-12'}],installmentCount:1}};
+assert.equal(F.planDifference(overPaid),1000);
+assert.equal(F.stage(payment('overPaid',overPaid),overPaid,imported,cutoff,current),'A vencer');
+const aboveLimit={...policy,data:{...policy.data,premium:11001,installmentPlan:[{amount:10000,due:'2026-10-12'}],installmentCount:1}};
 assert.equal(F.stage(payment('aboveLimit',aboveLimit),aboveLimit,imported,cutoff,current),'Conferir diferença no parcelamento');
 assert.equal(F.actionable(payment('aboveLimit',aboveLimit),aboveLimit,imported,cutoff,current),false);
 
