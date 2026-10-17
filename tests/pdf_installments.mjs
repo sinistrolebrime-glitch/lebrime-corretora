@@ -4,7 +4,7 @@ const fixtures=[
   ['Quadro com 3 parcelas',['Seguradora TESTE\nPlano de parcelamento\nParcela 1/3 10/11/2026 R$ 100,00\nParcela 2/3 10/12/2026 R$ 100,00\nParcela 3/3 10/01/2027 R$ 101,00'],30100,'verified'],
   ['Tabela sem prefixo',['Parcelas Vencimento Valor\n01 15/10/2026 1.000,00\n02 15/11/2026 1.250,00'],225000,'verified'],
   ['Sem evidência de parcela',['Vigência 10/10/2026 a 10/10/2027\nCobertura básica 1.000,00\nPrêmio total 1.000,00'],100000,'review'],
-  ['Prêmio divergente',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2101,'review'],
+  ['Prêmio divergente acima de R$10',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],3001,'review'],
   ['Diferença de R$1 aceita',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2100,'verified'],
   ['Diferença de R$0,01 aceita',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2001,'verified'],
   ['Parcela repetida em página',['Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00','Parcelamento\n1/2 10/10/2026 R$ 10,00\n2/2 10/11/2026 R$ 10,00'],2000,'verified'],
@@ -21,7 +21,12 @@ const slight=parseInstallmentSchedule(fixtures[5][1],{premium:2001});
 assert.equal(slight.variance,-1);
 assert.equal(slight.toleranceApplied,true);
 assert.equal(slight.toleranceCents,1);
-const over=parseInstallmentSchedule(fixtures[3][1],{premium:2101});
+const tenBelow=parseInstallmentSchedule(fixtures[3][1],{premium:3000});
+assert.equal(tenBelow.status,'verified');
+assert.equal(tenBelow.toleranceCents,1000);
+const tenAbove=parseInstallmentSchedule(fixtures[3][1],{premium:1000});
+assert.equal(tenAbove.status,'verified');
+const over=parseInstallmentSchedule(fixtures[3][1],{premium:3001});
 assert.equal(over.status,'review');
 
 const twoColumns=[
