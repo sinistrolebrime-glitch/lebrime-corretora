@@ -13,7 +13,7 @@ assert.equal(stage(p('2026-09-09')),'review_migration');
 assert.equal(stage(p('2026-10-10',{status:'Pago'})),'review_paid_evidence');
 assert.equal(stage(p('2026-10-10',{status:'Pago',paymentEvidence:'Comprovante da seguradora'})),'paid');
 const offByCents={...policy,data:{premium:10001,installmentPlan:[{amount:10000,due:'2026-10-11'}]}};
-assert.equal(stage(p('2026-10-11'),offByCents),'review_plan');
+assert.equal(stage(p('2026-10-11'),offByCents),'upcoming');
 assert.equal(includeByFilter({stage:'review_plan',due:'2026-10-11'},'review',day),true);
 assert.equal(includeByFilter({stage:'review_plan',due:'2026-10-11'},'attention',day),false);
 
