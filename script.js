@@ -2891,6 +2891,33 @@ async function uploadDocument(e){
     return;
   }
   $('#uploadType').value=documentType;
+  // Qualquer PDF enviado ao cadastro passa pela extração inicial ANTES de ser armazenado.
+  // A prévia é evidência auxiliar e nunca sobrescreve campos confirmados do contrato.
+  let parsedPreview=null,readIssue='';
+  if(/\.pdf$/i.test(f.name)){
+    $('#uploadStatus').textContent='Lendo PDF para identificar os campos, sem alterar contrato existente...';
+    try{
+      const result=await api('proposal-preview',f,{raw:true,headers:{'content-type':'application/pdf'}});
+      const preview=result?.preview;
+      if(preview&&result.stored===false&&result.requiresConfirmation===true)
+       parsedPreview={
+         recognized:Number(preview.recognized||0),
+         fields:preview.fields||{},
+         warnings:Array.isArray(preview.warnings)?preview.warnings:[],
+         parcelamento:preview.installments?.status||'a conferir',
+         source:'Prévia de PDF autenticada; validar antes de aplicar'
+       };
+      else readIssue='A extração automática não retornou campos verificáveis';
+    }catch(error){
+      readIssue='Falha na extração inicial: '+String(error?.message||error).slice(0,180);
+    }
+    const extractedId=String(parsedPreview?.fields?.insuredDocument?.value||'').replace(/\D/g,'');
+    const clientDoc=String(rowById(clientId)?.data?.document||'').replace(/\D/g,'');
+    if(extractedId&&clientDoc&&[11,14].includes(extractedId.length)&&extractedId!==clientDoc){
+      $('#uploadStatus').textContent='CPF/CNPJ encontrado no PDF é diferente do cliente selecionado. Selecione a ficha correta antes de enviar.';
+      return;
+    }
+  }
   const key=`clients/${clientId}/${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth()+1).padStart(2,'0')}/${uuid()}-${f.name.replace(/[^a-zA-Z0-9._-]+/g,'-')}`;
   $('#uploadStatus').textContent='Enviando e vinculando arquivo...';
   let uploaded=false;
@@ -2913,6 +2940,13 @@ async function uploadDocument(e){
       isEndorsement:documentType==='Endosso',
       status:'Recebido',storageKey:key,originalFileName:f.name,
       mimeType:f.type||'application/octet-stream',fileSize:f.size,
+      processingRuleVersion:'LEBRIME-INGESTAO-V1-20261025',
+      extractionStatus:parsedPreview?.recognized>0
+        ?'Leitura automática parcial — dados extraídos com fonte; revisar antes de atualizar contrato'
+        :'Revisão documental — extração não concluída',
+      extractionReviewRequired:true,
+      ...(parsedPreview?{extractedPreview:parsedPreview}:{}),
+      ...(readIssue?{extractionWarning:readIssue}:{}),
       notes:$('#uploadNotes').value||placeholder?.data.notes||''
     };
     const documentId=placeholder?.id||uuid();
@@ -2941,7 +2975,9 @@ async function uploadDocument(e){
       ?'Arquivo recuperado e vinculado ao seguro com sucesso.'
       :insurance
         ?'Documento armazenado e vinculado ao seguro com sucesso.'
-        :'Documento armazenado na ficha do cliente com sucesso.')+extractionNote;
+        :'Documento armazenado na ficha do cliente com sucesso.')+extractionNote+
+      (parsedPreview?.recognized>0?' Leitura automática: '+parsedPreview.recognized+' campo(s) encontrados; conferir dados antes de concluir.':
+       ' Leitura integral pendente de revisão; PDF preservado.');
     await loadRecords();
     uploadPrefill={clientId:'',insuranceId:''};
     await renderImportClients();
