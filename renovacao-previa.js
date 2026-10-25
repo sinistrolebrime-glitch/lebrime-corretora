@@ -47,7 +47,7 @@ pdf.addEventListener('change',()=>{
  // A prévia não cria contrato, cobrança, comissão ou vigência sem confirmação.
  forget();
  const file=pdf.files?.[0];
- for(const id of ['newRenewalNetPremium','newRenewalIof','newRenewalProducer','newRenewalCommissionPercent']){
+ for(const id of ['newRenewalNetPremium','newRenewalIof','newRenewalFinanceCharges','newRenewalProducer','newRenewalCommissionPercent']){
   const input=el(id);if(input)input.value='';
  }
  if(!file)return;
@@ -107,6 +107,16 @@ function render(result){
    risks.slice(0,35).map(c=>'<li>Página '+Number(c.page)+': '+clean(c.evidence||'')+'</li>').join('')+
    '</ul></details>':'')+'</div>';
  const cautions=[...result.warnings||[]];
+ const net=Number(values.netPremium?.value),iof=Number(values.iof?.value),total=Number(values.premium?.value);
+ if(values.netPremium&&values.iof&&values.premium){
+   const fees=values.financeCharges?Number(values.financeCharges.value):0;
+   const compared=globalThis.LebrimeFinancialTolerance?.compare(total,net+iof+fees);
+   if(compared?.accepted&&compared.absDifferenceCents>0)
+     cautions.unshift('Diferença de R$ '+(compared.absDifferenceCents/100).toFixed(2).replace('.',',')+
+      ' aceita pela tolerância LEBRIME (até R$ 10,00), mantendo os valores do PDF.');
+   else if(compared?.reviewRequired)
+     cautions.unshift('Diferença acima de R$ 10,00; revisar prêmio, IOF e adicionais antes de cadastrar.');
+ }
  const hint=producerFromFilename(activeFile);
  if(hint){
   const producerInput=el('newRenewalProducer'),commissionInput=el('newRenewalCommissionPercent');
@@ -155,6 +165,8 @@ function render(result){
    el('newRenewalNetPremium').value=formatCents(current.netPremium.value);
   if(Number.isSafeInteger(Number(current.iof?.value))&&Number(current.iof?.value)>=0)
    el('newRenewalIof').value=formatCents(current.iof.value);
+  if(Number.isSafeInteger(Number(current.financeCharges?.value))&&Number(current.financeCharges?.value)>=0)
+   el('newRenewalFinanceCharges').value=formatCents(current.financeCharges.value);
   if(Number(current.insuredValue?.value)>0)el('newRenewalInsuredValue').value=formatCents(current.insuredValue.value);
   // Só aplicar o produtor/percentual se estiverem explícitos e sem conflito com a anotação do nome.
   const fileHint=producerFromFilename(activeFile);
