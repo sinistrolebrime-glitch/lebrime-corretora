@@ -12,6 +12,14 @@ function clientOptions(){
   list('client').sort((a,b)=>String(a.data.name||'').localeCompare(String(b.data.name||''),'pt-BR'))
    .map(r=>'<option value="'+esc(r.id)+'">'+esc(r.data.name||'Cliente')+'</option>').join('');
  el('newRenewalClient').value=chosen;
+ const producerSelect=el('newRenewalProducer');
+ if(producerSelect){
+  const selectedProducer=producerSelect.value;
+  producerSelect.innerHTML='<option value="">Identificar no PDF ou relatório</option>'+
+   list('producer').sort((a,b)=>String(a.data.name||'').localeCompare(String(b.data.name||''),'pt-BR'))
+    .map(r=>'<option value="'+esc(r.id)+'">'+esc(r.data.name||'Produtor')+'</option>').join('');
+  producerSelect.value=selectedProducer;
+ }
 }
 function priorOptions(preferred=''){
  const rows=contractsFor(el('newRenewalClient').value);
@@ -30,6 +38,8 @@ function priorChanged(){
  el('newRenewalBrokerage').value=[...el('newRenewalBrokerage').options].some(o=>o.value===brokerage)?brokerage:'';
  el('newRenewalNumber').value='';
  el('newRenewalPremium').value='';
+ for(const id of ['newRenewalNetPremium','newRenewalIof','newRenewalCommissionPercent','newRenewalProducer'])
+  if(el(id))el(id).value='';
  el('newRenewalCount').value='0';
  el('newRenewalPdf').value='';
  if(/^\d{4}-\d{2}-\d{2}$/.test(prior.data.end||'')){
