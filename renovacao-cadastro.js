@@ -60,6 +60,13 @@ el('renewalNewForm').onsubmit=async e=>{
  const insurer=el('newRenewalInsurer').value.trim(),branch=el('newRenewalBranch').value.trim();
  const number=el('newRenewalNumber').value.trim(),start=el('newRenewalStart').value,end=el('newRenewalEnd').value;
  const premium=toCents(el('newRenewalPremium').value),count=Number(el('newRenewalCount').value||0);
+ const netText=String(el('newRenewalNetPremium')?.value||'').trim();
+ const iofText=String(el('newRenewalIof')?.value||'').trim();
+ const netPremium=netText?toCents(netText):null,iof=iofText?toCents(iofText):null;
+ const producerId=String(el('newRenewalProducer')?.value||'');
+ const producer=producerId?list('producer').find(r=>r.id===producerId):null;
+ const rateText=String(el('newRenewalCommissionPercent')?.value||'').trim();
+ const commissionPercent=rateText?Number(rateText.replace(',','.')):null;
  const insuredValueText=el('newRenewalInsuredValue').value.trim();
  const insuredValue=insuredValueText?toCents(insuredValueText):0;
  const brokerage=el('newRenewalBrokerage').value,method=el('newRenewalPayment').value.trim();
@@ -76,9 +83,25 @@ el('renewalNewForm').onsubmit=async e=>{
  if(!insurer||!branch||!number||!brokerage)return setMessage('Informe seguradora, ramo, número e corretora.');
  if(!validDate(start)||!validDate(end)||start>end)return setMessage('As datas de início e fim precisam ser válidas.');
  if(!Number.isSafeInteger(premium)||premium<=0)return setMessage('Informe o prêmio total conforme o PDF.');
+ if(netText&&(!Number.isSafeInteger(netPremium)||netPremium<0))
+  return setMessage('Prêmio líquido inválido; preencha somente se confirmado no PDF.');
+ if(iofText&&(!Number.isSafeInteger(iof)||iof<0))
+  return setMessage('IOF inválido; preencha somente se confirmado no PDF.');
+ if(producerId&&!producer)return setMessage('Selecione um produtor cadastrado válido.');
+ if(rateText&&(!Number.isFinite(commissionPercent)||commissionPercent<0||commissionPercent>100))
+  return setMessage('Comissão cheia inválida (0 a 100%).');
+ if(Boolean(producerId)!==Boolean(rateText))
+  return setMessage('Informe produtor e percentual de comissão juntos, conforme o PDF.');
+ if(netPremium!==null&&netPremium>premium)
+  return setMessage('Prêmio líquido maior que prêmio total. Confira o PDF.');
+ if(netPremium!==null&&iof!==null&&netPremium+iof>premium)
+  return setMessage('Prêmio líquido + IOF supera o prêmio total. Confira os adicionais no PDF.');
+
  if(insuredValueText&&(!Number.isSafeInteger(insuredValue)||insuredValue<=0))return setMessage('Valor assegurado/LMI inválido. Deixe vazio se não estiver comprovado.');
  if(!Number.isInteger(count)||count<0||count>72)return setMessage('Quantidade de parcelas inválida.');
  if(!file||!/\.pdf$/i.test(file.name)||file.size<10||file.size>15*1024*1024)return setMessage('Selecione um PDF válido de até 15 MB.');
+ if(/\bendosso\b/i.test(file.name))
+  return setMessage('Arquivo identificado como endosso: vincule ao contrato existente, sem criar nova proposta.');
  // Conferir assinatura PDF, não apenas extensão ou MIME, antes de armazenar.
  let pdfSignature='';
  try{
@@ -125,16 +148,36 @@ el('renewalNewForm').onsubmit=async e=>{
    throw new Error('Este mesmo PDF já foi importado para o cliente por outra sessão.');
   await api('storage-put',file,{raw:true,key,headers:{'content-type':'application/pdf'}});
   uploaded=true;
-  const proposal={clientId,number,insurer,branch,start,end,premium,brokerage,brokerages:brokerage,
-   status:'Importada — verificar emissão',source:'Importação manual de renovação',renewalOf:prior?.id||'',
+  const financialVerified=Boolean(producer&&commissionPercent!==null&&netPremium!==null);
+ const proposal={clientId,number,insurer,branch,start,end,premium,brokerage,brokerages:brokerage,
+   ...(netPremium!==null?{netPremium}:{}),
+   ...(iof!==null?{iof}:{}),
+   ...(producer?{producerId,producerName:producer.data.name}:{}),
+   ...(commissionPercent!==null?{commissionPercent}:{}),
+   commissionSource:producer&&commissionPercent!==null?
+     (globalThis.LebrimeProposalPreview?.producerEvidence?.(file)||'Informado e conferido pelo gestor no formulário'):
+     'Pendente: não identificado no documento',
+   importAuditFields:{
+     netPremium:netPremium!==null?'Conferido no PDF':'Pendente de leitura do prêmio líquido',
+     iof:iof!==null?'Conferido no PDF':'Pendente de leitura do IOF',
+     producer:producer?'Conferido com produtor cadastrado':'Pendente de fonte',
+     commissionPercent:commissionPercent!==null?'Comissão cheia identificada':'Pendente de fonte',
+     documentSource:'PDF original preservado por SHA-256',
+     reviewRequired:!financialVerified||iof===null||count===0
+   },
+   status:'Ativa — proposta cadastrada',source:'Importação assistida de seguro',renewalOf:prior?.id||'',
    importFingerprint,sourcePdfSha256:fileHash,
-   renewalType:prior?'Renovação':'Seguro novo',producerPending:true,
-   producerAssignmentStatus:'Pendente — conferir relatório',commissionPending:true,
+   renewalType:prior?'Renovação':'Seguro novo',producerPending:!producer,
+   producerAssignmentStatus:producer?'Confirmado por fonte indicada na ficha':'Pendente — conferir documento/relatório',
+   commissionPending:!financialVerified,
    insuredValue:insuredValue||0,insuredValuePending:!insuredValue,
    insuredValueSource:insuredValue?'PDF da proposta — valor confirmado pelo gestor':'Pendente',
    insuranceQualityStatus:'A conferir — verificar PDF',
    installmentCount:count,installmentExtractionStatus:'Pendente',paymentMethod:method,
-   paymentDueText:'Conferir vencimentos no PDF'};
+   paymentDueText:'Conferir vencimentos no PDF',
+   sourceFileName:file.name,
+   auditStatus:!financialVerified?'Importado com pendências financeiras':'Importado — conferir todas as coberturas e riscos',
+   processingRuleVersion:'LEBRIME-INGESTAO-V1-20261025'};
   const documentData={clientId,proposalId,policyId:'',contractId:proposalId,name:file.name,originalFileName:file.name,
    documentType:docType,referenceDate:start,storageKey:key,status:'Recebido',mimeType:'application/pdf',
    fileSize:file.size,fileSha256:fileHash,source:'Importação manual da proposta'};
@@ -159,7 +202,9 @@ el('renewalNewForm').onsubmit=async e=>{
   document.dispatchEvent(new CustomEvent('lebrime-renewal-import-success',{
     detail:{clientId,proposalId,documentId,fileSha256:fileHash,importFingerprint}
   }));
-  setMessage('Nova vigência criada no cliente existente. '+finance+' Produtor e comissão pendentes de fonte confirmada.');
+  setMessage('Nova vigência criada na ficha existente. '+finance+
+   (financialVerified?' Produtor e comissão cheia incluídos na importação; confira o registro financeiro.':
+   ' Prêmio líquido, produtor ou comissão pendentes: requer revisão documental.'));
   const button=document.createElement('button');button.type='button';button.className='btn ghost small';
   button.textContent='Abrir ficha atualizada do cliente';
   button.onclick=()=>openClientDetail(clientId);
