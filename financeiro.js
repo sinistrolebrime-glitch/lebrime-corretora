@@ -48,7 +48,9 @@ const FINANCE=(()=>{
     const difference=planDifference(contract);
     // Regra LEBRIME: até R$ 10,00 (1.000 centavos), inclusive, é tolerância aceita.
     // Não ajustar o prêmio nem as parcelas originais; divergências maiores exigem revisão.
-    if(difference!==null&&Math.abs(difference)>1000)return 'Conferir diferença no parcelamento';
+    if(difference!==null&&(globalThis.LebrimeFinancialTolerance
+    ?globalThis.LebrimeFinancialTolerance.compare(0,Math.abs(difference)).reviewRequired
+    :Math.abs(difference)>1000))return 'Conferir diferença no parcelamento';
     if(!Number(d.amount||0))return 'Conferir valor';
     if(!validDate(d.due))return 'Conferir vencimento';
     if(d.due.slice(0,7)<cutoff)return 'Migração a conferir';
