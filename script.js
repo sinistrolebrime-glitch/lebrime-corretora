@@ -165,14 +165,14 @@ async function openInsuranceDocument(insurance){
 
 const isInsuranceActive=insurance=>{
   const status=fold(insurance?.data?.status||'');
-  if(['cancelada','cancelado','recusada','recusado','convertida','convertido','perdida','perdido'].includes(status))return false;
+  if(['cancelada','cancelado'].includes(status))return false;
   return !insurance?.data?.end||insurance.data.end>=today();
 };
 
 const activeInsuranceRows=()=>[...list('proposal'),...list('policy')].filter(isInsuranceActive);
 // Não tratar propostas dentro da vigência como apólices contratadas.
 const isContractInPeriod=row=>insurancePeriodState(row).key==='current'&&
-  !['cancelada','cancelado','recusada','recusado','convertida','convertido','perdida','perdido']
+  !['cancelada','cancelado']
     .includes(fold(row?.data?.status||''));
 const isPolicyInPeriod=row=>row?.kind==='policy'&&isContractInPeriod(row);
 const isProposalInPeriod=row=>row?.kind==='proposal'&&isContractInPeriod(row);
@@ -184,7 +184,7 @@ const portfolioRows=()=>{
   const unique=new Map();
   for(const row of [...list('proposal'),...list('policy')]){
     const status=fold(row.data.status||'');
-    if(['cotacao','orcamento','simulacao','recusada','recusado','cancelada','cancelado','perdida','perdido','convertida','convertido'].includes(status)||
+    if(['cancelada','cancelado'].includes(status)||
       row.data.isDuplicate===true||row.data.duplicateOf)continue;
     const d=row.data;
     const key=d.clientId&&d.insurer&&d.number&&d.start
@@ -863,6 +863,7 @@ async function syncPortoNow(){
 function renderDashboard(){
   const contracts=portfolioRows();
   const inPeriodContracts=contracts.filter(isContractInPeriod);
+  const currentClientCount=new Set(inPeriodContracts.map(r=>String(r.data.clientId||'')).filter(Boolean)).size;
   const expiredContracts=contracts.filter(r=>insurancePeriodState(r).key==='expired');
   const futureContracts=contracts.filter(r=>insurancePeriodState(r).key==='future');
   const undatedContracts=contracts.filter(r=>insurancePeriodState(r).key==='unknown');
@@ -920,23 +921,40 @@ function renderDashboard(){
     return {name,count:items.length,premium:items.reduce((sum,r)=>sum+Number(r.data.premium||0),0)};
   }).filter(r=>r.count>0);
 
+  // Fase 5: mostrar completude calculada dos registros, nunca reaproveitar o
+  // índice histórico 99,12% do lote SegFlex de 09/10/2026 como garantia atual.
   const reliability=list('system_metric').find(r=>r.id==='segflex-reliability-current'||r.data.metricType==='segflex_reliability')?.data||{};
-  const reliabilityPct=Number(reliability.overallReliability||0);
-  const importProgress=Number(reliability.importProgress||0);
-  const cleanImportProgress=Number(reliability.cleanImportProgress||0);
   const sourceTotal=Number(reliability.sourceTotal||0);
   const sourceImported=Number(reliability.sourceImported||0);
   const sourcePendingReview=Number(reliability.sourcePendingReview||0);
   const sourceUnprocessed=Number(reliability.sourceUnprocessed||0);
-  const reliabilityLabel=reliabilityPct>=97?'Alta confiabilidade':reliabilityPct>=90?'Boa confiabilidade':reliabilityPct>=80?'Atenção':'Revisão necessária';
-  const reliabilityTone=reliabilityPct>=97?'high':reliabilityPct>=90?'good':reliabilityPct>=80?'attention':'critical';
+  const importProgress=Number(reliability.importProgress||0);
+  const cleanImportProgress=Number(reliability.cleanImportProgress||0);
+  const liveCount=inPeriodContracts.length;
+  const coveredDocuments=new Set(list('document').filter(documentAvailable)
+    .map(r=>String(r.data.policyId||r.data.proposalId||'')));
+  const coveredInstallments=new Set(list('payment')
+    .map(r=>String(r.data.policyId||r.data.proposalId||'')));
+  const coverageDimensions=[
+    ['Cliente vinculado',inPeriodContracts.filter(r=>rowById(r.data.clientId)?.kind==='client').length],
+    ['Produtor / comissão',inPeriodContracts.filter(r=>rowById(r.data.producerId)?.kind==='producer'&&r.data.commissionPercent!==undefined&&String(r.data.commissionPercent)!=='').length],
+    ['Documento com PDF',inPeriodContracts.filter(r=>coveredDocuments.has(String(r.id))).length],
+    ['Prêmio total',inPeriodContracts.filter(r=>r.data.premium!==undefined&&r.data.premium!==null&&String(r.data.premium)!=='').length],
+    ['IOF',inPeriodContracts.filter(r=>r.data.iof!==undefined&&r.data.iof!==null&&String(r.data.iof)!=='').length],
+    ['Valor assegurado monetário',inPeriodContracts.filter(r=>validatedInsuredCents(r.data.insuredValue)>0).length],
+    ['Parcelamento',inPeriodContracts.filter(r=>coveredInstallments.has(String(r.id))).length]
+  ];
+  const reliabilityPct=liveCount
+    ?coverageDimensions.reduce((sum,field)=>sum+field[1],0)/(liveCount*coverageDimensions.length)*100:0;
+  const reliabilityLabel='Cobertura cadastral, não exatidão documental';
+  const reliabilityTone=reliabilityPct>=97?'good':reliabilityPct>=90?'attention':'critical';
 
   $('#dashboard').innerHTML=`
     <div class="executive-heading">
       <div>
         <span class="section-kicker">Resumo executivo</span>
         <h2>Visão executiva da carteira</h2>
-        <p>Propostas e apólices formam uma única carteira; todo contrato válido contribui para o prêmio.</p>
+        <p>Proposta cadastrada equivale a contrato ativo na LEBRIME enquanto estiver no prazo. Somente cancelamento informado é registrado como cancelado.</p>
       </div>
       <div class="as-of">Posição em ${date(today())}</div>
     </div>
@@ -954,9 +972,14 @@ function renderDashboard(){
       </div>
       <div class="dashboard-main-kpis">
         <div class="dashboard-kpi">
-          <span>Clientes únicos</span>
+          <span>Clientes cadastrados no histórico</span>
           <strong>${list('client').length}</strong>
-          <small>Uma ficha por pessoa ou empresa (CPF/CNPJ)</small>
+          <small>Total de fichas distintas, inclusive com vigência encerrada</small>
+        </div>
+        <div class="dashboard-kpi dashboard-kpi-current">
+          <span>Clientes com seguro em vigência hoje</span>
+          <strong>${currentClientCount}</strong>
+          <small>Clientes distintos com ao menos uma proposta ou apólice dentro da vigência</small>
         </div>
         <div class="dashboard-kpi">
           <span>Total de contratos na carteira</span>
@@ -966,7 +989,7 @@ function renderDashboard(){
         <div class="dashboard-kpi dashboard-kpi-current">
           <span>Contratos em vigência hoje</span>
           <strong>${inPeriodContracts.length} <em>de ${contracts.length}</em></strong>
-          <small>Estão incluídos no total de contratos, não são adicionais</small>
+          <small>Propostas e apólices equivalentes; vigência encerrada não é cancelamento</small>
         </div>
       </div>
       <div class="dashboard-relationship">
@@ -988,11 +1011,11 @@ function renderDashboard(){
       </div>
       ${missingPortfolioPremium?'<p class="dashboard-caution">'+missingPortfolioPremium+' contrato(s) sem prêmio total confirmado ainda não contribuem para esses valores.</p>':''}
       <div class="dashboard-insured-title">
-        <span>Valor Total Assegurado <small>FIPE 2026 e valores segurados dos contratos</small></span>
+        <span>Valor assegurado de referência <small>FIPE 2026, estimativas e valores documentais (não é indenização fixa garantida)</small></span>
       </div>
       <div class="dashboard-premium-pair dashboard-insured-pair">
         <div><span>Carteira em vigência — valor total assegurado</span><strong>${currentInsuredAmount+currentEstimatedAmount?money(currentInsuredAmount+currentEstimatedAmount):'A apurar'}</strong>
-          <small>${currentTotalValued} de ${currentValuations.length} contratos avaliados; inclui valores FIPE aproximados quando necessário</small></div>
+          <small>${currentTotalValued} de ${currentValuations.length} contratos com referência; pode conter estimativas FIPE, valores de mercado e LMI distintos</small></div>
         <div><span>Histórico de vigências — valor total registrado</span><strong>${historicalValuedTotal?money(historicalValuedTotal):'A apurar'}</strong>
           <small>${valuedContracts.filter(x=>x.priced).length} contratos avaliados; o histórico pode incluir renovações do mesmo bem</small></div>
       </div>
@@ -1002,8 +1025,8 @@ function renderDashboard(){
     <section class="dashboard-topic" aria-labelledby="heading-importacao">
       <div class="dashboard-topic-heading">
         <div><span class="section-kicker">02 / Importação de documentos</span>
-          <h3 id="heading-importacao">SegFlex — andamento dos PDFs</h3>
-          <p>Este grupo conta arquivos analisados, não pessoas nem contratos novos.</p>
+          <h3 id="heading-importacao">SegFlex — processamento histórico do lote 960</h3>
+          <p>Visão do lote antigo de 960 PDFs, medida em 09/10/2026. Não representa os 1.044 documentos atualmente cadastrados.</p>
         </div>
         <button type="button" class="btn ghost small" data-go="imports">Ver documentos</button>
       </div>
@@ -1031,13 +1054,13 @@ function renderDashboard(){
         </div>
         <div class="finance-summary-grid">
           <div><span>Comissão bruta</span><strong>${money(gross)}</strong></div>
-          <div><span>Recebida</span><strong>${money(received)}</strong></div>
+          <div><span>Recebida por registro de importação</span><strong>${money(received)}</strong></div>
           <div><span>Taxa FF</span><strong>${money(ff)}</strong></div>
           <div><span>Produtores</span><strong>${money(producerExpected)}</strong></div>
           <div><span>Líquido Lebrime</span><strong>${money(lebrimeNet)}</strong></div>
-          <div><span>Pago a produtores</span><strong>${money(paid)}</strong></div>
+          <div><span>Pago a produtores (regra interna)</span><strong>${money(paid)}</strong></div>
         </div>
-        <p class="muted" style="margin:12px 0 0;font-size:12px">Repasses aos produtores considerados pagos automaticamente nos contratos cadastrados com comissão definida.</p>
+        <p class="muted" style="margin:12px 0 0;font-size:12px">Repasses são considerados pagos por regra interna da LEBRIME após cadastro da proposta; não representam extrato bancário conciliado.</p>
     </section>
 
     <div class="dashboard-topic-heading dashboard-operations-heading">
@@ -1071,7 +1094,7 @@ function renderDashboard(){
     <div class="dashboard-grid corporate-grid">
       <div class="panel reliability-panel">
         <div class="panel-head corporate-panel-head">
-          <div><span class="section-kicker">Qualidade dos dados</span><h2>Confiabilidade das informações</h2></div>
+          <div><span class="section-kicker">Qualidade dos dados</span><h2>Cobertura cadastral dos seguros vigentes</h2></div>
           <span class="reliability-badge ${reliabilityTone}">${reliabilityPct?reliabilityPct.toFixed(2)+'%':'—'}</span>
         </div>
         <div class="reliability-layout">
@@ -1087,22 +1110,17 @@ function renderDashboard(){
             </div>
           </div>
           <div class="reliability-dimensions">
-            ${[
-              ['Identidade',reliability.identityReliability],
-              ['Documentos',reliability.documentReliability],
-              ['Contratos',reliability.contractReliability],
-              ['Financeiro',reliability.financialReliability],
-              ['Vínculos',reliability.linkageReliability]
-            ].map(([label,value])=>{
-              const v=Number(value||0);
+            ${coverageDimensions.map(([label,count])=>{
+              const v=liveCount?100*count/liveCount:0;
               return `<div class="reliability-dimension"><span>${esc(label)}</span><strong>${v?v.toFixed(2)+'%':'—'}</strong><div><i style="width:${Math.max(0,Math.min(100,v))}%"></i></div></div>`;
             }).join('')}
           </div>
         </div>
         <div class="reliability-foot">
-          <span>Importação limpa: <strong>${sourceTotal?cleanImportProgress.toFixed(2)+'%':'—'}</strong></span>
-          <span>Duplicidades: <strong>${Number(reliability.duplicateClients||0)+Number(reliability.duplicateDocuments||0)+Number(reliability.duplicateInsuranceSources||0)+Number(reliability.duplicatePaymentGroups||0)}</strong></span>
-          <span>Registros avaliados: <strong>${Number(reliability.insuranceRecords||0)}</strong></span>
+          <span>Apuração: <strong>carteira vigente, em tempo real</strong></span>
+          <span>Critérios: <strong>7 campos por contrato</strong></span>
+          <span>Contratos avaliados: <strong>${liveCount}</strong></span>
+          <span>Atenção: <strong>não é índice de acerto financeiro ou comprovação dos PDFs</strong></span>
         </div>
       </div>
 
