@@ -2759,6 +2759,34 @@ function openInsuranceDetail(insuranceId){
     <div class="detail-row"><div><strong>${esc(r.data.number||'Sinistro')}</strong><span>${r.data.incidentDate?date(r.data.incidentDate):'Data não informada'} · ${esc(r.data.claimType||'Sinistro')}</span></div><span class="status-pill corporate-status ${statusTone(r.data.status)}">${esc(r.data.status||'—')}</span></div>
   `).join(''):'<div class="empty compact">Nenhum sinistro vinculado.</div>';
 
+  const diffAudit=globalThis.LebrimeFinancialTolerance;
+  const financialParts=insurance.data||{};
+  const hasFinanceDetails=[financialParts.premium,financialParts.netPremium,financialParts.iof]
+    .every(x=>x!==null&&x!==undefined&&String(x)!=='');
+  const extraValue=Number(financialParts.financeCharges||financialParts.premiumAdditionalCharge||0);
+  const premiumDiff=hasFinanceDetails&&diffAudit
+    ?diffAudit.compare(Number(financialParts.premium),
+       Number(financialParts.netPremium)+Number(financialParts.iof)+extraValue):null;
+  const planValues=Array.isArray(financialParts.installmentPlan)?financialParts.installmentPlan:null;
+  const installmentDiff=planValues?.length&&diffAudit
+    ?diffAudit.parts(Number(financialParts.premium),planValues.map(x=>Number(x.amount))):null;
+  const toleranceDetails=[
+    ...(premiumDiff&&premiumDiff.absDifferenceCents>0?[{
+      text:premiumDiff.accepted?'Diferença de prêmio tolerada':'Diferença de prêmio a conferir',
+      value:premiumDiff.absDifferenceCents
+    }]:[]),
+    ...(installmentDiff&&installmentDiff.absDifferenceCents>0?[{
+      text:installmentDiff.accepted?'Diferença de parcelas tolerada':'Diferença de parcelas a conferir',
+      value:installmentDiff.absDifferenceCents
+    }]:[]),
+    ...(financialParts.financialDifferenceAccepted===true&&Number(financialParts.financialDifferenceCents||0)>0?[{
+      text:'Diferença documental anteriormente aceita',value:Math.abs(Number(financialParts.financialDifferenceCents))
+    }]:[])
+  ];
+  const toleranceDetailsHtml=toleranceDetails.length
+    ?'<div class="rule-callout"><strong>Conciliação financeira · tolerância R$ 10,00</strong><span>'+
+     toleranceDetails.map(a=>esc(a.text)+': '+money(a.value)).join(' · ')+
+     '. Valores originais preservados.</span></div>':'';
   $('#insuranceDetailTitle').textContent=`Contrato ${insurance.data.number||'sem número'}`;
   $('#insuranceDetailBody').innerHTML=`
     <div class="contract-hero">
@@ -2766,6 +2794,7 @@ function openInsuranceDetail(insuranceId){
       <span class="status-pill corporate-status ${statusTone(insurance.data.status)}">${esc(insurance.data.status||'Cadastrado')}</span>
     </div>
     ${insurance.kind==='proposal'&&insurance.data.producerPending&&!insurance.data.producerId?`<div class="rule-callout producer-pending-callout"><strong>Produtor pendente</strong><span>Proposta importada da Porto sem produtor. O produtor deve ser definido manualmente antes do cálculo da comissão.</span></div>`:''}
+    ${toleranceDetailsHtml}
     <div class="contract-summary-grid">
       <div><span>Cliente</span><strong>${esc(client.name||'—')}</strong></div>
       <div><span>CPF/CNPJ</span><strong>${esc(client.document||'—')}</strong></div>
