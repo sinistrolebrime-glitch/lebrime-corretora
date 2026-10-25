@@ -23,9 +23,14 @@ let analyzed=null,activeFile=null,generation=0;
 function warning(msg){status.textContent=msg;}
 function forget(){
  generation++;analyzed=null;activeFile=null;view.hidden=true;view.innerHTML='';
- warning('Selecione o PDF e clique em "Ler PDF e mostrar prévia". Nenhum dado é salvo nesta etapa.');
+ warning('Ao selecionar um PDF, a leitura inicial começa automaticamente. Nenhum dado é salvo antes da conferência.');
 }
-pdf.addEventListener('change',forget);
+pdf.addEventListener('change',()=>{
+ // O PDF entra na engrenagem de leitura assim que for selecionado.
+ // A prévia nunca salva contrato, cobra parcela ou confirma um campo não comprovado.
+ forget();
+ if(pdf.files?.[0])queueMicrotask(()=>previewButton.click());
+});
 function linkedClient(fields){
  const documentId=digits(fields?.insuredDocument?.value);
  if(![11,14].includes(documentId.length))return null;
@@ -107,7 +112,7 @@ previewButton.onclick=async()=>{
   if(!data?.preview||data.requiresConfirmation!==true||data.stored!==false)
    throw new Error('Resposta de prévia inválida.');
   analyzed=data.preview;render(analyzed);
-  warning('Prévia carregada. Revise todos os campos e aplique somente os valores confirmados.');
+  warning('Leitura automática concluída. Revise todos os campos e aplique somente os valores confirmados.');
  }catch(e){
   if(seq===generation)warning('Falha na prévia: '+String(e.message||e));
  }finally{previewButton.disabled=false;}
