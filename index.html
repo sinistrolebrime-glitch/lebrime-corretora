@@ -12,24 +12,6 @@
   </script>
   <link rel="stylesheet" href="styles.css?v=20.64">
 
-  <style>
-    .historical-review-panel{max-width:1100px;margin:0 auto}
-    .historical-toolbar{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
-    .historical-toolbar label{flex:1 1 220px;display:grid;gap:6px}
-    .historical-row{border:1px solid var(--border,#d9d9d9);border-radius:12px;padding:16px;margin:12px 0;background:var(--surface,#fff)}
-    .historical-row-head,.historical-actions,.historical-pagination{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
-    .historical-row-head{margin-bottom:14px}
-    .historical-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .historical-fields label{display:grid;gap:6px;min-width:0}
-    .historical-fields input,.historical-fields select{width:100%;min-width:0}
-    .historical-file-label{grid-column:1/-1;border:1px dashed var(--border,#b5b5b5);border-radius:10px;padding:10px}
-    .historical-file-label small{display:block;font-size:12px;color:var(--muted,#666)}
-    .historical-actions{margin-top:14px;align-items:center}
-    .historical-actions .muted{flex:1 1 240px}
-    .historical-result{margin-top:8px;font-size:13px}
-    .historical-pagination{margin:16px 0}
-    @media(max-width:660px){.historical-fields{grid-template-columns:1fr}}
-  </style>
 </head>
 <body>
   <div id="loadingView" class="auth-shell" role="status" aria-live="polite">
@@ -173,8 +155,6 @@
           <div id="uploadStatus" class="status"></div>
         </div>
       </section>
-
-      <section id="historicReviewView" class="view hidden"></section>
       <section id="integrationView" class="view hidden"></section>
     </main>
   </div>
@@ -259,6 +239,5 @@
   <script src="gerencial-ficha-abas.js?v=20.64"></script>
   <script src="qualidade-carteira.js?v=20.71"></script>
   <script src="central-conferencia.js?v=20.64"></script>
-  <script src="pendencias-produtores.js?v=20.72"></script>
 </body>
 </html>
