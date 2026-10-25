@@ -38,7 +38,7 @@ function priorChanged(){
  el('newRenewalBrokerage').value=[...el('newRenewalBrokerage').options].some(o=>o.value===brokerage)?brokerage:'';
  el('newRenewalNumber').value='';
  el('newRenewalPremium').value='';
- for(const id of ['newRenewalNetPremium','newRenewalIof','newRenewalCommissionPercent','newRenewalProducer'])
+ for(const id of ['newRenewalNetPremium','newRenewalIof','newRenewalFinanceCharges','newRenewalCommissionPercent','newRenewalProducer'])
   if(el(id))el(id).value='';
  el('newRenewalCount').value='0';
  el('newRenewalPdf').value='';
@@ -73,6 +73,8 @@ el('renewalNewForm').onsubmit=async e=>{
  const netText=String(el('newRenewalNetPremium')?.value||'').trim();
  const iofText=String(el('newRenewalIof')?.value||'').trim();
  const netPremium=netText?toCents(netText):null,iof=iofText?toCents(iofText):null;
+  const chargeText=String(el('newRenewalFinanceCharges')?.value||'').trim();
+  const financeCharges=chargeText?toCents(chargeText):null;
  const producerId=String(el('newRenewalProducer')?.value||'');
  const producer=producerId?list('producer').find(r=>r.id===producerId):null;
  const rateText=String(el('newRenewalCommissionPercent')?.value||'').trim();
@@ -102,10 +104,13 @@ el('renewalNewForm').onsubmit=async e=>{
   return setMessage('Comissão cheia inválida (0 a 100%).');
  if(Boolean(producerId)!==Boolean(rateText))
   return setMessage('Informe produtor e percentual de comissão juntos, conforme o PDF.');
- if(netPremium!==null&&netPremium>premium)
-  return setMessage('Prêmio líquido maior que prêmio total. Confira o PDF.');
- if(netPremium!==null&&iof!==null&&netPremium+iof>premium)
-  return setMessage('Prêmio líquido + IOF supera o prêmio total. Confira os adicionais no PDF.');
+ if(chargeText&&(!Number.isSafeInteger(financeCharges)||financeCharges<0))
+  return setMessage('Juros/adicionais inválidos; informe somente o valor do PDF.');
+ const reconcile=netPremium!==null&&iof!==null
+   ?globalThis.LebrimeFinancialTolerance?.compare(premium,netPremium+iof+(financeCharges||0))
+   :null;
+ if(reconcile?.reviewRequired)
+  return setMessage('Diferença acima de R$ 10,00 entre prêmio total e líquido + IOF + adicionais. Confira no PDF e registre os encargos documentados antes de cadastrar.');
 
  if(insuredValueText&&(!Number.isSafeInteger(insuredValue)||insuredValue<=0))return setMessage('Valor assegurado/LMI inválido. Deixe vazio se não estiver comprovado.');
  if(!Number.isInteger(count)||count<0||count>72)return setMessage('Quantidade de parcelas inválida.');
@@ -162,6 +167,12 @@ el('renewalNewForm').onsubmit=async e=>{
  const proposal={clientId,number,insurer,branch,start,end,premium,brokerage,brokerages:brokerage,
    ...(netPremium!==null?{netPremium}:{}),
    ...(iof!==null?{iof}:{}),
+   ...(financeCharges!==null?{financeCharges}:{}),
+   ...(reconcile?{financialReconciliation:{
+     status:reconcile.status,differenceCents:reconcile.deltaCents,
+     accepted:reconcile.accepted,toleranceCents:reconcile.toleranceCents,
+     evidence:'Prêmio total comparado com líquido + IOF + adicionais documentados'
+   }}:{}),
    ...(producer?{producerId,producerName:producer.data.name}:{}),
    ...(commissionPercent!==null?{commissionPercent}:{}),
    commissionSource:producer&&commissionPercent!==null?
