@@ -17,7 +17,10 @@ const formatCents=cents=>(Number(cents||0)/100).toLocaleString('pt-BR',{minimumF
 const labels={
  insuredDocument:'CPF/CNPJ',insuredName:'Segurado',insurer:'Seguradora',branch:'Ramo',
  number:'Proposta / apólice',start:'Início da vigência',end:'Fim da vigência',
- premium:'Prêmio total',insuredValue:'Valor assegurado/LMI'
+ premium:'Prêmio total',netPremium:'Prêmio líquido',iof:'IOF',
+ financeCharges:'Juros/encargos',insuredValue:'Valor assegurado/LMI',
+ producerName:'Produtor (documento)',commissionPercent:'Comissão cheia (%)',
+ paymentMethod:'Forma de pagamento',brokerage:'Corretora',fipePercent:'Percentual FIPE (%)'
 };
 let analyzed=null,activeFile=null,generation=0;
 const foldName=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -74,7 +77,8 @@ function render(result){
  const documentConflict=selectedClient&&documentId&&digits(selectedClient.data?.document)!==documentId;
  const fields=Object.entries(labels).map(([key,label])=>{
   const r=values[key],value=r?
-    (['premium','insuredValue'].includes(key)?money(r.value):String(r.value)):'Não identificado';
+    (['premium','netPremium','iof','financeCharges','insuredValue'].includes(key)?money(r.value):
+     (['commissionPercent','fipePercent'].includes(key)?String(r.value).replace('.',',')+'%':String(r.value))):'Não identificado';
   return '<div class="pdf-preview-field"><strong>'+clean(label)+'</strong><span>'+clean(value)+'</span>'+
    (r?'<small>Página '+Number(r.page)+' · '+clean(r.evidence)+'</small>':'<small>Preenchimento manual necessário</small>')+'</div>';
  }).join('');
@@ -91,6 +95,17 @@ function render(result){
   clean(installments[installments.length-1].estimatedDue.split('-').reverse().join('/'))+
   '. Meses/anos projetados, não são vencimentos confirmados nem liberam cobrança.</p>':'')+
   '</div>';
+ const coverages=Array.isArray(result.coverages)?result.coverages:[];
+ const risks=Array.isArray(result.risks)?result.risks:[];
+ const documentDetails='<div class="pdf-preview-summary">'+
+  '<strong>Itens e coberturas encontrados (verificar limites no PDF)</strong>'+
+  '<p>'+coverages.length+' linhas de cobertura/franquia e '+risks.length+' itens de risco identificados.</p>'+
+  (coverages.length?'<details><summary>Ver trechos de coberturas</summary><ul>'+
+   coverages.slice(0,35).map(c=>'<li>Página '+Number(c.page)+': '+clean(c.evidence||c.description||'')+'</li>').join('')+
+   '</ul></details>':'')+
+  (risks.length?'<details><summary>Ver itens/placas/chassis</summary><ul>'+
+   risks.slice(0,35).map(c=>'<li>Página '+Number(c.page)+': '+clean(c.evidence||'')+'</li>').join('')+
+   '</ul></details>':'')+'</div>';
  const cautions=[...result.warnings||[]];
  const hint=producerFromFilename(activeFile);
  if(hint){
@@ -112,7 +127,7 @@ function render(result){
  if(!client)cautions.unshift('Selecione e confira manualmente o cliente correto na carteira.');
  view.innerHTML='<h3>Prévia — '+Number(result.recognized||0)+' campo(s) localizados</h3>'+
   '<p class="muted">Somente campos com rótulo explícito são sugeridos. Confira diretamente no PDF antes de aplicar.</p>'+
-  '<div class="pdf-preview-fields">'+fields+'</div>'+summary+
+  '<div class="pdf-preview-fields">'+fields+'</div>'+summary+documentDetails+
   '<ul class="pdf-preview-notes">'+cautions.map(x=>'<li>'+clean(x)+'</li>').join('')+'</ul>'+
   '<button type="button" class="btn primary" id="newRenewalApplyPreview"'+
   (documentConflict?' disabled title="Cliente divergente"':'')+'>Aplicar campos conferidos ao formulário</button>';
@@ -136,7 +151,22 @@ function render(result){
    if(current[field]?.value)el(id).value=String(current[field].value);
   }
   if(Number(current.premium?.value)>0)el('newRenewalPremium').value=formatCents(current.premium.value);
+  if(Number.isSafeInteger(Number(current.netPremium?.value))&&Number(current.netPremium?.value)>0)
+   el('newRenewalNetPremium').value=formatCents(current.netPremium.value);
+  if(Number.isSafeInteger(Number(current.iof?.value))&&Number(current.iof?.value)>=0)
+   el('newRenewalIof').value=formatCents(current.iof.value);
   if(Number(current.insuredValue?.value)>0)el('newRenewalInsuredValue').value=formatCents(current.insuredValue.value);
+  // Só aplicar o produtor/percentual se estiverem explícitos e sem conflito com a anotação do nome.
+  const fileHint=producerFromFilename(activeFile);
+  const pct=Number(current.commissionPercent?.value);
+  const pctInput=el('newRenewalCommissionPercent');
+  if(pct>0&&pct<=100&&(!fileHint||Number(fileHint.commissionPercent)===pct))
+   pctInput.value=String(pct).replace('.',',');
+  const producerText=String(current.producerName?.value||'').trim();
+  const matches=list('producer').filter(p=>foldName(p.data.name)===foldName(producerText));
+  if(matches.length===1&&(!fileHint||fileHint.producerId===matches[0].id))
+   el('newRenewalProducer').value=matches[0].id;
+  if(current.paymentMethod?.value)el('newRenewalPayment').value=String(current.paymentMethod.value);
   // Só sugerir quantidade de parcelas quando todas as datas e soma foram conciliadas.
   if(verified&&installments.length>0)el('newRenewalCount').value=String(installments.length);
   warning('Campos sugeridos aplicados. Confira PDF, cliente, vigência, prêmio, LMI e parcelas antes de cadastrar.');
