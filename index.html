@@ -46,7 +46,7 @@
             <strong>Portal Lebrime</strong>
             <span>Corretora de Seguros</span>
           </div>
-          <small class="version-badge">v20.65</small>
+          <small class="version-badge">v20.66</small>
         </div>
 
         <div class="portal-search">
@@ -111,12 +111,16 @@
             <label>Início da nova vigência<input id="newRenewalStart" type="date" required></label>
             <label>Fim da nova vigência<input id="newRenewalEnd" type="date" required></label>
             <label>Prêmio total (R$)<input id="newRenewalPremium" placeholder="0,00" required></label>
+            <label>Prêmio líquido (R$) — conforme PDF<input id="newRenewalNetPremium" inputmode="decimal" placeholder="A conferir"></label>
+            <label>IOF (R$) — conforme PDF<input id="newRenewalIof" inputmode="decimal" placeholder="A conferir"></label>
+            <label>Produtor identificado<select id="newRenewalProducer"><option value="">Identificar no PDF ou relatório</option></select></label>
+            <label>Comissão cheia (%)<input id="newRenewalCommissionPercent" inputmode="decimal" placeholder="Ex.: 20 ou 22,84"></label>
             <label>Valor assegurado / LMI total (R$) — se confirmado<input id="newRenewalInsuredValue" inputmode="decimal" placeholder="A conferir"></label>
             <label>Quantidade de parcelas<input id="newRenewalCount" type="number" min="0" max="72" value="0"></label>
             <label>Forma de pagamento<input id="newRenewalPayment" placeholder="Boleto, débito, cartão..."></label>
             <label>PDF da nova proposta<input id="newRenewalPdf" type="file" accept=".pdf,application/pdf" required></label>
             <div class="span-2" id="newRenewalPreviewPanel">
-              <button type="button" class="btn ghost" id="newRenewalPreviewButton">Ler PDF e mostrar prévia</button>
+              <button type="button" class="btn ghost" id="newRenewalPreviewButton">Repetir leitura do PDF</button>
               <p id="newRenewalPreviewStatus" class="muted" role="status" aria-live="polite">A análise não salva o arquivo. Confira os dados sugeridos antes de cadastrar.</p>
               <div id="newRenewalPreviewResults" hidden></div>
             </div>
@@ -223,8 +227,8 @@
   <script src="script.js?v=20.65"></script>
   <script src="financeiro-ui.js?v=20.64"></script>
   <script src="role-bridge.js?v=20.64"></script>
-  <script src="renovacao-cadastro.js?v=20.64"></script>
-  <script src="renovacao-previa.js?v=20.64"></script>
+  <script src="renovacao-cadastro.js?v=20.66"></script>
+  <script src="renovacao-previa.js?v=20.66"></script>
   <script src="importacao-lote.js?v=20.64"></script>
   <script src="continuidade-importacao.js?v=20.64"></script>
   <script src="import-queue-monitor.js?v=20.64"></script>
