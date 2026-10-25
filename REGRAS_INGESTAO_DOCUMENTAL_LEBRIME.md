@@ -94,3 +94,12 @@ Informar em linguagem objetiva: arquivo, cliente vinculado, tipo e período do c
 - **Pasta privada de entrada monitorada:** [LEBRIME - ENTRADA AUTOMATICA DE PDFS](https://drive.google.com/drive/folders/16VUcau6FlvVvE2wknf8dTKomxRoNoVRU), sob o Drive privado do sistema. É o único diretório de entrada do monitor agendado, não todas as pastas do usuário.
 - **Verificação de entrada do Drive:** tarefa recorrente a cada **uma hora**, usando os conectores Google Drive e Supabase disponíveis na execução; compara ID do arquivo e registros/checkpoints para evitar repetição, analisa PDFs novos, vincula somente quando os campos forem comprovados e notifica pendências. **Não é webhook instantâneo**, e seu primeiro processamento real ainda depende da execução agendada/validação.
 - **Limites declarados:** arquivos digitalizados sem texto selecionável ainda requerem OCR autorizado ou revisão humana; PDF com mais de 100 páginas requer divisão/revisão; registros com conflito nunca são completados automaticamente. O monitor depende do conector Drive e acesso ao Supabase em cada execução; se falhar, sinalizar necessidade de intervenção sem declarar importação concluída.
+
+### Tolerância financeira permanente — 25/10/2026
+
+**Até R$ 10,00 (inclusive) de diferença financeira de conciliação é aceito sem pendência por essa diferença.** Isso inclui prêmio total versus prêmio líquido + IOF + adicionais documentados e soma das parcelas versus prêmio total, aplicando sempre centavos inteiros e valor absoluto do saldo. R$ 9,99 e R$ 10,00 são tolerados; R$ 10,01 exige revisão. Essa regra não justifica ausência de comprovante, vencimento, cliente, produtor ou valor. **Não alterar o prêmio, parcelas ou IOF do documento para forçar conciliação.**
+
+- Função compartilhada no frontend: `tolerancia-financeira.js`.
+- Validação SQL: `public.lebrime_financial_difference(valor_esperado_centavos, valor_encontrado_centavos)`.
+- Leitura de PDFs: `lebrime-api` com `financialReconciliation`, sem alertas financeiros para diferenças toleradas.
+- Aplicação: prévia, nova vigência, cobrança/parcelas, detalhes dos contratos e relatórios de auditoria.
