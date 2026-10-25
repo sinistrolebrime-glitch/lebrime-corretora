@@ -40,10 +40,24 @@ function forget(){
  warning('Ao selecionar um PDF, a leitura inicial começa automaticamente. Nenhum dado é salvo antes da conferência.');
 }
 pdf.addEventListener('change',()=>{
- // O PDF entra na engrenagem de leitura assim que for selecionado.
- // A prévia nunca salva contrato, cobra parcela ou confirma um campo não comprovado.
+ // Nunca reutilizar produtor, IOF ou prêmio líquido extraídos de PDF anterior.
+ // A prévia não cria contrato, cobrança, comissão ou vigência sem confirmação.
  forget();
- if(pdf.files?.[0])queueMicrotask(()=>previewButton.click());
+ const file=pdf.files?.[0];
+ for(const id of ['newRenewalNetPremium','newRenewalIof','newRenewalProducer','newRenewalCommissionPercent']){
+  const input=el(id);if(input)input.value='';
+ }
+ if(!file)return;
+ // O cabeçalho do nome do arquivo pode ser aproveitado mesmo quando o PDF for digitalizado.
+ const hint=producerFromFilename(file);
+ if(hint){
+  const prod=el('newRenewalProducer'),pct=el('newRenewalCommissionPercent');
+  if(prod)prod.value=hint.producerId;
+  if(pct)pct.value=String(hint.commissionPercent).replace('.',',');
+  warning('Comissão cheia identificada no nome do arquivo: '+hint.producerName+
+   ' '+String(hint.commissionPercent).replace('.',',')+'%. Lendo o PDF e aguardando conferência...');
+ }
+ queueMicrotask(()=>previewButton.click());
 });
 function linkedClient(fields){
  const documentId=digits(fields?.insuredDocument?.value);
