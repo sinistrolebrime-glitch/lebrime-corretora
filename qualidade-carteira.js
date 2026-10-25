@@ -21,7 +21,28 @@ function coverage(clients,contracts,documents,payments){
   Boolean(c.data?.producerId||c.data?.producer));
  const paymentDates=payments.filter(p=>isoDate(p.data?.due));
  const mismatched=contracts.filter(c=>c.data?.clientId&&!clientIds.has(String(c.data.clientId)));
+ const tol=globalThis.LebrimeFinancialTolerance;
+ const audits={premiumTested:0,premiumTolerated:0,premiumNeedsReview:0,installmentsTested:0,installmentsTolerated:0,installmentsNeedsReview:0};
+ if(tol)for(const contract of contracts){
+  const d=contract.data||{},premium=Number(d.premium),net=Number(d.netPremium),iof=Number(d.iof),extra=Number(d.financeCharges||d.premiumAdditionalCharge||0);
+  if([d.premium,d.netPremium,d.iof].every(x=>x!==null&&x!==undefined&&String(x)!=='')&&
+    [premium,net,iof,extra].every(Number.isSafeInteger)){
+    const result=tol.compare(premium,net+iof+extra);
+    audits.premiumTested++;
+    if(result.accepted&&result.absDifferenceCents>0)audits.premiumTolerated++;
+    if(result.reviewRequired)audits.premiumNeedsReview++;
+  }
+  if(Array.isArray(d.installmentPlan)&&d.installmentPlan.length&&d.premium!==undefined&&d.premium!==null){
+    const result=tol.parts(premium,d.installmentPlan.map(x=>Number(x.amount)));
+    if(result.absDifferenceCents!==null){
+      audits.installmentsTested++;
+      if(result.accepted&&result.absDifferenceCents>0)audits.installmentsTolerated++;
+      if(result.reviewRequired)audits.installmentsNeedsReview++;
+    }
+  }
+ }
  return {
+  audits,
   stats:[
    {id:'client',label:'Clientes com CPF/CNPJ informado',value:clientDocuments.length,total:clients.length},
    {id:'period',label:'Contratos com vigências válidas',value:endDate.length,total:contracts.length},
@@ -48,6 +69,12 @@ function renderQuality(){
      '<div class="quality-track"><div class="quality-fill" style="width:'+pct+'%"></div></div></div>';
    }).join('')+'</div>'+
    (values.missingClient?'<p class="muted">Atenção: '+values.missingClient+' contrato(s) apontam para cliente não localizado.</p>':'')+
+   '<p class="muted"><strong>Conciliação financeira (tolerância até R$ 10,00):</strong> '+
+   values.audits.premiumTested+' prêmios com valores suficientes: '+values.audits.premiumTolerated+
+   ' diferenças toleradas, '+values.audits.premiumNeedsReview+' acima de R$ 10,00. '+
+   values.audits.installmentsTested+' planos de parcelas com valores suficientes: '+
+   values.audits.installmentsTolerated+' diferenças toleradas e '+
+   values.audits.installmentsNeedsReview+' acima de R$ 10,00. Não altera valores documentais.</p>'+
    '</section>';
  root.insertAdjacentHTML('beforeend',html);
 }
