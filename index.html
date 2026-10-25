@@ -46,7 +46,7 @@
             <strong>Portal Lebrime</strong>
             <span>Corretora de Seguros</span>
           </div>
-          <small class="version-badge">v20.69</small>
+          <small class="version-badge">v20.70</small>
         </div>
 
         <div class="portal-search">
@@ -113,6 +113,8 @@
             <label>Prêmio total (R$)<input id="newRenewalPremium" placeholder="0,00" required></label>
             <label>Prêmio líquido (R$) — conforme PDF<input id="newRenewalNetPremium" inputmode="decimal" placeholder="A conferir"></label>
             <label>IOF (R$) — conforme PDF<input id="newRenewalIof" inputmode="decimal" placeholder="A conferir"></label>
+            <label>Juros/adicionais documentados (R$)<input id="newRenewalFinanceCharges" inputmode="decimal" placeholder="Se houver"></label>
+            <p class="muted">Diferenças de conciliação até R$ 10,00 são toleradas. Acima desse limite, confira o PDF antes de salvar.</p>
             <label>Produtor identificado<select id="newRenewalProducer"><option value="">Identificar no PDF ou relatório</option></select></label>
             <label>Comissão cheia (%)<input id="newRenewalCommissionPercent" inputmode="decimal" placeholder="Ex.: 20 ou 22,84"></label>
             <label>Valor assegurado / LMI total (R$) — se confirmado<input id="newRenewalInsuredValue" inputmode="decimal" placeholder="A conferir"></label>
@@ -222,13 +224,14 @@
     </form>
   </dialog>
 
-  <script src="financeiro.js?v=20.64"></script>
+  <script src="tolerancia-financeira.js?v=20.70"></script>
+  <script src="financeiro.js?v=20.70"></script>
   <script src="relatorios-pdf.js?v=20.64"></script>
-  <script src="script.js?v=20.68"></script>
+  <script src="script.js?v=20.70"></script>
   <script src="financeiro-ui.js?v=20.64"></script>
   <script src="role-bridge.js?v=20.64"></script>
-  <script src="renovacao-cadastro.js?v=20.68"></script>
-  <script src="renovacao-previa.js?v=20.69"></script>
+  <script src="renovacao-cadastro.js?v=20.70"></script>
+  <script src="renovacao-previa.js?v=20.70"></script>
   <script src="importacao-lote.js?v=20.64"></script>
   <script src="continuidade-importacao.js?v=20.64"></script>
   <script src="import-queue-monitor.js?v=20.64"></script>
