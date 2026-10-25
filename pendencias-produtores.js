@@ -23,7 +23,7 @@
     return (records||[]).filter(r=>
       (r.kind==='proposal'||r.kind==='policy') &&
       r.data?.sourceSystem==='SegFlex' &&
-      r.data?.producerPending===true || false
+      String(r.data?.producerPending)==='true'
     ).filter(r=>!r.data?.producerId && clients.has(r.data?.clientId))
     .map(r=>({...r,client:clients.get(r.data.clientId)}))
     .sort((a,b)=>nameOf(a.client).localeCompare(nameOf(b.client),'pt-BR')||a.id.localeCompare(b.id));
