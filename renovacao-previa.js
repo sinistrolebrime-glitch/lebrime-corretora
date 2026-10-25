@@ -20,6 +20,20 @@ const labels={
  premium:'Prêmio total',insuredValue:'Valor assegurado/LMI'
 };
 let analyzed=null,activeFile=null,generation=0;
+const foldName=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function producerFromFilename(file){
+ const name=String(file?.name||'');
+ const stem=name.replace(/\.pdf$/i,'').replace(/\s*\(\d+\)\s*$/,'').replace(/[_\s-]+$/,'');
+ // Somente anotação explícita após o nome do segurado. Siglas ambíguas não são inferidas.
+ const match=stem.match(/(?:^|[\s_–-])(leandro|leonardo|clovis|cl|romulo|rômulo|higo|waldemiro|angelo|ângelo|joao|joão)\s*[\s_:–-]+\s*(\d{1,2}(?:[.,]\d{1,2})?)\s*%?\s*$/i);
+ if(!match)return null;
+ const alias=foldName(match[1]);
+ const producerName=alias==='cl'?'clovis':alias==='joao'?'joao albano':alias;
+ const choices=list('producer').filter(row=>foldName(row.data.name)===producerName);
+ const rate=Number(match[2].replace(',','.'));
+ if(choices.length!==1||!Number.isFinite(rate)||rate<=0||rate>100)return null;
+ return {producerId:choices[0].id,producerName:choices[0].data.name,commissionPercent:rate,filename:name};
+}
 function warning(msg){status.textContent=msg;}
 function forget(){
  generation++;analyzed=null;activeFile=null;view.hidden=true;view.innerHTML='';
@@ -64,6 +78,21 @@ function render(result){
   '. Meses/anos projetados, não são vencimentos confirmados nem liberam cobrança.</p>':'')+
   '</div>';
  const cautions=[...result.warnings||[]];
+ const hint=producerFromFilename(activeFile);
+ if(hint){
+  const producerInput=el('newRenewalProducer'),commissionInput=el('newRenewalCommissionPercent');
+  if(producerInput&&commissionInput){
+   if(!producerInput.value)producerInput.value=hint.producerId;
+   if(!String(commissionInput.value||'').trim())
+    commissionInput.value=String(hint.commissionPercent).replace('.',',');
+  }
+  cautions.unshift('Produtor e comissão cheia identificados no nome do arquivo: '+
+   hint.producerName+' '+String(hint.commissionPercent).replace('.',',')+
+   '%. Confira a anotação e o produtor antes de cadastrar.');
+ }
+ if(/(?:^|[\s_-])endosso(?:[\s_-]|$)/i.test(String(activeFile?.name||'')))
+  cautions.unshift('Este arquivo parece ser ENDOSSO: vincule ao contrato principal, sem criar seguro independente.');
+
  if(client)cautions.unshift('Cliente identificado pelo CPF/CNPJ: '+String(client.data.name||'')+'. Confira antes de aplicar.');
  if(documentConflict)cautions.unshift('ATENÇÃO: CPF/CNPJ do PDF diverge do cliente selecionado. Corrija o cadastro antes de aplicar.');
  if(!client)cautions.unshift('Selecione e confira manualmente o cliente correto na carteira.');
@@ -130,6 +159,17 @@ document.head.appendChild(style);
 globalThis.LebrimeProposalPreview={
  linkedClient,
  documentFor:file=>file&&analyzed&&activeFile===file?
-  digits(analyzed.fields?.insuredDocument?.value)||null:null
+  digits(analyzed.fields?.insuredDocument?.value)||null:null,
+ producerEvidence:file=>{
+  if(!file||file!==activeFile)return '';
+  const hint=producerFromFilename(file);
+  if(!hint)return '';
+  const chosen=el('newRenewalProducer')?.value;
+  const chosenRate=Number(String(el('newRenewalCommissionPercent')?.value||'').replace(',','.'));
+  return chosen===hint.producerId && chosenRate===hint.commissionPercent
+    ?'Nome original do arquivo: '+hint.filename+' — '+hint.producerName+
+     ' '+String(hint.commissionPercent).replace('.',',')+'% (comissão cheia)'
+    :'';
+ }
 };
 })();
