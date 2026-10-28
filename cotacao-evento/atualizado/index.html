@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102b47">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="description" content="Solicite sua cotação de seguro sem compromisso com a Lebrime Corretora de Seguros.">
+<title>Cote seu seguro sem compromisso | Lebrime</title>
+<style>
+*{box-sizing:border-box}
+:root{font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#17324c;background:#06182b}
+body{min-height:100vh;margin:0;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 20% 10%,#30577d 0,transparent 46%),linear-gradient(130deg,#102c47,#051524)}
+main{width:min(100%,530px);background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 24px 76px #0007}
+header{padding:31px 30px 29px;background:#0e2b48;color:#fff;border-bottom:4px solid #c5a166}
+.brand{color:#e9c985;font-size:23px;font-weight:900;letter-spacing:.16em}
+.brand-sub{color:#d5e3ee;letter-spacing:.18em;font-size:10px;font-weight:700;margin:4px 0 21px}
+h1{font-size:clamp(25px,5.8vw,34px);letter-spacing:-.04em;line-height:1.14;margin:0 0 12px;font-weight:850}
+header p{font-size:14px;color:#dfebf4;line-height:1.55;margin:0}
+form{padding:28px 30px 22px}
+.field{margin-bottom:16px}
+label.field-label{display:block;margin-bottom:7px;font-size:13px;font-weight:750;color:#1b344c}
+input[type=text],input[type=email],input[type=tel]{width:100%;padding:13px 14px;border:1px solid #c9d5de;border-radius:9px;font:16px system-ui,sans-serif;background:#f9fbfe;color:#112d45;outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus{border-color:#b18b4e;box-shadow:0 0 0 3px #c9a16644}
+input::placeholder{color:#8998a6}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:12px;line-height:1.55;color:#53677b;margin:4px 0 21px}
+.consent input{margin:3px 0 0;width:18px;height:18px;flex:0 0 18px;accent-color:#a98242}
+button{display:block;width:100%;border:0;border-radius:9px;padding:15px;background:linear-gradient(100deg,#b28a4b,#dec183);color:#10253b;font-size:16px;font-weight:800;cursor:pointer}
+button:disabled{opacity:.7;cursor:wait}
+#message{min-height:20px;margin:13px 0 0;text-align:center;color:#ad3434;font-size:13px}
+#message.ok{color:#126743}
+.whatsapp-link{display:block;text-align:center;background:#18794e;color:#fff;text-decoration:none;font-weight:750;padding:13px;border-radius:9px;margin-top:10px}.whatsapp-link[hidden]{display:none}
+.footer{color:#7c8997;text-align:center;font-size:11px;padding:0 30px 24px}
+.hp{position:absolute;left:-10000px;opacity:0}
+@media (max-width:480px){body{padding:14px}header{padding:27px 23px 24px}form{padding:23px 23px 19px}.footer{padding-bottom:21px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="brand">LEBRIME</div><div class="brand-sub">CORRETORA DE SEGUROS</div>
+<h1>Cote seu seguro sem compromisso</h1>
+<p>Preencha seus dados e continue pelo WhatsApp para solicitar sua cotação.</p>
+</header>
+<form id="cotacao" autocomplete="on">
+<div class="field"><label class="field-label" for="nome">Nome completo</label><input id="nome" name="nome" type="text" autocomplete="name" minlength="3" maxlength="120" required placeholder="Seu nome completo"></div>
+<div class="field"><label class="field-label" for="telefone">Telefone / WhatsApp</label><input id="telefone" name="telefone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="(86) 99999-9999"></div>
+<div class="field"><label class="field-label" for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="voce@exemplo.com"></div>
+<div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" autocomplete="off" tabindex="-1"></div>
+<label class="consent" for="consentimento"><input id="consentimento" name="consentimento" type="checkbox" required><span>Autorizo a Lebrime Corretora de Seguros a usar estes dados para entrar em contato comigo e elaborar uma cotação de seguro, conforme a LGPD.</span></label>
+<button id="submit" type="submit">ENVIAR</button>
+<p id="message" role="status" aria-live="polite"></p>
+<a id="whatsapp-link" class="whatsapp-link" href="#" rel="noopener noreferrer" hidden>Abrir conversa com a Lebrime no WhatsApp</a>
+</form>
+<div class="footer">A sua tranquilidade é o nosso negócio.</div>
+</main>
+<script>
+"use strict";
+const API="https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-cotacao-evento";
+const WHATSAPP_NUMBER="5586994801456";
+const form=document.getElementById("cotacao");
+const message=document.getElementById("message");
+const button=document.getElementById("submit");
+const whatsappLink=document.getElementById("whatsapp-link");
+const el=name=>form.elements.namedItem(name);
+const digits=value=>String(value||"").replace(/\D/g,"");
+function whatsappUrl(data){
+ const text=[
+  "Olá, Lebrime! Vim pelo QR Code do evento e gostaria de cotar meu seguro sem compromisso.",
+  "",
+  "Nome: "+data.nome,
+  "Telefone: "+data.telefone,
+  "E-mail: "+data.email
+ ].join("\n");
+ return "https://wa.me/"+WHATSAPP_NUMBER+"?text="+encodeURIComponent(text);
+}
+function showWhatsapp(data){
+ whatsappLink.href=whatsappUrl(data);
+ whatsappLink.hidden=false;
+}
+form.addEventListener("submit",async event=>{
+ event.preventDefault();
+ message.className="";
+ message.textContent="";
+ whatsappLink.hidden=true;
+ const payload={
+  nome:el("nome").value.trim(),
+  telefone:digits(el("telefone").value),
+  email:el("email").value.trim().toLowerCase(),
+  consentimento:el("consentimento").checked,
+  website:el("website").value
+ };
+ if(payload.nome.length<3||payload.nome.length>120){
+  message.textContent="Informe seu nome completo.";return;
+ }
+ if(!/^\d{10,11}$/.test(payload.telefone)){
+  message.textContent="Informe um telefone válido com DDD.";return;
+ }
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(payload.email)){
+  message.textContent="Informe um e-mail válido.";return;
+ }
+ if(!payload.consentimento){
+  message.textContent="É necessário autorizar o uso dos dados para a cotação.";return;
+ }
+ button.disabled=true;
+ button.textContent="ENVIAR";
+ try{
+  const response=await fetch(API,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify(payload)
+  });
+  const result=await response.json();
+  if(!response.ok)throw new Error(result.error||"Não foi possível concluir o cadastro.");
+  showWhatsapp(payload);
+  form.reset();
+  message.className="ok";
+  message.textContent="Cadastro salvo! O WhatsApp será aberto com a mensagem pronta. Toque em Enviar no WhatsApp para encaminhá-la à corretora.";
+  button.textContent="ENVIAR";
+  window.location.assign(whatsappLink.href);
+ }catch(error){
+  showWhatsapp(payload);
+  message.textContent="Não foi possível salvar o cadastro agora. Você ainda pode enviar seus dados pelo WhatsApp usando o botão abaixo.";
+  button.disabled=false;
+  button.textContent="ENVIAR";
+ }
+});
+</script>
+</body>
+</html>
