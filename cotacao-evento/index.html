@@ -28,6 +28,7 @@ button{display:block;width:100%;border:0;border-radius:9px;padding:15px;backgrou
 button:disabled{opacity:.7;cursor:wait}
 #message{min-height:20px;margin:13px 0 0;text-align:center;color:#ad3434;font-size:13px}
 #message.ok{color:#126743}
+.whatsapp-link{display:block;text-align:center;background:#18794e;color:#fff;text-decoration:none;font-weight:750;padding:13px;border-radius:9px;margin-top:10px}.whatsapp-link[hidden]{display:none}
 .footer{color:#7c8997;text-align:center;font-size:11px;padding:0 30px 24px}
 .hp{position:absolute;left:-10000px;opacity:0}
 @media (max-width:480px){body{padding:14px}header{padding:27px 23px 24px}form{padding:23px 23px 19px}.footer{padding-bottom:21px}}
@@ -38,61 +39,89 @@ button:disabled{opacity:.7;cursor:wait}
 <header>
 <div class="brand">LEBRIME</div><div class="brand-sub">CORRETORA DE SEGUROS</div>
 <h1>Cote seu seguro sem compromisso</h1>
-<p>Preencha seus dados e nossa equipe entrará em contato para preparar sua cotação.</p>
+<p>Preencha seus dados e continue pelo WhatsApp para solicitar sua cotação.</p>
 </header>
 <form id="cotacao" autocomplete="on">
 <div class="field"><label class="field-label" for="nome">Nome completo</label><input id="nome" name="nome" type="text" autocomplete="name" minlength="3" maxlength="120" required placeholder="Seu nome completo"></div>
-<div class="field"><label class="field-label" for="cpf">CPF</label><input id="cpf" name="cpf" type="text" inputmode="numeric" maxlength="14" required placeholder="000.000.000-00"></div>
 <div class="field"><label class="field-label" for="telefone">Telefone / WhatsApp</label><input id="telefone" name="telefone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required placeholder="(86) 99999-9999"></div>
-<div class="field"><label class="field-label" for="placa">Placa do veículo</label><input id="placa" name="placa" type="text" autocapitalize="characters" maxlength="7" required placeholder="ABC1D23" style="text-transform:uppercase"></div>
 <div class="field"><label class="field-label" for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" maxlength="254" required placeholder="voce@exemplo.com"></div>
 <div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" type="text" autocomplete="off" tabindex="-1"></div>
 <label class="consent" for="consentimento"><input id="consentimento" name="consentimento" type="checkbox" required><span>Autorizo a Lebrime Corretora de Seguros a usar estes dados para entrar em contato comigo e elaborar uma cotação de seguro, conforme a LGPD.</span></label>
-<button id="submit" type="submit">Solicitar minha cotação</button>
+<button id="submit" type="submit">Salvar e abrir WhatsApp</button>
 <p id="message" role="status" aria-live="polite"></p>
+<a id="whatsapp-link" class="whatsapp-link" href="#" rel="noopener noreferrer" hidden>Abrir conversa com a Lebrime no WhatsApp</a>
 </form>
 <div class="footer">A sua tranquilidade é o nosso negócio.</div>
 </main>
 <script>
 "use strict";
 const API="https://paiezoesntmicnwcmemt.supabase.co/functions/v1/lebrime-cotacao-evento";
-const form=document.getElementById("cotacao"),message=document.getElementById("message"),button=document.getElementById("submit");
+const WHATSAPP_NUMBER="5586994801456";
+const form=document.getElementById("cotacao");
+const message=document.getElementById("message");
+const button=document.getElementById("submit");
+const whatsappLink=document.getElementById("whatsapp-link");
 const el=name=>form.elements.namedItem(name);
 const digits=value=>String(value||"").replace(/\D/g,"");
-function validCPF(cpf){
- if(!/^\d{11}$/.test(cpf)||/^(\d)\1{10}$/.test(cpf))return false;
- for(let n=9;n<=10;n++){let sum=0;for(let i=0;i<n;i++)sum+=Number(cpf[i])*(n+1-i);let result=(sum*10)%11;if(result===10)result=0;if(result!==Number(cpf[n]))return false}
- return true;
+function whatsappUrl(data){
+ const text=[
+  "Olá, Lebrime! Vim pelo QR Code do evento e gostaria de cotar meu seguro sem compromisso.",
+  "",
+  "Nome: "+data.nome,
+  "Telefone: "+data.telefone,
+  "E-mail: "+data.email
+ ].join("\n");
+ return "https://wa.me/"+WHATSAPP_NUMBER+"?text="+encodeURIComponent(text);
 }
-el("cpf").addEventListener("input",event=>{
- const c=digits(event.target.value).slice(0,11);
- event.target.value=c.replace(/^(\d{3})(\d)/,"$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/,"$1.$2.$3").replace(/\.(\d{3})(\d)/,".$1-$2");
-});
-el("placa").addEventListener("input",event=>{event.target.value=event.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,7)});
+function showWhatsapp(data){
+ whatsappLink.href=whatsappUrl(data);
+ whatsappLink.hidden=false;
+}
 form.addEventListener("submit",async event=>{
  event.preventDefault();
- message.className="";message.textContent="";
+ message.className="";
+ message.textContent="";
+ whatsappLink.hidden=true;
  const payload={
   nome:el("nome").value.trim(),
-  cpf:digits(el("cpf").value),
   telefone:digits(el("telefone").value),
-  placa:el("placa").value.trim().toUpperCase(),
   email:el("email").value.trim().toLowerCase(),
   consentimento:el("consentimento").checked,
   website:el("website").value
  };
- if(!validCPF(payload.cpf)){message.textContent="Confira o CPF informado.";return;}
- if(!/^\d{10,11}$/.test(payload.telefone)){message.textContent="Informe um telefone com DDD válido.";return;}
- if(!/^([A-Z]{3}\d{4}|[A-Z]{3}\d[A-Z]\d{2})$/.test(payload.placa)){message.textContent="Confira a placa do veículo.";return;}
- button.disabled=true;button.textContent="Enviando...";
+ if(payload.nome.length<3||payload.nome.length>120){
+  message.textContent="Informe seu nome completo.";return;
+ }
+ if(!/^\d{10,11}$/.test(payload.telefone)){
+  message.textContent="Informe um telefone válido com DDD.";return;
+ }
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(payload.email)){
+  message.textContent="Informe um e-mail válido.";return;
+ }
+ if(!payload.consentimento){
+  message.textContent="É necessário autorizar o uso dos dados para a cotação.";return;
+ }
+ button.disabled=true;
+ button.textContent="Salvando cadastro...";
  try{
-  const response=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const response=await fetch(API,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify(payload)
+  });
   const result=await response.json();
   if(!response.ok)throw new Error(result.error||"Não foi possível concluir o cadastro.");
-  form.reset();message.className="ok";message.textContent="Cadastro recebido! Em breve nossa equipe entrará em contato.";button.textContent="Solicitação enviada!";
- }catch(e){
-  message.textContent=e instanceof Error?e.message:"Falha no envio. Tente novamente.";
-  button.disabled=false;button.textContent="Solicitar minha cotação";
+  showWhatsapp(payload);
+  form.reset();
+  message.className="ok";
+  message.textContent="Cadastro salvo! O WhatsApp será aberto com a mensagem pronta. Toque em Enviar no WhatsApp para encaminhá-la à corretora.";
+  button.textContent="Cadastro salvo";
+  window.location.assign(whatsappLink.href);
+ }catch(error){
+  showWhatsapp(payload);
+  message.textContent="Não foi possível salvar o cadastro agora. Você ainda pode enviar seus dados pelo WhatsApp usando o botão abaixo.";
+  button.disabled=false;
+  button.textContent="Tentar salvar novamente";
  }
 });
 </script>
